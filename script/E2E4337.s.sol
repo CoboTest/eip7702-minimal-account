@@ -71,6 +71,7 @@ contract E2E4337 is Script {
 
         _step6_handleOps(op);
         _step7_verify();
+        _step8_returnUSDC();
         _footer();
     }
 
@@ -253,6 +254,21 @@ contract E2E4337 is Script {
         console.log("  Deployer USDC:", USDC.balanceOf(deployer) / 1e6, "USDC");
 
         console.log("  PASS: all assertions passed");
+    }
+
+    function _step8_returnUSDC() internal {
+        console.log("");
+        console.log("[8] Deployer returns USDC to Sponsor...");
+
+        uint256 deployerUsdc = USDC.balanceOf(deployer);
+        require(deployerUsdc >= USDC_AMOUNT, "Deployer should have USDC");
+
+        vm.broadcast(deployerPk);
+        USDC.transfer(sponsor, USDC_AMOUNT);
+
+        console.log("  Returned:", USDC_AMOUNT / 1e6, "USDC to Sponsor");
+        console.log("  Sponsor USDC:", USDC.balanceOf(sponsor) / 1e6, "USDC");
+        console.log("  PASS: USDC returned");
     }
 
     function _footer() internal view {

@@ -72,13 +72,22 @@ forge build
 forge test -vvv
 ```
 
-### E2E Test (Sepolia)
+23 tests covering: access control, delegation, batch execution, UserOp validation, ERC-165, edge cases.
 
-Full ERC-4337 sponsored gasless flow via Forge Script. Four actors:
-- **Deployer** — deploys fresh MinimalAccount each run
-- **Sponsor** — deposits to EntryPoint for Alice + funds Alice with transfer values (in production this is typically a Paymaster contract)
-- **Bundler** — submits `handleOps` type 4 tx (gas recouped from UserOp prefund)
-- **Alice** — fresh EOA with 0 ETH, signs delegation + UserOp off-chain only
+### E2E Tests (Sepolia)
+
+Two E2E scripts demonstrate different execution paths. Both use Forge Script with on-chain broadcast.
+
+#### E2E #1: ERC-4337 Sponsored Gasless Flow
+
+Four actors — Alice signs off-chain only, never pays gas:
+
+| Actor | Role |
+|-------|------|
+| **Deployer** | Deploys fresh MinimalAccount |
+| **Sponsor** | Deposits to EntryPoint for Alice + funds transfer values |
+| **Bundler** | Submits `handleOps` type 4 tx |
+| **Alice** | Fresh EOA (0 ETH), signs delegation + UserOp off-chain |
 
 ```bash
 source .env  # DEPLOYER_PRIVATE_KEY, SPONSOR_PRIVATE_KEY, BUNDLER_PRIVATE_KEY, RPC_URL
@@ -89,18 +98,71 @@ forge script script/E2E4337.s.sol \
   --gas-estimate-multiplier 500
 ```
 
-**What it tests:**
-1. Deployer deploys fresh MinimalAccount
-2. Alice starts with 0 ETH (no code, no balance)
-3. Sponsor deposits to EntryPoint for Alice (gas sponsorship)
+**Flow:**
+1. Deployer deploys MinimalAccount
+2. Verify Alice starts empty (0 ETH, no code)
+3. Sponsor deposits to EntryPoint for Alice
 4. Sponsor funds Alice with transfer values
-5. Alice signs UserOp off-chain (0 gas consumed)
-6. Bundler submits `handleOps` + EIP-7702 delegation in single type 4 tx
-7. Verify: delegation active, EP nonce incremented, Alice balance = 0 (all transferred to Deployer)
+5. Alice signs UserOp off-chain (0 gas)
+6. **Alice signs EIP-7702 delegation off-chain** → `(v, r, s)` signature authorizing MinimalAccount
+7. Bundler submits `handleOps` + delegation in single type 4 tx
+8. Verify: delegation active, EP nonce incremented, Alice balance = 0
 
-> **Note:** Forge underestimates gas for type 4 (EIP-7702) txs. Use `--gas-estimate-multiplier 500`.
+#### E2E #2: Direct Execution Flow (no ERC-4337)
 
-Test reports are saved to `test-reports/`.
+Two actors — Alice delegates and calls `executeBatch` directly:
+
+| Actor | Role |
+|-------|------|
+| **Deployer** | Deploys MinimalAccount + funds Alice |
+| **Alice** | Fresh EOA, signs delegation + sends type 4 tx |
+
+```bash
+source .env  # DEPLOYER_PRIVATE_KEY, RPC_URL
+
+./script/run-e2e.exp forge script script/E2EDirect.s.sol \
+  --rpc-url $RPC_URL \
+  --broadcast --slow \
+  --gas-estimate-multiplier 500
+```
+
+> Requires `expect` (`run-e2e.exp`) — forge prompts for confirmation when sending to addresses without code.
+
+**Flow:**
+1. Deployer deploys MinimalAccount
+2. Deployer funds Alice with 0.01 ETH
+3. **Alice signs EIP-7702 delegation off-chain** → `(v, r, s)` authorizing MinimalAccount
+4. Alice sends type 4 tx: delegation + `executeBatch(3× transfer)` in one shot
+5. Verify: transfers received, delegation active during execution
+
+#### EIP-7702 Delegation Signing
+
+Both E2E scripts demonstrate the delegation signing process:
+
+```
+Alice signs: signDelegation(implementationAddress, alicePrivateKey)
+  → SignedDelegation { v, r, s }
+  → Embedded in type 4 tx authorization list
+  → EVM processes authorization BEFORE execution
+  → Delegation is active when contract calls run
+```
+
+Key difference: in ERC-4337 flow, the **Bundler** carries Alice's delegation in their type 4 tx. In direct flow, **Alice** carries her own delegation.
+
+### Notes
+
+- **Gas estimation**: Forge underestimates gas for type 4 (EIP-7702) txs → use `--gas-estimate-multiplier 500`
+- **Deterministic Alice**: Each run generates a fresh Alice keypair from `keccak256("alice-...", block.number, block.timestamp)`
+- Test reports are saved to `test-reports/`
+
+## Environment Variables
+
+| Variable | Used By | Description |
+|----------|---------|-------------|
+| `DEPLOYER_PRIVATE_KEY` | Both | Deploys MinimalAccount |
+| `SPONSOR_PRIVATE_KEY` | E2E4337 | Deposits to EntryPoint + funds Alice |
+| `BUNDLER_PRIVATE_KEY` | E2E4337 | Submits handleOps tx |
+| `RPC_URL` | Both | Sepolia RPC endpoint |
 
 ## Security
 

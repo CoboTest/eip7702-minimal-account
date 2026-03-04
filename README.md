@@ -8,6 +8,7 @@ A minimal EIP-7702 delegate contract for EOAs. Adds batch execution and ERC-4337
 - **Single Execution** — Convenience function for single calls
 - **Gas Sponsorship** — ERC-4337 v0.7 compatible (`IAccount.validateUserOp`)
 - **Zero State** — No `initialize()`, no owner storage. EOA private key = sole authority
+- **Self-Call Protection** — Blocks calls targeting the EOA itself (prevents privilege escalation)
 - **ERC-165** — Interface detection support
 
 ## Design Philosophy
@@ -44,9 +45,6 @@ Traditional Smart Accounts store an `owner` in contract storage, requiring an `i
 ### Direct Batch Execution
 
 ```solidity
-// User signs an EIP-7702 authorization to delegate to BatchExecutor
-// Then calls executeBatch on their own EOA address
-
 BatchExecutor.Call[] memory calls = new BatchExecutor.Call[](2);
 calls[0] = BatchExecutor.Call(tokenA, 0, abi.encodeCall(IERC20.approve, (router, amount)));
 calls[1] = BatchExecutor.Call(router, 0, abi.encodeCall(IRouter.swap, (tokenA, tokenB, amount)));
@@ -57,10 +55,6 @@ BatchExecutor(payable(myEOA)).executeBatch(calls);
 ### Gas-Sponsored Execution (ERC-4337)
 
 ```solidity
-// Build a UserOperation targeting the EOA
-// Sign the userOpHash with the EOA's private key
-// Submit via Bundler — Paymaster pays the gas
-
 PackedUserOperation memory userOp = PackedUserOperation({
     sender: myEOA,
     callData: abi.encodeCall(BatchExecutor.executeBatch, (calls)),
@@ -71,17 +65,72 @@ PackedUserOperation memory userOp = PackedUserOperation({
 
 ## Build & Test
 
+### Unit Tests (local, no ETH needed)
+
 ```bash
 forge build
 forge test -vvv
 ```
+
+### E2E Tests (Sepolia testnet)
+
+Both scripts require a funded Sepolia wallet and [Foundry](https://book.getfoundry.sh/) (`cast`, `forge`).
+
+```bash
+export PRIVATE_KEY=0x...   # Wallet with Sepolia ETH
+```
+
+#### Basic E2E — Deploy + Direct Execution
+
+Tests contract deployment, EIP-7702 delegation, single/batch execution, and self-call protection.
+
+```bash
+# Full run: deploy + test (8 assertions)
+./script/e2e-basic.sh
+
+# Skip deploy, reuse existing contract
+EXECUTOR=0x... ./script/e2e-basic.sh
+```
+
+**What it tests:**
+1. Contract deployment
+2. Self-call prevention (`SelfCallNotAllowed` revert)
+3. Single `execute()` — ETH transfer via type 4 tx
+4. Batch `executeBatch()` — 2 transfers in 1 tx
+5. EIP-7702 delegation verification (`0xef0100` prefix)
+
+#### ERC-4337 E2E — Full UserOp Lifecycle
+
+Tests the complete ERC-4337 flow: deposit → build UserOp → sign → `handleOps` → verify.
+
+```bash
+# Requires an already-deployed contract
+EXECUTOR=0x... ./script/e2e-4337.sh
+```
+
+**What it tests:**
+1. EntryPoint deposit
+2. UserOp construction with `executeBatch` calldata
+3. `userOpHash` signing (ECDSA, verified via `ecrecover`)
+4. `handleOps` submission (type 4 EIP-7702 tx)
+5. Batch transfer verification (2 recipients)
+6. EntryPoint nonce increment
+
+#### Deployed Contracts (Sepolia)
+
+| Contract | Address |
+|----------|---------|
+| BatchExecutor | [`0x7669bD38Fcf0D2a778AE02CB6c2769f657E60Fe0`](https://sepolia.etherscan.io/address/0x7669bD38Fcf0D2a778AE02CB6c2769f657E60Fe0) |
+| EntryPoint v0.7 | [`0x0000000071727De22E5E9d8BAf0edAc6f37da032`](https://sepolia.etherscan.io/address/0x0000000071727De22E5E9d8BAf0edAc6f37da032) |
 
 ## Security
 
 - **No frontrunning risk** — Nothing to initialize, nothing to steal
 - **Signature validation** — Rejects malleable signatures (EIP-2)
 - **Access control** — Only the EOA itself or EntryPoint can execute
+- **Self-call blocked** — Prevents re-entrant privilege escalation via batch
 - **No delegatecall** — All calls are regular `call`, preventing storage corruption
+- **validateUserOp** — Restricted to EntryPoint only (per ERC-4337 spec)
 
 ## License
 

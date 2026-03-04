@@ -124,8 +124,10 @@ contract MinimalAccount is IAccount {
         // Validate signature against the EOA address (address(this))
         validationData = _validateSignature(userOpHash, userOp.signature) ? 0 : 1;
 
-        // Pay prefund if needed (MUST pay per ERC-4337 spec)
-        if (missingAccountFunds > 0) {
+        // Pay prefund only if signature is valid.
+        // If invalid (validationData == 1), return SIG_VALIDATION_FAILED
+        // without reverting — let EntryPoint handle rejection gracefully.
+        if (missingAccountFunds > 0 && validationData == 0) {
             (bool ok, ) = payable(ENTRY_POINT).call{ value: missingAccountFunds }("");
             if (!ok) revert PrefundFailed();
         }

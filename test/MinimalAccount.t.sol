@@ -297,6 +297,36 @@ contract MinimalAccountTest is Test {
         );
     }
 
+    function test_validateUserOp_invalid_sig_no_prefund() public {
+        bytes32 userOpHash = keccak256("test-userop-hash");
+
+        // Sign with wrong key
+        uint256 wrongKey = 0xBAD;
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(wrongKey, keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", userOpHash)));
+        bytes memory signature = abi.encodePacked(r, s, v);
+
+        PackedUserOperation memory userOp = _dummyUserOp(signature);
+
+        uint256 prefund = 0.01 ether;
+        uint256 epBalanceBefore = executor.ENTRY_POINT().balance;
+
+        // Should return 1 (SIG_VALIDATION_FAILED) without reverting,
+        // and should NOT pay prefund when signature is invalid
+        vm.prank(executor.ENTRY_POINT());
+        uint256 result = MinimalAccount(payable(eoaAddress)).validateUserOp(
+            userOp,
+            userOpHash,
+            prefund
+        );
+
+        assertEq(result, 1, "Invalid signature should return 1");
+        assertEq(
+            executor.ENTRY_POINT().balance,
+            epBalanceBefore,
+            "Should NOT pay prefund when signature is invalid"
+        );
+    }
+
     function test_validateUserOp_onlyEntryPoint() public {
         bytes32 userOpHash = keccak256("test-userop-hash");
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", userOpHash)));

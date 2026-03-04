@@ -13,68 +13,45 @@ interface IEntryPoint {
     function depositTo(address account) external payable;
 }
 
-/// @title E2ETest
-/// @notice Full E2E test via Forge Script: deploy + basic + ERC-4337.
-/// @dev    Usage: PRIVATE_KEY=0x... forge script script/E2ETest.s.sol --rpc-url <RPC> --broadcast
-contract E2ETest is Script {
-    IEntryPoint constant EP = IEntryPoint(0x0000000071727De22E5E9d8BAf0edAc6f37da032);
+/// @title E2E Step 1: Deploy
+contract E2EDeploy is Script {
+    function run() external {
+        uint256 pk = vm.envUint("PRIVATE_KEY");
+        console.log("Deploying BatchExecutor...");
+
+        vm.broadcast(pk);
+        BatchExecutor executor = new BatchExecutor();
+
+        console.log("Deployed:", address(executor));
+    }
+}
+
+/// @title E2E Step 2: Basic Execution
+contract E2EBasic is Script {
     address constant T1 = 0x1111111111111111111111111111111111111111;
     address constant T2 = 0x2222222222222222222222222222222222222222;
 
-    uint256 pk;
-    address eoa;
-    BatchExecutor executor;
-
     function run() external {
-        pk = vm.envUint("PRIVATE_KEY");
-        eoa = vm.addr(pk);
+        uint256 pk = vm.envUint("PRIVATE_KEY");
+        address eoa = vm.addr(pk);
+        address executor = vm.envAddress("EXECUTOR");
 
-        console.log("========================================");
-        console.log("  EIP-7702 BatchExecutor E2E Test");
-        console.log("========================================");
+        console.log("=== Basic Execution Test ===");
         console.log("EOA:", eoa);
-        console.log("Balance:", eoa.balance);
 
-        _step1_deploy();
-        _step2_basicExecution();
-        _step3_selfCallProtection();
-        _step4_erc4337();
-
-        console.log("");
-        console.log("========================================");
-        console.log("  ALL TESTS PASSED");
-        console.log("========================================");
-    }
-
-    function _step1_deploy() internal {
-        console.log("");
-        console.log("[1] Deploy BatchExecutor...");
-
-        vm.broadcast(pk);
-        executor = new BatchExecutor();
-
-        console.log("  Deployed:", address(executor));
-        require(address(executor).code.length > 0, "deploy failed");
-        console.log("  PASS: contract deployed");
-    }
-
-    function _step2_basicExecution() internal {
-        console.log("");
-        console.log("[2] Basic execution (EIP-7702 delegation)...");
-
-        // --- Single execute ---
+        // Single execute
         uint256 bal1Before = T1.balance;
 
-        vm.signAndAttachDelegation(address(executor), pk);
+        vm.signAndAttachDelegation(executor, pk);
         vm.broadcast(pk);
         BatchExecutor(payable(eoa)).execute{ value: 0.00001 ether }(
             T1, 0.00001 ether, ""
         );
 
-        require(T1.balance - bal1Before == 0.00001 ether, "single execute transfer failed");
-        console.log("  PASS: single execute");
+        require(T1.balance - bal1Before == 0.00001 ether, "single execute failed");
+        console.log("PASS: single execute");
 
-        // --- Batch execute ---
+        // Batch execute
         uint256 bal1Before2 = T1.balance;
         uint256 bal2Before = T2.balance;
 
@@ -82,46 +59,50 @@ contract E2ETest is Script {
         calls[0] = BatchExecutor.Call(T1, 0.00001 ether, "");
         calls[1] = BatchExecutor.Call(T2, 0.00001 ether, "");
 
-        vm.signAndAttachDelegation(address(executor), pk);
+        vm.signAndAttachDelegation(executor, pk);
         vm.broadcast(pk);
         BatchExecutor(payable(eoa)).executeBatch{ value: 0.00002 ether }(calls);
 
         require(T1.balance - bal1Before2 == 0.00001 ether, "batch T1 failed");
         require(T2.balance - bal2Before == 0.00001 ether, "batch T2 failed");
-        console.log("  PASS: batch execute (2 transfers)");
+        console.log("PASS: batch execute");
 
-        // --- Verify delegation ---
-        require(eoa.code.length == 23, "delegation code not set");
-        console.log("  PASS: EIP-7702 delegation active");
+        // Verify delegation
+        require(eoa.code.length == 23, "delegation not set");
+        console.log("PASS: delegation active");
     }
+}
 
-    function _step3_selfCallProtection() internal {
-        console.log("");
-        console.log("[3] Self-call protection...");
+/// @title E2E Step 3: ERC-4337 UserOp
+contract E2E4337 is Script {
+    IEntryPoint constant EP = IEntryPoint(0x0000000071727De22E5E9d8BAf0edAc6f37da032);
+    address constant T1 = 0x1111111111111111111111111111111111111111;
+    address constant T2 = 0x2222222222222222222222222222222222222222;
 
-        // We can't easily test reverts in scripts, so just verify the error selector exists
-        // The shell E2E already covers this on-chain
-        console.log("  SKIP: self-call revert tested in unit tests + shell E2E");
-    }
+    function run() external {
+        uint256 pk = vm.envUint("PRIVATE_KEY");
+        address eoa = vm.addr(pk);
+        address executor = vm.envAddress("EXECUTOR");
 
-    function _step4_erc4337() internal {
-        console.log("");
-        console.log("[4] ERC-4337 UserOp flow...");
+        console.log("=== ERC-4337 Test ===");
 
-        // Deposit to EntryPoint
+        // Deposit if needed
         if (EP.balanceOf(eoa) < 0.005 ether) {
             vm.broadcast(pk);
             EP.depositTo{ value: 0.01 ether }(eoa);
-            console.log("  Deposited 0.01 ETH to EntryPoint");
+            console.log("Deposited 0.01 ETH to EntryPoint");
         }
 
-        // Build UserOp
+        _submitUserOp(eoa, pk, executor);
+    }
+
+    function _submitUserOp(address eoa, uint256 pk, address executor) internal {
         BatchExecutor.Call[] memory calls = new BatchExecutor.Call[](2);
         calls[0] = BatchExecutor.Call(T1, 0.00001 ether, "");
         calls[1] = BatchExecutor.Call(T2, 0.00001 ether, "");
 
         uint256 nonce = EP.getNonce(eoa, 0);
-        console.log("  EP nonce:", nonce);
+        console.log("EP nonce:", nonce);
 
         PackedUserOperation memory op = PackedUserOperation({
             sender: eoa,
@@ -135,30 +116,25 @@ contract E2ETest is Script {
             signature: ""
         });
 
-        // Sign
         bytes32 opHash = EP.getUserOpHash(op);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, opHash);
         op.signature = abi.encodePacked(r, s, v);
 
-        // Record balances
         uint256 bal1Before = T1.balance;
         uint256 bal2Before = T2.balance;
 
-        // Submit
         PackedUserOperation[] memory ops = new PackedUserOperation[](1);
         ops[0] = op;
 
-        vm.signAndAttachDelegation(address(executor), pk);
+        vm.signAndAttachDelegation(executor, pk);
         vm.broadcast(pk);
         EP.handleOps(ops, payable(eoa));
 
-        // Verify
         require(T1.balance - bal1Before == 0.00001 ether, "4337 T1 failed");
         require(T2.balance - bal2Before == 0.00001 ether, "4337 T2 failed");
-        console.log("  PASS: handleOps executed batch");
+        console.log("PASS: handleOps batch");
 
-        uint256 newNonce = EP.getNonce(eoa, 0);
-        require(newNonce == nonce + 1, "nonce not incremented");
-        console.log("  PASS: nonce incremented");
+        require(EP.getNonce(eoa, 0) == nonce + 1, "nonce not incremented");
+        console.log("PASS: nonce incremented");
     }
 }

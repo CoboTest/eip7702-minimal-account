@@ -16,6 +16,15 @@ import { PackedUserOperation } from "./interfaces/PackedUserOperation.sol";
 ///         This prevents storage corruption from untrusted targets.
 ///         Self-calls are explicitly blocked to prevent re-entrant
 ///         privilege escalation (e.g., calling validateUserOp on itself).
+///
+///         TRUST MODEL: This contract trusts the ERC-4337 v0.7 EntryPoint singleton
+///         at 0x0000000071727De22E5E9d8BAf0edAc6f37da032. The EntryPoint is allowed
+///         to call execute/executeBatch after validating the UserOp via validateUserOp.
+///         This is safe because the EntryPoint guarantees it will only execute the
+///         UserOp's callData after a successful validation (signature check).
+///         Note: Under EIP-7702, the EOA can revoke or replace this delegation at any
+///         time via a new type-4 authorization. This does not affect the EntryPoint
+///         trust assumption — it simply means the delegation code may no longer be active.
 contract MinimalAccount is IAccount {
     // ─── Errors ──────────────────────────────────────────────────────────
 
@@ -38,6 +47,13 @@ contract MinimalAccount is IAccount {
 
     /// @notice ERC-4337 v0.7 EntryPoint (singleton).
     address public constant ENTRY_POINT = 0x0000000071727De22E5E9d8BAf0edAc6f37da032;
+
+    /// @dev ERC-4337 validationData: signature is valid (no time range restriction).
+    uint256 private constant SIG_VALIDATION_SUCCESS = 0;
+
+    /// @dev ERC-4337 validationData: signature validation failed.
+    ///      Maps to SIG_VALIDATION_FAILED sentinel in EntryPoint v0.7.
+    uint256 private constant SIG_VALIDATION_FAILED = 1;
 
     // ─── Structs ─────────────────────────────────────────────────────────
 
@@ -122,12 +138,14 @@ contract MinimalAccount is IAccount {
         uint256 missingAccountFunds
     ) external onlyEntryPoint returns (uint256 validationData) {
         // Validate signature against the EOA address (address(this))
-        validationData = _validateSignature(userOpHash, userOp.signature) ? 0 : 1;
+        validationData = _validateSignature(userOpHash, userOp.signature)
+            ? SIG_VALIDATION_SUCCESS
+            : SIG_VALIDATION_FAILED;
 
         // Pay prefund only if signature is valid.
-        // If invalid (validationData == 1), return SIG_VALIDATION_FAILED
-        // without reverting — let EntryPoint handle rejection gracefully.
-        if (missingAccountFunds > 0 && validationData == 0) {
+        // If invalid, return SIG_VALIDATION_FAILED without reverting —
+        // let EntryPoint handle rejection gracefully.
+        if (missingAccountFunds > 0 && validationData == SIG_VALIDATION_SUCCESS) {
             (bool ok, ) = payable(ENTRY_POINT).call{ value: missingAccountFunds }("");
             if (!ok) revert PrefundFailed();
         }

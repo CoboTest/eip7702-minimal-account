@@ -1,0 +1,222 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.28;
+
+import { Script, console } from "forge-std/Script.sol";
+import { BatchExecutor } from "../src/BatchExecutor.sol";
+import { PackedUserOperation } from "../src/interfaces/PackedUserOperation.sol";
+
+interface IEntryPoint {
+    function handleOps(PackedUserOperation[] calldata ops, address payable beneficiary) external;
+    function getUserOpHash(PackedUserOperation calldata userOp) external view returns (bytes32);
+    function getNonce(address sender, uint192 key) external view returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
+    function depositTo(address account) external payable;
+}
+
+/// @title E2E4337 — Full ERC-4337 Sponsored Gasless Flow
+/// @notice Three actors:
+///   - Deployer: deploys BatchExecutor (skip if EXECUTOR env is set)
+///   - Bundler:  pays all gas (deposit, fund, handleOps)
+///   - Alice:    fresh EOA with 0 ETH, signs delegation + UserOp off-chain
+///
+/// @dev Usage:
+///   # Fresh deploy:
+///   source .env && forge script script/E2E4337.s.sol --rpc-url $RPC_URL --broadcast --slow
+///
+///   # Reuse existing contract:
+///   source .env && EXECUTOR=0x... forge script script/E2E4337.s.sol --rpc-url $RPC_URL --broadcast --slow
+contract E2E4337 is Script {
+    IEntryPoint constant EP = IEntryPoint(0x0000000071727De22E5E9d8BAf0edAc6f37da032);
+    address constant T1 = 0x1111111111111111111111111111111111111111;
+    address constant T2 = 0x2222222222222222222222222222222222222222;
+    uint256 constant TRANSFER_AMT = 0.00001 ether;
+
+    uint256 bundlerPk;
+    address bundler;
+    uint256 alicePk;
+    address alice;
+    address executorAddr;
+
+    function run() external {
+        bundlerPk = vm.envUint("BUNDLER_PRIVATE_KEY");
+        bundler = vm.addr(bundlerPk);
+
+        // Fresh Alice each run — use block.number for determinism within a single broadcast
+        // (vm.unixTime may differ between simulation phases)
+        alicePk = uint256(keccak256(abi.encodePacked("alice-e2e", block.number, block.timestamp)));
+        alice = vm.addr(alicePk);
+
+        executorAddr = vm.envOr("EXECUTOR", address(0));
+
+        _header();
+        _step1_deploy();
+        _step2_verifyAlice();
+        _step3_deposit();
+        _step4_fund();
+
+        PackedUserOperation memory op = _step5_signUserOp();
+
+        _step6_handleOps(op);
+        _step7_verify();
+        _footer();
+    }
+
+    function _header() internal view {
+        console.log("================================================");
+        console.log("  ERC-4337 Sponsored Gasless E2E");
+        console.log("================================================");
+        console.log("  Alice (fresh):", alice);
+        console.log("  Bundler:      ", bundler);
+        console.log("  EntryPoint:   ", address(EP));
+        console.log("================================================");
+    }
+
+    function _step1_deploy() internal {
+        if (executorAddr != address(0)) {
+            console.log("");
+            console.log("[1] Using existing BatchExecutor:", executorAddr);
+            return;
+        }
+
+        uint256 deployerPk = vm.envUint("PRIVATE_KEY");
+        console.log("");
+        console.log("[1] Deployer deploys BatchExecutor...");
+        console.log("  Deployer:", vm.addr(deployerPk));
+
+        vm.broadcast(deployerPk);
+        BatchExecutor impl = new BatchExecutor();
+        executorAddr = address(impl);
+
+        require(executorAddr.code.length > 0, "deploy failed");
+        console.log("  PASS: deployed at", executorAddr);
+    }
+
+    function _step2_verifyAlice() internal view {
+        console.log("");
+        console.log("[2] Verify Alice starts with 0 ETH...");
+        require(alice.balance == 0, "Alice should have 0 balance");
+        require(alice.code.length == 0, "Alice should have no code");
+        console.log("  PASS: balance = 0, no code");
+    }
+
+    function _step3_deposit() internal {
+        console.log("");
+        console.log("[3] Bundler deposits to EntryPoint for Alice...");
+
+        vm.broadcast(bundlerPk);
+        EP.depositTo{ value: 0.01 ether }(alice);
+
+        console.log("  PASS: deposited 0.01 ETH");
+    }
+
+    function _step4_fund() internal {
+        console.log("");
+        console.log("[4] Bundler funds Alice for transfer values...");
+
+        vm.broadcast(bundlerPk);
+        (bool ok,) = alice.call{ value: 0.0001 ether }("");
+        require(ok, "fund failed");
+
+        console.log("  PASS: funded 0.0001 ETH");
+    }
+
+    /// @dev Compute userOpHash locally (same as EntryPoint.getUserOpHash)
+    ///      to avoid simulation vs on-chain divergence.
+    function _packUserOp(PackedUserOperation memory op) internal pure returns (bytes32) {
+        return keccak256(abi.encode(
+            op.sender,
+            op.nonce,
+            keccak256(op.initCode),
+            keccak256(op.callData),
+            op.accountGasLimits,
+            op.preVerificationGas,
+            op.gasFees,
+            keccak256(op.paymasterAndData)
+        ));
+    }
+
+    function _getUserOpHash(PackedUserOperation memory op) internal view returns (bytes32) {
+        return keccak256(abi.encode(
+            _packUserOp(op),
+            address(EP),
+            block.chainid
+        ));
+    }
+
+    function _step5_signUserOp() internal returns (PackedUserOperation memory op) {
+        console.log("");
+        console.log("[5] Alice signs UserOp (off-chain, 0 gas)...");
+
+        BatchExecutor.Call[] memory calls = new BatchExecutor.Call[](2);
+        calls[0] = BatchExecutor.Call(T1, TRANSFER_AMT, "");
+        calls[1] = BatchExecutor.Call(T2, TRANSFER_AMT, "");
+
+        op = PackedUserOperation({
+            sender: alice,
+            nonce: 0,  // Fresh Alice, always 0
+            initCode: "",
+            callData: abi.encodeCall(BatchExecutor.executeBatch, (calls)),
+            // verificationGasLimit=200k, callGasLimit=300k
+            accountGasLimits: bytes32(uint256(uint128(200_000)) << 128 | uint128(300_000)),
+            preVerificationGas: 100_000,
+            // maxPriorityFeePerGas=1gwei, maxFeePerGas=3gwei
+            gasFees: bytes32(uint256(uint128(1 gwei)) << 128 | uint128(3 gwei)),
+            paymasterAndData: "",
+            signature: ""
+        });
+
+        // Compute hash locally to ensure simulation == on-chain
+        bytes32 opHash = _getUserOpHash(op);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(alicePk, opHash);
+        op.signature = abi.encodePacked(r, s, v);
+
+        console.log("  UserOp hash:", vm.toString(opHash));
+        console.log("  PASS: signed by Alice");
+    }
+
+    function _step6_handleOps(PackedUserOperation memory op) internal {
+        console.log("");
+        console.log("[6] Bundler submits handleOps + delegation...");
+
+        // Alice signs delegation (off-chain, nonce=0 for fresh account)
+        vm.attachDelegation(vm.signDelegation(executorAddr, alicePk));
+
+        PackedUserOperation[] memory ops = new PackedUserOperation[](1);
+        ops[0] = op;
+
+        // Bundler sends type 4 tx: sets delegation + executes handleOps
+        vm.broadcast(bundlerPk);
+        EP.handleOps(ops, payable(bundler));
+
+        console.log("  PASS: handleOps executed");
+    }
+
+    function _step7_verify() internal view {
+        console.log("");
+        console.log("[7] Verify results...");
+
+        // Delegation active
+        require(alice.code.length == 23, "delegation not set");
+        console.log("  PASS: delegation active (code.length = 23)");
+
+        // EP nonce incremented
+        require(EP.getNonce(alice, 0) == 1, "nonce should be 1");
+        console.log("  PASS: EP nonce = 1");
+
+        // Alice balance (still has leftover, spent 0 gas)
+        console.log("  Alice final balance:", alice.balance, "wei");
+    }
+
+    function _footer() internal view {
+        console.log("");
+        console.log("================================================");
+        console.log("  ALL TESTS PASSED");
+        console.log("================================================");
+        console.log("  Alice:    ", alice);
+        console.log("  Alice PK: ", vm.toString(bytes32(alicePk)));
+        console.log("  Executor: ", executorAddr);
+        console.log("  Bundler:  ", bundler);
+        console.log("================================================");
+    }
+}

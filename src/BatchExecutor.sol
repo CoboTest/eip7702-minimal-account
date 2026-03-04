@@ -11,26 +11,30 @@ import { PackedUserOperation } from "./interfaces/PackedUserOperation.sol";
 /// @dev    Designed to be set as an EOA's delegate via EIP-7702 authorization.
 ///         Validates signatures against `address(this)` (the EOA itself).
 ///         Compatible with ERC-7821 Minimal Batch Executor pattern.
+///
+///         SECURITY: All external calls use `call` only — no `delegatecall`.
+///         This prevents storage corruption from untrusted targets.
+///         Self-calls are explicitly blocked to prevent re-entrant
+///         privilege escalation (e.g., calling validateUserOp on itself).
 contract BatchExecutor is IAccount {
     // ─── Errors ──────────────────────────────────────────────────────────
 
     /// @dev Caller is not this account (the EOA) or the EntryPoint.
     error Unauthorized();
 
+    /// @dev Caller is not the EntryPoint.
+    error OnlyEntryPoint();
+
     /// @dev A call in the batch failed.
     error ExecutionFailed(uint256 index, bytes returnData);
 
-    /// @dev Invalid signature length.
-    error InvalidSignatureLength();
+    /// @dev Cannot call self in a batch (prevents privilege escalation).
+    error SelfCallNotAllowed();
 
     // ─── Constants ───────────────────────────────────────────────────────
 
     /// @notice ERC-4337 v0.7 EntryPoint (singleton).
     address public constant ENTRY_POINT = 0x0000000071727De22E5E9d8BAf0edAc6f37da032;
-
-    /// @notice EIP-191 signed data prefix.
-    bytes1 private constant _EIP191_PREFIX = 0x19;
-    bytes1 private constant _EIP191_VERSION = 0x00;
 
     // ─── Structs ─────────────────────────────────────────────────────────
 
@@ -43,6 +47,7 @@ contract BatchExecutor is IAccount {
     // ─── Events ──────────────────────────────────────────────────────────
 
     event BatchExecuted(uint256 indexed count);
+    event Executed(address indexed target, uint256 value, bytes returnData);
 
     // ─── Modifiers ───────────────────────────────────────────────────────
 
@@ -54,15 +59,25 @@ contract BatchExecutor is IAccount {
         _;
     }
 
+    /// @dev Only the EntryPoint can call.
+    modifier onlyEntryPoint() {
+        if (msg.sender != ENTRY_POINT) {
+            revert OnlyEntryPoint();
+        }
+        _;
+    }
+
     // ─── External Functions ──────────────────────────────────────────────
 
     /// @notice Execute a batch of calls.
     /// @dev    Only callable by the EOA itself (via direct tx) or EntryPoint (via UserOp).
+    ///         Reverts if any call targets this contract (self-call prevention).
     /// @param calls Array of calls to execute sequentially.
     function executeBatch(Call[] calldata calls) external payable onlySelfOrEntryPoint {
         uint256 len = calls.length;
         for (uint256 i; i < len; ) {
             Call calldata c = calls[i];
+            if (c.target == address(this)) revert SelfCallNotAllowed();
             (bool ok, bytes memory ret) = c.target.call{ value: c.value }(c.data);
             if (!ok) revert ExecutionFailed(i, ret);
             unchecked { ++i; }
@@ -71,6 +86,7 @@ contract BatchExecutor is IAccount {
     }
 
     /// @notice Execute a single call (convenience).
+    /// @dev    Reverts if target is this contract (self-call prevention).
     /// @param target Target contract address.
     /// @param value  ETH value to send.
     /// @param data   Calldata to send.
@@ -80,15 +96,18 @@ contract BatchExecutor is IAccount {
         uint256 value,
         bytes calldata data
     ) external payable onlySelfOrEntryPoint returns (bytes memory result) {
+        if (target == address(this)) revert SelfCallNotAllowed();
         bool ok;
         (ok, result) = target.call{ value: value }(data);
         if (!ok) revert ExecutionFailed(0, result);
+        emit Executed(target, value, result);
     }
 
     // ─── ERC-4337 IAccount ───────────────────────────────────────────────
 
     /// @notice Validate a UserOperation signature for ERC-4337 gas sponsorship.
-    /// @dev    Validates that the signature was produced by the EOA's private key
+    /// @dev    Only callable by the EntryPoint (per ERC-4337 spec).
+    ///         Validates that the signature was produced by the EOA's private key
     ///         (i.e., `ecrecover` returns `address(this)`).
     /// @param userOp         The packed user operation.
     /// @param userOpHash     Hash of the user operation.
@@ -98,7 +117,7 @@ contract BatchExecutor is IAccount {
         PackedUserOperation calldata userOp,
         bytes32 userOpHash,
         uint256 missingAccountFunds
-    ) external onlySelfOrEntryPoint returns (uint256 validationData) {
+    ) external onlyEntryPoint returns (uint256 validationData) {
         // Validate signature against the EOA address (address(this))
         validationData = _validateSignature(userOpHash, userOp.signature) ? 0 : 1;
 

@@ -44,23 +44,20 @@ contract BatchExecutorTest is Test {
         vm.deal(eoaAddress, 10 ether);
 
         // EIP-7702: set the EOA's code to delegate to executor
-        // In Foundry, we simulate this with vm.etch + delegatecall pattern
-        // For Prague-compatible testing, use vm.signDelegation + vm.attachDelegation
         _setupDelegation();
     }
 
     function _setupDelegation() internal {
-        // Sign EIP-7702 delegation
         Vm.SignedDelegation memory signedDelegation = vm.signDelegation(
             address(executor),
             eoaPrivateKey
         );
-
-        // Attach delegation to the EOA (simulates EIP-7702 SET_CODE_TX)
         vm.attachDelegation(signedDelegation);
     }
 
-    // ─── Single Execution ────────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════════
+    //                      SINGLE EXECUTION
+    // ═══════════════════════════════════════════════════════════════════
 
     function test_execute_single() public {
         vm.prank(eoaAddress);
@@ -85,7 +82,20 @@ contract BatchExecutorTest is Test {
         assertEq(address(target).balance, 1 ether);
     }
 
-    // ─── Batch Execution ─────────────────────────────────────────────────
+    function test_execute_emits_Executed_event() public {
+        vm.prank(eoaAddress);
+        vm.expectEmit(true, false, false, false);
+        emit BatchExecutor.Executed(address(target), 0, "");
+        BatchExecutor(payable(eoaAddress)).execute(
+            address(target),
+            0,
+            abi.encodeCall(MockTarget.setValue, (42))
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //                      BATCH EXECUTION
+    // ═══════════════════════════════════════════════════════════════════
 
     function test_executeBatch() public {
         BatchExecutor.Call[] memory calls = new BatchExecutor.Call[](3);
@@ -96,7 +106,6 @@ contract BatchExecutorTest is Test {
         vm.prank(eoaAddress);
         BatchExecutor(payable(eoaAddress)).executeBatch(calls);
 
-        // Last call wins
         assertEq(target.value(), 30);
         assertEq(target.callCount(), 3);
     }
@@ -120,10 +129,11 @@ contract BatchExecutorTest is Test {
 
         vm.prank(eoaAddress);
         BatchExecutor(payable(eoaAddress)).executeBatch(calls);
-        // Should succeed with no-op
     }
 
-    // ─── Revert Handling ─────────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════════
+    //                      REVERT HANDLING
+    // ═══════════════════════════════════════════════════════════════════
 
     function test_execute_revert_propagates() public {
         vm.prank(eoaAddress);
@@ -145,7 +155,9 @@ contract BatchExecutorTest is Test {
         BatchExecutor(payable(eoaAddress)).executeBatch(calls);
     }
 
-    // ─── Access Control ──────────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════════
+    //                      ACCESS CONTROL
+    // ═══════════════════════════════════════════════════════════════════
 
     function test_unauthorized_caller_reverts() public {
         address attacker = makeAddr("attacker");
@@ -169,12 +181,8 @@ contract BatchExecutorTest is Test {
         BatchExecutor(payable(eoaAddress)).executeBatch(calls);
     }
 
-    function test_entryPoint_can_call() public {
+    function test_entryPoint_can_call_execute() public {
         vm.prank(executor.ENTRY_POINT());
-        // EntryPoint should be allowed to call execute on the EOA
-        // Note: in real scenario, EOA has delegation. Here we test the modifier only.
-        // Since we're calling the implementation directly (not via delegation),
-        // this tests the access control modifier accepts ENTRY_POINT.
         BatchExecutor(payable(eoaAddress)).execute(
             address(target),
             0,
@@ -183,12 +191,37 @@ contract BatchExecutorTest is Test {
         assertEq(target.value(), 777);
     }
 
-    // ─── validateUserOp ──────────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════════
+    //                      SELF-CALL PREVENTION
+    // ═══════════════════════════════════════════════════════════════════
+
+    function test_execute_selfCall_reverts() public {
+        vm.prank(eoaAddress);
+        vm.expectRevert(BatchExecutor.SelfCallNotAllowed.selector);
+        BatchExecutor(payable(eoaAddress)).execute(
+            eoaAddress,  // self-call
+            0,
+            abi.encodeCall(MockTarget.setValue, (42))
+        );
+    }
+
+    function test_executeBatch_selfCall_reverts() public {
+        BatchExecutor.Call[] memory calls = new BatchExecutor.Call[](2);
+        calls[0] = BatchExecutor.Call(address(target), 0, abi.encodeCall(MockTarget.setValue, (10)));
+        calls[1] = BatchExecutor.Call(eoaAddress, 0, "");  // self-call in batch
+
+        vm.prank(eoaAddress);
+        vm.expectRevert(BatchExecutor.SelfCallNotAllowed.selector);
+        BatchExecutor(payable(eoaAddress)).executeBatch(calls);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //                    validateUserOp
+    // ═══════════════════════════════════════════════════════════════════
 
     function test_validateUserOp_valid_signature() public {
         bytes32 userOpHash = keccak256("test-userop-hash");
 
-        // Sign the userOpHash with the EOA's private key
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, userOpHash);
         bytes memory signature = abi.encodePacked(r, s, v);
 
@@ -207,7 +240,6 @@ contract BatchExecutorTest is Test {
     function test_validateUserOp_invalid_signature() public {
         bytes32 userOpHash = keccak256("test-userop-hash");
 
-        // Sign with a different key
         uint256 wrongKey = 0xBAD;
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(wrongKey, userOpHash);
         bytes memory signature = abi.encodePacked(r, s, v);
@@ -227,7 +259,7 @@ contract BatchExecutorTest is Test {
     function test_validateUserOp_short_signature() public {
         bytes32 userOpHash = keccak256("test-userop-hash");
 
-        bytes memory signature = hex"DEADBEEF"; // Too short
+        bytes memory signature = hex"DEADBEEF";
 
         PackedUserOperation memory userOp = _dummyUserOp(signature);
 
@@ -265,14 +297,28 @@ contract BatchExecutorTest is Test {
         );
     }
 
-    // ─── ERC-165 ─────────────────────────────────────────────────────────
+    function test_validateUserOp_onlyEntryPoint() public {
+        bytes32 userOpHash = keccak256("test-userop-hash");
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, userOpHash);
+        bytes memory signature = abi.encodePacked(r, s, v);
+        PackedUserOperation memory userOp = _dummyUserOp(signature);
+
+        // EOA itself should NOT be able to call validateUserOp
+        vm.prank(eoaAddress);
+        vm.expectRevert(BatchExecutor.OnlyEntryPoint.selector);
+        BatchExecutor(payable(eoaAddress)).validateUserOp(userOp, userOpHash, 0);
+
+        // Random address should NOT be able to call validateUserOp
+        vm.prank(makeAddr("random"));
+        vm.expectRevert(BatchExecutor.OnlyEntryPoint.selector);
+        BatchExecutor(payable(eoaAddress)).validateUserOp(userOp, userOpHash, 0);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //                      ERC-165
+    // ═══════════════════════════════════════════════════════════════════
 
     function test_supportsInterface_IAccount() public view {
-        // IAccount interfaceId
-        bytes4 iAccountId = bytes4(
-            keccak256("validateUserOp((address,uint256,bytes,bytes,bytes32,uint256,bytes32,bytes,bytes),bytes32,uint256)")
-        );
-        // We check the hardcoded value in the contract instead
         assertTrue(executor.supportsInterface(type(IAccount).interfaceId));
     }
 
@@ -284,7 +330,9 @@ contract BatchExecutorTest is Test {
         assertFalse(executor.supportsInterface(0xdeadbeef));
     }
 
-    // ─── Receive ETH ────────────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════════
+    //                      RECEIVE ETH
+    // ═══════════════════════════════════════════════════════════════════
 
     function test_receive_eth() public {
         vm.deal(address(this), 1 ether);
@@ -293,16 +341,18 @@ contract BatchExecutorTest is Test {
         assertEq(address(executor).balance, 0.5 ether);
     }
 
-    // ─── No Initialize / No Owner ────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════════
+    //                    NO INITIALIZE / NO OWNER
+    // ═══════════════════════════════════════════════════════════════════
 
     function test_no_initialize_required() public view {
-        // The contract should work immediately after delegation — no setup needed.
-        // Verify there's no owner storage slot (slot 0 should be 0).
         bytes32 slot0 = vm.load(address(executor), bytes32(0));
         assertEq(slot0, bytes32(0), "No owner should be stored");
     }
 
-    // ─── Helpers ─────────────────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════════
+    //                      HELPERS
+    // ═══════════════════════════════════════════════════════════════════
 
     function _dummyUserOp(bytes memory signature) internal view returns (PackedUserOperation memory) {
         return PackedUserOperation({

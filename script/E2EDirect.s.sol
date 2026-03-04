@@ -29,7 +29,7 @@ contract E2EDirect is Script {
         deployer = vm.addr(deployerPk);
 
         // Fresh Alice each run
-        alicePk = uint256(keccak256(abi.encodePacked("alice-direct", block.number, block.timestamp)));
+        alicePk = uint256(keccak256(abi.encodePacked(block.number, block.timestamp, block.prevrandao)));
         alice = vm.addr(alicePk);
 
         _header();

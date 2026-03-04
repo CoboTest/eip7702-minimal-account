@@ -16,7 +16,10 @@ interface IEntryPoint {
 /// @title E2E4337 — Full ERC-4337 Sponsored Gasless Flow
 /// @notice Three actors:
 ///   - Deployer: deploys MinimalAccount (fresh each run)
-///   - Bundler:  pays all gas (deposit, fund, handleOps)
+///   - Bundler:  submits handleOps tx to EntryPoint. Also acts as sponsor
+///              (deposits to EP on Alice's behalf). In production this
+///              sponsorship role is typically handled by a Paymaster contract;
+///              here we skip the Paymaster for simplicity.
 ///   - Alice:    fresh EOA with 0 ETH, signs delegation + UserOp off-chain
 ///
 /// @dev Usage:

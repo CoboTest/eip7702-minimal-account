@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import { IAccount } from "./interfaces/IAccount.sol";
 import { PackedUserOperation } from "./interfaces/PackedUserOperation.sol";
+import { IERC165 } from "./interfaces/IERC165.sol";
 
 /// @title MinimalAccount
 /// @notice Minimal EIP-7702 delegate contract for EOAs.
@@ -159,8 +160,8 @@ contract MinimalAccount is IAccount {
     /// @notice ERC-165 interface support.
     function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
         return
-            interfaceId == type(IAccount).interfaceId || // ERC-4337
-            interfaceId == 0x01ffc9a7;                   // ERC-165
+            interfaceId == type(IAccount).interfaceId ||  // ERC-4337
+            interfaceId == type(IERC165).interfaceId;     // ERC-165
     }
 
     // ─── Receive ETH ────────────────────────────────────────────────────

@@ -2,8 +2,8 @@
 /out/
 /cache/
 
-# Dependencies
-/lib/
+# Dependencies (forge-std tracked as submodule)
+# /lib/
 
 # Environment
 .env

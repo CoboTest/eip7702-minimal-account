@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { Script, console } from "forge-std/Script.sol";
+import { Vm } from "forge-std/Vm.sol";
 import { MinimalAccount } from "../src/MinimalAccount.sol";
 import { PackedUserOperation } from "../src/interfaces/PackedUserOperation.sol";
 
@@ -182,8 +183,14 @@ contract E2E4337 is Script {
         console.log("");
         console.log("[6] Bundler submits handleOps + delegation (type 4 tx)...");
 
-        // Alice signs delegation (off-chain, nonce=0 for fresh account)
-        vm.attachDelegation(vm.signDelegation(executorAddr, alicePk));
+        // Alice signs EIP-7702 delegation off-chain (authorizes executorAddr)
+        Vm.SignedDelegation memory signedDelegation = vm.signDelegation(executorAddr, alicePk);
+        vm.attachDelegation(signedDelegation);
+        console.log("  Alice signed delegation (off-chain):");
+        console.log("    target:", executorAddr);
+        console.log("    v:", signedDelegation.v);
+        console.log("    r:", vm.toString(signedDelegation.r));
+        console.log("    s:", vm.toString(signedDelegation.s));
 
         PackedUserOperation[] memory ops = new PackedUserOperation[](1);
         ops[0] = op;
@@ -192,8 +199,7 @@ contract E2E4337 is Script {
         vm.broadcast(bundlerPk);
         EP.handleOps(ops, payable(bundler));
 
-        console.log("  Delegation: Alice ->", executorAddr);
-        console.log("  PASS: handleOps executed on-chain");
+        console.log("  PASS: delegation activated + handleOps executed on-chain");
     }
 
     function _step7_verify() internal view {

@@ -17,6 +17,8 @@ import { MinimalAccount } from "../src/MinimalAccount.sol";
 ///   forge script script/E2EDirect.s.sol --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
 contract E2EDirect is Script {
     uint256 constant TRANSFER_AMT = 0.00005 ether;
+    uint256 constant FUND_AMT = 3 * TRANSFER_AMT; // Exact amount for transfers
+    uint256 constant GAS_AMT = 0.0002 ether;       // Gas budget for Alice's 3 txs
 
     uint256 deployerPk;
     address deployer;
@@ -68,10 +70,12 @@ contract E2EDirect is Script {
         console.log("");
         console.log("[2] Deployer funds Alice...");
 
+        // Fund exact transfer amount + gas budget
         vm.broadcast(deployerPk);
-        (bool ok,) = alice.call{ value: 0.01 ether }("");
+        (bool ok,) = alice.call{ value: FUND_AMT + GAS_AMT }("");
         require(ok, "fund failed");
-        console.log("  Amount: 0.01 ETH");
+        console.log("  Transfer fund:", FUND_AMT, "wei");
+        console.log("  Gas budget:", GAS_AMT, "wei");
         console.log("  PASS: funded");
     }
 
@@ -142,7 +146,7 @@ contract E2EDirect is Script {
 
         require(alice.code.length == 23, "delegation lost");
         console.log("  Delegation: still active");
-        console.log("  Alice balance:", alice.balance, "wei");
+        console.log("  Alice balance:", alice.balance, "wei (gas remainder)");
         console.log("  Total transferred: 3x", TRANSFER_AMT, "wei to Deployer");
         console.log("  PASS: all assertions passed");
     }

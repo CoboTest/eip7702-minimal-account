@@ -128,6 +128,8 @@ contract MinimalAccount is IAccount {
     /// @dev    Only callable by the EntryPoint (per ERC-4337 spec).
     ///         Validates that the signature was produced by the EOA's private key
     ///         (i.e., `ecrecover` returns `address(this)`).
+    ///         NOTE: We do not check `userOp.sender == address(this)` because the
+    ///         EntryPoint guarantees it only calls validateUserOp on the sender account.
     /// @param userOp         The packed user operation.
     /// @param userOpHash     Hash of the user operation.
     /// @param missingAccountFunds Funds the account must deposit to EntryPoint.

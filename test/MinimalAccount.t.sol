@@ -23,6 +23,26 @@ contract MockTarget {
     receive() external payable {}
 }
 
+/// @dev Malicious contract that re-enters executeBatch on receive.
+contract ReentrantTarget {
+    address public victim;
+    bool public attacked;
+
+    constructor(address _victim) {
+        victim = _victim;
+    }
+
+    receive() external payable {
+        if (!attacked) {
+            attacked = true;
+            // Attempt re-entry into executeBatch
+            MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](1);
+            calls[0] = MinimalAccount.Call(address(this), 0, "");
+            MinimalAccount(payable(victim)).executeBatch(calls);
+        }
+    }
+}
+
 contract MinimalAccountTest is Test {
     MinimalAccount public executor;
     MockTarget public target;
@@ -426,6 +446,87 @@ contract MinimalAccountTest is Test {
     function test_no_initialize_required() public view {
         bytes32 slot0 = vm.load(address(executor), bytes32(0));
         assertEq(slot0, bytes32(0), "No owner should be stored");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //                      REENTRANCY
+    // ═══════════════════════════════════════════════════════════════════
+
+    function test_executeBatch_reentrant_target_reverts() public {
+        // Malicious target tries to re-enter executeBatch via receive()
+        ReentrantTarget reentrant = new ReentrantTarget(eoaAddress);
+
+        MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](1);
+        calls[0] = MinimalAccount.Call(address(reentrant), 0.1 ether, "");
+
+        // Re-entrant call from ReentrantTarget → Unauthorized inside,
+        // which bubbles up as ExecutionFailed(0, Unauthorized.selector)
+        vm.prank(eoaAddress);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                MinimalAccount.ExecutionFailed.selector,
+                0,
+                abi.encodeWithSelector(MinimalAccount.Unauthorized.selector)
+            )
+        );
+        MinimalAccount(payable(eoaAddress)).executeBatch{ value: 0.1 ether }(calls);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //              ADDITIONAL EDGE CASES
+    // ═══════════════════════════════════════════════════════════════════
+
+    function test_validateUserOp_zero_prefund_zero_balance_no_revert() public {
+        // Drain EOA
+        uint256 bal = eoaAddress.balance;
+        vm.prank(eoaAddress);
+        (bool ok,) = payable(address(0xdead)).call{ value: bal }("");
+        assertTrue(ok);
+        assertEq(eoaAddress.balance, 0);
+
+        bytes32 userOpHash = keccak256("test-zero-prefund");
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            eoaPrivateKey,
+            keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", userOpHash))
+        );
+        bytes memory signature = abi.encodePacked(r, s, v);
+        PackedUserOperation memory userOp = _dummyUserOp(signature);
+
+        // missingAccountFunds == 0, balance == 0 → should NOT revert
+        vm.prank(executor.ENTRY_POINT());
+        uint256 result = MinimalAccount(payable(eoaAddress)).validateUserOp(
+            userOp, userOpHash, 0
+        );
+        assertEq(result, 0, "Valid sig + zero prefund should succeed");
+    }
+
+    function test_validateUserOp_all_zero_signature() public {
+        bytes32 userOpHash = keccak256("test-zero-sig");
+        // All-zero signature: v=0, r=0, s=0
+        bytes memory signature = new bytes(65);
+        PackedUserOperation memory userOp = _dummyUserOp(signature);
+
+        vm.prank(executor.ENTRY_POINT());
+        uint256 result = MinimalAccount(payable(eoaAddress)).validateUserOp(
+            userOp, userOpHash, 0
+        );
+        assertEq(result, 1, "All-zero signature should return SIG_VALIDATION_FAILED");
+    }
+
+    function test_execute_excess_msgValue_stays_in_eoa() public {
+        uint256 eoaBalBefore = eoaAddress.balance;
+        uint256 sendValue = 0.5 ether;
+        uint256 msgValue = 1 ether;  // Excess 0.5 ETH
+
+        vm.prank(eoaAddress);
+        MinimalAccount(payable(eoaAddress)).execute{ value: msgValue }(
+            address(target), sendValue, ""
+        );
+
+        // Target receives sendValue
+        assertEq(address(target).balance, sendValue);
+        // Excess stays in EOA (msgValue - sendValue returned)
+        assertEq(eoaAddress.balance, eoaBalBefore - sendValue);
     }
 
     // ═══════════════════════════════════════════════════════════════════

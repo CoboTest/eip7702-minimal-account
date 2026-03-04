@@ -12,5 +12,8 @@
 /coverage/
 lcov.info
 
+# Broadcast artifacts
+/broadcast/
+
 # OS
 .DS_Store

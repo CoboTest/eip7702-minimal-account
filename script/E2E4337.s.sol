@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { Script, console } from "forge-std/Script.sol";
-import { BatchExecutor } from "../src/BatchExecutor.sol";
+import { MinimalAccount } from "../src/MinimalAccount.sol";
 import { PackedUserOperation } from "../src/interfaces/PackedUserOperation.sol";
 
 interface IEntryPoint {
@@ -15,7 +15,7 @@ interface IEntryPoint {
 
 /// @title E2E4337 — Full ERC-4337 Sponsored Gasless Flow
 /// @notice Three actors:
-///   - Deployer: deploys BatchExecutor (fresh each run)
+///   - Deployer: deploys MinimalAccount (fresh each run)
 ///   - Bundler:  pays all gas (deposit, fund, handleOps)
 ///   - Alice:    fresh EOA with 0 ETH, signs delegation + UserOp off-chain
 ///
@@ -70,10 +70,10 @@ contract E2E4337 is Script {
 
     function _step1_deploy() internal {
         console.log("");
-        console.log("[1] Deployer deploys BatchExecutor...");
+        console.log("[1] Deployer deploys MinimalAccount...");
 
         vm.broadcast(deployerPk);
-        BatchExecutor impl = new BatchExecutor();
+        MinimalAccount impl = new MinimalAccount();
         executorAddr = address(impl);
 
         require(executorAddr.code.length > 0, "deploy failed");
@@ -141,15 +141,15 @@ contract E2E4337 is Script {
         // Transfer all funded ETH back to Deployer (Alice ends with 0)
         // Split into 2 calls to test batch: half + half
         uint256 half = FUND_AMT / 2;
-        BatchExecutor.Call[] memory calls = new BatchExecutor.Call[](2);
-        calls[0] = BatchExecutor.Call(deployer, half, "");
-        calls[1] = BatchExecutor.Call(deployer, half, "");
+        MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](2);
+        calls[0] = MinimalAccount.Call(deployer, half, "");
+        calls[1] = MinimalAccount.Call(deployer, half, "");
 
         op = PackedUserOperation({
             sender: alice,
             nonce: 0,  // Fresh Alice, always 0
             initCode: "",
-            callData: abi.encodeCall(BatchExecutor.executeBatch, (calls)),
+            callData: abi.encodeCall(MinimalAccount.executeBatch, (calls)),
             // verificationGasLimit=200k, callGasLimit=300k
             accountGasLimits: bytes32(uint256(uint128(200_000)) << 128 | uint128(300_000)),
             preVerificationGas: 100_000,

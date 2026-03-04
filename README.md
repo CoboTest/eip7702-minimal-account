@@ -26,7 +26,7 @@ Traditional Smart Accounts store an `owner` in contract storage, requiring an `i
 │  EOA (user's address)                   │
 │  ┌─────────────────────────────────┐    │
 │  │  EIP-7702 delegation code       │    │
-│  │  → points to BatchExecutor      │    │
+│  │  → points to MinimalAccount      │    │
 │  └─────────────────────────────────┘    │
 │                                         │
 │  Storage: (empty — no owner, no state)  │
@@ -45,11 +45,11 @@ Traditional Smart Accounts store an `owner` in contract storage, requiring an `i
 ### Direct Batch Execution
 
 ```solidity
-BatchExecutor.Call[] memory calls = new BatchExecutor.Call[](2);
-calls[0] = BatchExecutor.Call(tokenA, 0, abi.encodeCall(IERC20.approve, (router, amount)));
-calls[1] = BatchExecutor.Call(router, 0, abi.encodeCall(IRouter.swap, (tokenA, tokenB, amount)));
+MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](2);
+calls[0] = MinimalAccount.Call(tokenA, 0, abi.encodeCall(IERC20.approve, (router, amount)));
+calls[1] = MinimalAccount.Call(router, 0, abi.encodeCall(IRouter.swap, (tokenA, tokenB, amount)));
 
-BatchExecutor(payable(myEOA)).executeBatch(calls);
+MinimalAccount(payable(myEOA)).executeBatch(calls);
 ```
 
 ### Gas-Sponsored Execution (ERC-4337)
@@ -57,7 +57,7 @@ BatchExecutor(payable(myEOA)).executeBatch(calls);
 ```solidity
 PackedUserOperation memory userOp = PackedUserOperation({
     sender: myEOA,
-    callData: abi.encodeCall(BatchExecutor.executeBatch, (calls)),
+    callData: abi.encodeCall(MinimalAccount.executeBatch, (calls)),
     // ... other fields
     signature: eoaSignature
 });
@@ -120,7 +120,7 @@ EXECUTOR=0x... ./script/e2e-4337.sh
 
 | Contract | Address |
 |----------|---------|
-| BatchExecutor | [`0x7669bD38Fcf0D2a778AE02CB6c2769f657E60Fe0`](https://sepolia.etherscan.io/address/0x7669bD38Fcf0D2a778AE02CB6c2769f657E60Fe0) |
+| MinimalAccount | [`0x7669bD38Fcf0D2a778AE02CB6c2769f657E60Fe0`](https://sepolia.etherscan.io/address/0x7669bD38Fcf0D2a778AE02CB6c2769f657E60Fe0) |
 | EntryPoint v0.7 | [`0x0000000071727De22E5E9d8BAf0edAc6f37da032`](https://sepolia.etherscan.io/address/0x0000000071727De22E5E9d8BAf0edAc6f37da032) |
 
 ## Security

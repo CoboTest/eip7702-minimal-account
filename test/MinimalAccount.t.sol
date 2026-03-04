@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
-import { BatchExecutor } from "../src/BatchExecutor.sol";
+import { MinimalAccount } from "../src/MinimalAccount.sol";
 import { IAccount } from "../src/interfaces/IAccount.sol";
 import { PackedUserOperation } from "../src/interfaces/PackedUserOperation.sol";
 
@@ -23,11 +23,11 @@ contract MockTarget {
     receive() external payable {}
 }
 
-contract BatchExecutorTest is Test {
-    BatchExecutor public executor;
+contract MinimalAccountTest is Test {
+    MinimalAccount public executor;
     MockTarget public target;
 
-    // EOA that will delegate to BatchExecutor via EIP-7702
+    // EOA that will delegate to MinimalAccount via EIP-7702
     uint256 internal eoaPrivateKey = 0xA11CE;
     address internal eoaAddress;
 
@@ -35,7 +35,7 @@ contract BatchExecutorTest is Test {
         eoaAddress = vm.addr(eoaPrivateKey);
 
         // Deploy the delegate implementation
-        executor = new BatchExecutor();
+        executor = new MinimalAccount();
 
         // Deploy mock target
         target = new MockTarget();
@@ -61,7 +61,7 @@ contract BatchExecutorTest is Test {
 
     function test_execute_single() public {
         vm.prank(eoaAddress);
-        BatchExecutor(payable(eoaAddress)).execute(
+        MinimalAccount(payable(eoaAddress)).execute(
             address(target),
             0,
             abi.encodeCall(MockTarget.setValue, (42))
@@ -73,7 +73,7 @@ contract BatchExecutorTest is Test {
 
     function test_execute_single_with_value() public {
         vm.prank(eoaAddress);
-        BatchExecutor(payable(eoaAddress)).execute{ value: 1 ether }(
+        MinimalAccount(payable(eoaAddress)).execute{ value: 1 ether }(
             address(target),
             1 ether,
             ""
@@ -85,8 +85,8 @@ contract BatchExecutorTest is Test {
     function test_execute_emits_Executed_event() public {
         vm.prank(eoaAddress);
         vm.expectEmit(true, false, false, false);
-        emit BatchExecutor.Executed(address(target), 0, "");
-        BatchExecutor(payable(eoaAddress)).execute(
+        emit MinimalAccount.Executed(address(target), 0, "");
+        MinimalAccount(payable(eoaAddress)).execute(
             address(target),
             0,
             abi.encodeCall(MockTarget.setValue, (42))
@@ -98,13 +98,13 @@ contract BatchExecutorTest is Test {
     // ═══════════════════════════════════════════════════════════════════
 
     function test_executeBatch() public {
-        BatchExecutor.Call[] memory calls = new BatchExecutor.Call[](3);
-        calls[0] = BatchExecutor.Call(address(target), 0, abi.encodeCall(MockTarget.setValue, (10)));
-        calls[1] = BatchExecutor.Call(address(target), 0, abi.encodeCall(MockTarget.setValue, (20)));
-        calls[2] = BatchExecutor.Call(address(target), 0, abi.encodeCall(MockTarget.setValue, (30)));
+        MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](3);
+        calls[0] = MinimalAccount.Call(address(target), 0, abi.encodeCall(MockTarget.setValue, (10)));
+        calls[1] = MinimalAccount.Call(address(target), 0, abi.encodeCall(MockTarget.setValue, (20)));
+        calls[2] = MinimalAccount.Call(address(target), 0, abi.encodeCall(MockTarget.setValue, (30)));
 
         vm.prank(eoaAddress);
-        BatchExecutor(payable(eoaAddress)).executeBatch(calls);
+        MinimalAccount(payable(eoaAddress)).executeBatch(calls);
 
         assertEq(target.value(), 30);
         assertEq(target.callCount(), 3);
@@ -113,22 +113,22 @@ contract BatchExecutorTest is Test {
     function test_executeBatch_with_value() public {
         MockTarget target2 = new MockTarget();
 
-        BatchExecutor.Call[] memory calls = new BatchExecutor.Call[](2);
-        calls[0] = BatchExecutor.Call(address(target), 0.5 ether, "");
-        calls[1] = BatchExecutor.Call(address(target2), 0.3 ether, "");
+        MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](2);
+        calls[0] = MinimalAccount.Call(address(target), 0.5 ether, "");
+        calls[1] = MinimalAccount.Call(address(target2), 0.3 ether, "");
 
         vm.prank(eoaAddress);
-        BatchExecutor(payable(eoaAddress)).executeBatch{ value: 0.8 ether }(calls);
+        MinimalAccount(payable(eoaAddress)).executeBatch{ value: 0.8 ether }(calls);
 
         assertEq(address(target).balance, 0.5 ether);
         assertEq(address(target2).balance, 0.3 ether);
     }
 
     function test_executeBatch_empty() public {
-        BatchExecutor.Call[] memory calls = new BatchExecutor.Call[](0);
+        MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](0);
 
         vm.prank(eoaAddress);
-        BatchExecutor(payable(eoaAddress)).executeBatch(calls);
+        MinimalAccount(payable(eoaAddress)).executeBatch(calls);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -138,7 +138,7 @@ contract BatchExecutorTest is Test {
     function test_execute_revert_propagates() public {
         vm.prank(eoaAddress);
         vm.expectRevert();
-        BatchExecutor(payable(eoaAddress)).execute(
+        MinimalAccount(payable(eoaAddress)).execute(
             address(target),
             0,
             abi.encodeCall(MockTarget.reverting, ())
@@ -146,13 +146,13 @@ contract BatchExecutorTest is Test {
     }
 
     function test_executeBatch_revert_on_failure() public {
-        BatchExecutor.Call[] memory calls = new BatchExecutor.Call[](2);
-        calls[0] = BatchExecutor.Call(address(target), 0, abi.encodeCall(MockTarget.setValue, (1)));
-        calls[1] = BatchExecutor.Call(address(target), 0, abi.encodeCall(MockTarget.reverting, ()));
+        MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](2);
+        calls[0] = MinimalAccount.Call(address(target), 0, abi.encodeCall(MockTarget.setValue, (1)));
+        calls[1] = MinimalAccount.Call(address(target), 0, abi.encodeCall(MockTarget.reverting, ()));
 
         vm.prank(eoaAddress);
         vm.expectRevert();
-        BatchExecutor(payable(eoaAddress)).executeBatch(calls);
+        MinimalAccount(payable(eoaAddress)).executeBatch(calls);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -163,8 +163,8 @@ contract BatchExecutorTest is Test {
         address attacker = makeAddr("attacker");
 
         vm.prank(attacker);
-        vm.expectRevert(BatchExecutor.Unauthorized.selector);
-        BatchExecutor(payable(eoaAddress)).execute(
+        vm.expectRevert(MinimalAccount.Unauthorized.selector);
+        MinimalAccount(payable(eoaAddress)).execute(
             address(target),
             0,
             abi.encodeCall(MockTarget.setValue, (999))
@@ -173,17 +173,17 @@ contract BatchExecutorTest is Test {
 
     function test_unauthorized_batch_reverts() public {
         address attacker = makeAddr("attacker");
-        BatchExecutor.Call[] memory calls = new BatchExecutor.Call[](1);
-        calls[0] = BatchExecutor.Call(address(target), 0, abi.encodeCall(MockTarget.setValue, (999)));
+        MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](1);
+        calls[0] = MinimalAccount.Call(address(target), 0, abi.encodeCall(MockTarget.setValue, (999)));
 
         vm.prank(attacker);
-        vm.expectRevert(BatchExecutor.Unauthorized.selector);
-        BatchExecutor(payable(eoaAddress)).executeBatch(calls);
+        vm.expectRevert(MinimalAccount.Unauthorized.selector);
+        MinimalAccount(payable(eoaAddress)).executeBatch(calls);
     }
 
     function test_entryPoint_can_call_execute() public {
         vm.prank(executor.ENTRY_POINT());
-        BatchExecutor(payable(eoaAddress)).execute(
+        MinimalAccount(payable(eoaAddress)).execute(
             address(target),
             0,
             abi.encodeCall(MockTarget.setValue, (777))
@@ -197,8 +197,8 @@ contract BatchExecutorTest is Test {
 
     function test_execute_selfCall_reverts() public {
         vm.prank(eoaAddress);
-        vm.expectRevert(BatchExecutor.SelfCallNotAllowed.selector);
-        BatchExecutor(payable(eoaAddress)).execute(
+        vm.expectRevert(MinimalAccount.SelfCallNotAllowed.selector);
+        MinimalAccount(payable(eoaAddress)).execute(
             eoaAddress,  // self-call
             0,
             abi.encodeCall(MockTarget.setValue, (42))
@@ -206,13 +206,13 @@ contract BatchExecutorTest is Test {
     }
 
     function test_executeBatch_selfCall_reverts() public {
-        BatchExecutor.Call[] memory calls = new BatchExecutor.Call[](2);
-        calls[0] = BatchExecutor.Call(address(target), 0, abi.encodeCall(MockTarget.setValue, (10)));
-        calls[1] = BatchExecutor.Call(eoaAddress, 0, "");  // self-call in batch
+        MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](2);
+        calls[0] = MinimalAccount.Call(address(target), 0, abi.encodeCall(MockTarget.setValue, (10)));
+        calls[1] = MinimalAccount.Call(eoaAddress, 0, "");  // self-call in batch
 
         vm.prank(eoaAddress);
-        vm.expectRevert(BatchExecutor.SelfCallNotAllowed.selector);
-        BatchExecutor(payable(eoaAddress)).executeBatch(calls);
+        vm.expectRevert(MinimalAccount.SelfCallNotAllowed.selector);
+        MinimalAccount(payable(eoaAddress)).executeBatch(calls);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -228,7 +228,7 @@ contract BatchExecutorTest is Test {
         PackedUserOperation memory userOp = _dummyUserOp(signature);
 
         vm.prank(executor.ENTRY_POINT());
-        uint256 result = BatchExecutor(payable(eoaAddress)).validateUserOp(
+        uint256 result = MinimalAccount(payable(eoaAddress)).validateUserOp(
             userOp,
             userOpHash,
             0
@@ -247,7 +247,7 @@ contract BatchExecutorTest is Test {
         PackedUserOperation memory userOp = _dummyUserOp(signature);
 
         vm.prank(executor.ENTRY_POINT());
-        uint256 result = BatchExecutor(payable(eoaAddress)).validateUserOp(
+        uint256 result = MinimalAccount(payable(eoaAddress)).validateUserOp(
             userOp,
             userOpHash,
             0
@@ -264,7 +264,7 @@ contract BatchExecutorTest is Test {
         PackedUserOperation memory userOp = _dummyUserOp(signature);
 
         vm.prank(executor.ENTRY_POINT());
-        uint256 result = BatchExecutor(payable(eoaAddress)).validateUserOp(
+        uint256 result = MinimalAccount(payable(eoaAddress)).validateUserOp(
             userOp,
             userOpHash,
             0
@@ -284,7 +284,7 @@ contract BatchExecutorTest is Test {
         uint256 epBalanceBefore = executor.ENTRY_POINT().balance;
 
         vm.prank(executor.ENTRY_POINT());
-        BatchExecutor(payable(eoaAddress)).validateUserOp(
+        MinimalAccount(payable(eoaAddress)).validateUserOp(
             userOp,
             userOpHash,
             prefund
@@ -305,13 +305,13 @@ contract BatchExecutorTest is Test {
 
         // EOA itself should NOT be able to call validateUserOp
         vm.prank(eoaAddress);
-        vm.expectRevert(BatchExecutor.OnlyEntryPoint.selector);
-        BatchExecutor(payable(eoaAddress)).validateUserOp(userOp, userOpHash, 0);
+        vm.expectRevert(MinimalAccount.OnlyEntryPoint.selector);
+        MinimalAccount(payable(eoaAddress)).validateUserOp(userOp, userOpHash, 0);
 
         // Random address should NOT be able to call validateUserOp
         vm.prank(makeAddr("random"));
-        vm.expectRevert(BatchExecutor.OnlyEntryPoint.selector);
-        BatchExecutor(payable(eoaAddress)).validateUserOp(userOp, userOpHash, 0);
+        vm.expectRevert(MinimalAccount.OnlyEntryPoint.selector);
+        MinimalAccount(payable(eoaAddress)).validateUserOp(userOp, userOpHash, 0);
     }
 
     // ═══════════════════════════════════════════════════════════════════

@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { IAccount } from "./interfaces/IAccount.sol";
 import { PackedUserOperation } from "./interfaces/PackedUserOperation.sol";
 
-/// @title BatchExecutor
+/// @title MinimalAccount
 /// @notice Minimal EIP-7702 delegate contract for EOAs.
 ///         Provides batch execution and ERC-4337 gas sponsorship.
 ///         No owner storage, no initialize — EOA private key is the sole authority.
@@ -16,7 +16,7 @@ import { PackedUserOperation } from "./interfaces/PackedUserOperation.sol";
 ///         This prevents storage corruption from untrusted targets.
 ///         Self-calls are explicitly blocked to prevent re-entrant
 ///         privilege escalation (e.g., calling validateUserOp on itself).
-contract BatchExecutor is IAccount {
+contract MinimalAccount is IAccount {
     // ─── Errors ──────────────────────────────────────────────────────────
 
     /// @dev Caller is not this account (the EOA) or the EntryPoint.

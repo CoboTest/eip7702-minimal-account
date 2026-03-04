@@ -1,4 +1,4 @@
-# EIP-7702 Minimal Batch Executor
+# EIP-7702 Minimal Account
 
 A minimal EIP-7702 delegate contract for EOAs. Adds batch execution and ERC-4337 gas sponsorship with **zero initialization** — no owner storage, no `initialize()`, no frontrunning attack surface.
 
@@ -17,7 +17,7 @@ Traditional Smart Accounts store an `owner` in contract storage, requiring an `i
 
 - The EOA's private key is the **only** authority (`ecrecover` against `address(this)`)
 - No storage means no initialization, which means **zero attack surface**
-- Compatible with ERC-7821 Minimal Batch Executor pattern
+- Compatible with ERC-7821 Minimal Batch Executor interface
 
 ## Architecture
 
@@ -26,7 +26,7 @@ Traditional Smart Accounts store an `owner` in contract storage, requiring an `i
 │  EOA (user's address)                   │
 │  ┌─────────────────────────────────┐    │
 │  │  EIP-7702 delegation code       │    │
-│  │  → points to MinimalAccount      │    │
+│  │  → points to MinimalAccount     │    │
 │  └─────────────────────────────────┘    │
 │                                         │
 │  Storage: (empty — no owner, no state)  │
@@ -65,63 +65,41 @@ PackedUserOperation memory userOp = PackedUserOperation({
 
 ## Build & Test
 
-### Unit Tests (local, no ETH needed)
+### Unit Tests
 
 ```bash
 forge build
 forge test -vvv
 ```
 
-### E2E Tests (Sepolia testnet)
+### E2E Test (Sepolia)
 
-Both scripts require a funded Sepolia wallet and [Foundry](https://book.getfoundry.sh/) (`cast`, `forge`).
-
-```bash
-export PRIVATE_KEY=0x...   # Wallet with Sepolia ETH
-```
-
-#### Basic E2E — Deploy + Direct Execution
-
-Tests contract deployment, EIP-7702 delegation, single/batch execution, and self-call protection.
+Full ERC-4337 sponsored gasless flow via Forge Script. Three actors:
+- **Deployer** — deploys fresh MinimalAccount each run
+- **Bundler** — pays all gas (deposit, fund, handleOps)
+- **Alice** — fresh EOA with 0 ETH, signs off-chain only
 
 ```bash
-# Full run: deploy + test (8 assertions)
-./script/e2e-basic.sh
+source .env  # DEPLOYER_PRIVATE_KEY, BUNDLER_PRIVATE_KEY, RPC_URL
 
-# Skip deploy, reuse existing contract
-EXECUTOR=0x... ./script/e2e-basic.sh
+forge script script/E2E4337.s.sol \
+  --rpc-url $RPC_URL \
+  --broadcast --slow \
+  --gas-estimate-multiplier 500
 ```
 
 **What it tests:**
-1. Contract deployment
-2. Self-call prevention (`SelfCallNotAllowed` revert)
-3. Single `execute()` — ETH transfer via type 4 tx
-4. Batch `executeBatch()` — 2 transfers in 1 tx
-5. EIP-7702 delegation verification (`0xef0100` prefix)
+1. Fresh contract deployment
+2. Alice starts with 0 ETH (no code, no balance)
+3. Bundler deposits to EntryPoint for Alice (gas sponsorship)
+4. Bundler funds Alice with transfer values only
+5. Alice signs UserOp off-chain (0 gas consumed)
+6. Bundler submits `handleOps` + EIP-7702 delegation in single type 4 tx
+7. Verify: delegation active, EP nonce incremented, Alice balance = 0 (all transferred)
 
-#### ERC-4337 E2E — Full UserOp Lifecycle
+> **Note:** Forge underestimates gas for type 4 (EIP-7702) txs. Use `--gas-estimate-multiplier 500`.
 
-Tests the complete ERC-4337 flow: deposit → build UserOp → sign → `handleOps` → verify.
-
-```bash
-# Requires an already-deployed contract
-EXECUTOR=0x... ./script/e2e-4337.sh
-```
-
-**What it tests:**
-1. EntryPoint deposit
-2. UserOp construction with `executeBatch` calldata
-3. `userOpHash` signing (ECDSA, verified via `ecrecover`)
-4. `handleOps` submission (type 4 EIP-7702 tx)
-5. Batch transfer verification (2 recipients)
-6. EntryPoint nonce increment
-
-#### Deployed Contracts (Sepolia)
-
-| Contract | Address |
-|----------|---------|
-| MinimalAccount | [`0x7669bD38Fcf0D2a778AE02CB6c2769f657E60Fe0`](https://sepolia.etherscan.io/address/0x7669bD38Fcf0D2a778AE02CB6c2769f657E60Fe0) |
-| EntryPoint v0.7 | [`0x0000000071727De22E5E9d8BAf0edAc6f37da032`](https://sepolia.etherscan.io/address/0x0000000071727De22E5E9d8BAf0edAc6f37da032) |
+Test reports are saved to `test-reports/`.
 
 ## Security
 

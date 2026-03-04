@@ -10,7 +10,7 @@ import { PackedUserOperation } from "./interfaces/PackedUserOperation.sol";
 ///         No owner storage, no initialize — EOA private key is the sole authority.
 /// @dev    Designed to be set as an EOA's delegate via EIP-7702 authorization.
 ///         Validates signatures against `address(this)` (the EOA itself).
-///         Compatible with ERC-7821 Minimal Batch Executor pattern.
+///         Compatible with ERC-7821 Minimal Batch Executor interface.
 ///
 ///         SECURITY: All external calls use `call` only — no `delegatecall`.
 ///         This prevents storage corruption from untrusted targets.

@@ -1,58 +1,54 @@
 #!/usr/bin/env bash
-# EIP-7702 BatchExecutor — Sepolia E2E Test Script
+# EIP-7702 BatchExecutor — Sepolia E2E Test (2-actor)
+#
+# Two actors:
+#   EOA     — Signs EIP-7702 delegation (via --auth), executes calls
+#   BUNDLER — Deploys the contract (optional)
 #
 # Usage:
-#   ./script/testnet-e2e.sh
+#   source .env && ./script/e2e-basic.sh
+#   source .env && EXECUTOR=0x... ./script/e2e-basic.sh   # skip deploy
 #
-# Environment:
-#   PRIVATE_KEY  — Deployer/EOA private key (must have Sepolia ETH)
-#   RPC_URL      — Sepolia RPC (default: https://ethereum-sepolia-rpc.publicnode.com)
-#   EXECUTOR     — Skip deployment, use existing contract address
-#
-# Example:
-#   PRIVATE_KEY=0x... ./script/testnet-e2e.sh
-#   PRIVATE_KEY=0x... EXECUTOR=0x... ./script/testnet-e2e.sh  # skip deploy
+# Env vars:
+#   PRIVATE_KEY         — EOA private key (signs delegation + sends txs)
+#   BUNDLER_PRIVATE_KEY — Bundler private key (deploys contract)
+#   RPC_URL             — RPC endpoint (default: public Sepolia)
+#   EXECUTOR            — Skip deployment, use existing contract
 
 set -euo pipefail
 
-# ─── Config ───────────────────────────────────────────────────────────
-
 RPC_URL="${RPC_URL:-https://ethereum-sepolia-rpc.publicnode.com}"
 
-if [[ -z "${PRIVATE_KEY:-}" ]]; then
-  echo "❌ PRIVATE_KEY not set. Export it first:"
-  echo "   export PRIVATE_KEY=0x..."
-  exit 1
-fi
+if [[ -z "${PRIVATE_KEY:-}" ]]; then echo "❌ PRIVATE_KEY not set"; exit 1; fi
+if [[ -z "${BUNDLER_PRIVATE_KEY:-}" ]]; then echo "❌ BUNDLER_PRIVATE_KEY not set"; exit 1; fi
 
 EOA=$(cast wallet address "$PRIVATE_KEY")
-BALANCE=$(cast balance "$EOA" --rpc-url "$RPC_URL" --ether)
+BUNDLER=$(cast wallet address "$BUNDLER_PRIVATE_KEY")
 
 echo "═══════════════════════════════════════════════════════"
 echo "  EIP-7702 BatchExecutor — Sepolia E2E Test"
 echo "═══════════════════════════════════════════════════════"
-echo "  RPC:     $RPC_URL"
+echo "  RPC:     ${RPC_URL%%/v2/*}..."
 echo "  EOA:     $EOA"
-echo "  Balance: $BALANCE ETH"
+echo "  Bundler: $BUNDLER"
 echo "═══════════════════════════════════════════════════════"
 echo ""
 
 PASS=0
 FAIL=0
 TOTAL=0
-
 pass() { PASS=$((PASS + 1)); TOTAL=$((TOTAL + 1)); echo "  ✅ $1"; }
 fail() { FAIL=$((FAIL + 1)); TOTAL=$((TOTAL + 1)); echo "  ❌ $1: $2"; }
 
-# ─── Step 1: Deploy ──────────────────────────────────────────────────
+# ─── Step 1: Deploy (Bundler) ────────────────────────────────────────
 
 if [[ -n "${EXECUTOR:-}" ]]; then
   echo "📦 Using existing contract: $EXECUTOR"
 else
-  echo "📦 Step 1: Deploying BatchExecutor..."
+  echo "📦 Step 1: Bundler deploys BatchExecutor..."
   DEPLOY_OUTPUT=$(forge create src/BatchExecutor.sol:BatchExecutor \
     --rpc-url "$RPC_URL" \
-    --private-key "$PRIVATE_KEY" \
+    --private-key "$BUNDLER_PRIVATE_KEY" \
     --broadcast 2>&1)
 
   EXECUTOR=$(echo "$DEPLOY_OUTPUT" | grep "Deployed to:" | awk '{print $3}')
@@ -62,12 +58,12 @@ else
     echo "$DEPLOY_OUTPUT"
     exit 1
   fi
-  pass "Deployed to $EXECUTOR"
+  pass "Bundler deployed to $EXECUTOR"
 fi
 
 echo ""
 
-# ─── Step 2: Self-call prevention ────────────────────────────────────
+# ─── Step 2: Self-call prevention (EOA) ──────────────────────────────
 
 echo "🛡️  Step 2: Self-call prevention..."
 SELFCALL_OUTPUT=$(cast send --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY" \
@@ -80,12 +76,12 @@ SELFCALL_OUTPUT=$(cast send --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY" \
 if echo "$SELFCALL_OUTPUT" | grep -q "SelfCallNotAllowed"; then
   pass "Self-call correctly reverted (SelfCallNotAllowed)"
 else
-  fail "Self-call prevention" "Expected SelfCallNotAllowed, got: $SELFCALL_OUTPUT"
+  fail "Self-call prevention" "Expected SelfCallNotAllowed"
 fi
 
 echo ""
 
-# ─── Step 3: Single execute ──────────────────────────────────────────
+# ─── Step 3: Single execute (EOA) ────────────────────────────────────
 
 echo "🔹 Step 3: Single execute (send 0.0001 ETH to address(1))..."
 TARGET1="0x0000000000000000000000000000000000000001"
@@ -128,7 +124,7 @@ fi
 
 echo ""
 
-# ─── Step 4: Batch execute ───────────────────────────────────────────
+# ─── Step 4: Batch execute (EOA) ─────────────────────────────────────
 
 echo "🔸 Step 4: Batch executeBatch (2 transfers in 1 tx)..."
 TARGET2="0x0000000000000000000000000000000000000002"
@@ -195,11 +191,9 @@ echo ""
 echo "═══════════════════════════════════════════════════════"
 echo "  Results: $PASS passed, $FAIL failed (out of $TOTAL)"
 echo "═══════════════════════════════════════════════════════"
-echo "  Contract:  $EXECUTOR"
-echo "  EOA:       $EOA"
-echo "  Etherscan: https://sepolia.etherscan.io/address/$EXECUTOR"
+echo "  Contract: $EXECUTOR"
+echo "  EOA:      $EOA"
+echo "  Bundler:  $BUNDLER"
 echo "═══════════════════════════════════════════════════════"
 
-if [[ "$FAIL" -gt 0 ]]; then
-  exit 1
-fi
+if [[ "$FAIL" -gt 0 ]]; then exit 1; fi

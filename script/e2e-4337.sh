@@ -1,17 +1,25 @@
 #!/usr/bin/env bash
-# ERC-4337 E2E Test on Sepolia
+# ERC-4337 Sponsored E2E Test on Sepolia (2-actor)
 #
-# Tests the full UserOp flow via EntryPoint.handleOps:
-#   1. Deposit ETH to EntryPoint for the EOA
-#   2. Build UserOp with executeBatch calldata
-#   3. Sign userOpHash with EOA key
-#   4. Submit handleOps via cast send (with --auth for EIP-7702)
+# Two actors:
+#   EOA     — Delegates to BatchExecutor, signs UserOp (0 gas)
+#   BUNDLER — Deposits to EntryPoint, submits handleOps (pays gas)
+#
+# Flow:
+#   1. Bundler deposits ETH to EntryPoint for EOA (sponsorship)
+#   2. EOA signs delegation (--auth on Bundler's tx)
+#   3. EOA signs UserOp hash (off-chain)
+#   4. Bundler submits handleOps with attached delegation
 #   5. Verify batch transfers executed
 #
 # Usage:
-#   PRIVATE_KEY=0x... EXECUTOR=0x... ./script/testnet-4337.sh
+#   source .env && EXECUTOR=0x... ./script/e2e-4337.sh
 #
-# Requires: foundry (cast, forge), jq
+# Env vars:
+#   PRIVATE_KEY         — EOA private key (signs delegation + UserOp)
+#   BUNDLER_PRIVATE_KEY — Bundler private key (deposits + submits handleOps)
+#   EXECUTOR            — Deployed BatchExecutor address
+#   RPC_URL             — RPC endpoint (default: public Sepolia)
 
 set -euo pipefail
 
@@ -22,16 +30,19 @@ T2="0x2222222222222222222222222222222222222222"
 AMOUNT="10000000000000"  # 0.00001 ETH
 
 if [[ -z "${PRIVATE_KEY:-}" ]]; then echo "❌ PRIVATE_KEY not set"; exit 1; fi
+if [[ -z "${BUNDLER_PRIVATE_KEY:-}" ]]; then echo "❌ BUNDLER_PRIVATE_KEY not set"; exit 1; fi
 if [[ -z "${EXECUTOR:-}" ]]; then echo "❌ EXECUTOR not set"; exit 1; fi
 
 EOA=$(cast wallet address "$PRIVATE_KEY")
+BUNDLER=$(cast wallet address "$BUNDLER_PRIVATE_KEY")
 
 echo "═══════════════════════════════════════════════════════"
-echo "  ERC-4337 E2E Test — Sepolia"
+echo "  ERC-4337 Sponsored E2E Test — Sepolia"
 echo "═══════════════════════════════════════════════════════"
-echo "  EOA:        $EOA"
-echo "  Executor:   $EXECUTOR"
-echo "  EntryPoint: $ENTRY_POINT"
+echo "  EOA (delegator): $EOA"
+echo "  Bundler (payer): $BUNDLER"
+echo "  Executor:        $EXECUTOR"
+echo "  EntryPoint:      $ENTRY_POINT"
 echo "═══════════════════════════════════════════════════════"
 echo ""
 
@@ -41,82 +52,80 @@ TOTAL=0
 pass() { PASS=$((PASS + 1)); TOTAL=$((TOTAL + 1)); echo "  ✅ $1"; }
 fail() { FAIL=$((FAIL + 1)); TOTAL=$((TOTAL + 1)); echo "  ❌ $1: $2"; }
 
-# ─── Step 1: Deposit to EntryPoint ──────────────────────────────────
+# ─── Step 1: Bundler deposits to EntryPoint for EOA ─────────────────
 
-echo "💰 Step 1: Ensure EntryPoint deposit..."
-DEPOSIT=$(cast call --rpc-url "$RPC_URL" "$ENTRY_POINT" "balanceOf(address)(uint256)" "$EOA")
+echo "💰 Step 1: Bundler ensures EntryPoint deposit for EOA..."
+DEPOSIT=$(cast call --rpc-url "$RPC_URL" "$ENTRY_POINT" "balanceOf(address)(uint256)" "$EOA" | awk '{print $1}')
 
-# Strip Foundry's scientific notation suffix (e.g. "10000 [1e4]")
-DEPOSIT=$(echo "$DEPOSIT" | awk '{print $1}')
 if [[ "$DEPOSIT" -lt "5000000000000000" ]]; then
-  echo "  Depositing 0.01 ETH to EntryPoint..."
-  cast send --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY" \
-    --auth "$EXECUTOR" \
+  echo "  Bundler depositing 0.01 ETH to EntryPoint for EOA..."
+  cast send --rpc-url "$RPC_URL" --private-key "$BUNDLER_PRIVATE_KEY" \
     --value 0.01ether \
     "$ENTRY_POINT" "depositTo(address)" "$EOA" > /dev/null 2>&1
-  pass "Deposited 0.01 ETH to EntryPoint"
+  pass "Bundler deposited 0.01 ETH (sponsorship)"
 else
   pass "Sufficient deposit: $DEPOSIT wei"
 fi
 
 echo ""
 
-# ─── Step 2: Build UserOp ───────────────────────────────────────────
+# ─── Step 2: EOA delegates via Bundler's tx ──────────────────────────
 
-echo "🔨 Step 2: Build UserOp..."
+echo "🔗 Step 2: EOA signs delegation (off-chain)..."
 
-# Get nonce from EntryPoint
+# EOA signs an EIP-7702 authorization off-chain
+SIGNED_AUTH=$(cast wallet sign-auth "$EXECUTOR" \
+  --private-key "$PRIVATE_KEY" \
+  --rpc-url "$RPC_URL" 2>&1)
+echo "  Signed auth: ${SIGNED_AUTH:0:30}..."
+pass "EOA signed delegation (off-chain, 0 gas)"
+
+echo ""
+
+# ─── Step 3: Build & sign UserOp ────────────────────────────────────
+
+echo "🔨 Step 3: Build & sign UserOp (off-chain)..."
+
 NONCE=$(cast call --rpc-url "$RPC_URL" "$ENTRY_POINT" "getNonce(address,uint192)(uint256)" "$EOA" 0 | awk '{print $1}')
-echo "  Nonce: $NONCE"
+echo "  EP nonce: $NONCE"
 
-# Build executeBatch calldata
 INNER_CALLDATA=$(cast calldata "executeBatch((address,uint256,bytes)[])" \
   "[($T1,$AMOUNT,0x),($T2,$AMOUNT,0x)]")
 
-# Pack gas fields
-# accountGasLimits: verificationGasLimit (128k) << 128 | callGasLimit (256k)
-ACCOUNT_GAS="0x0000000000000000000000000001f4000000000000000000000000000003e800"
+# accountGasLimits: verificationGasLimit (200k) << 128 | callGasLimit (300k)
+ACCOUNT_GAS="0x00000000000000000000000000030d40000000000000000000000000000493e0"
 PRE_VER_GAS="100000"
 # gasFees: maxPriorityFeePerGas (2 gwei) << 128 | maxFeePerGas (50 gwei)
 GAS_FEES="0x0000000000000000000000007735940000000000000000000000000ba43b7400"
 
-pass "UserOp built"
-echo ""
-
-# ─── Step 3: Get userOpHash and sign ─────────────────────────────────
-
-echo "✍️  Step 3: Sign UserOp..."
-
-# Encode the UserOp for getUserOpHash
-# We need to ABI-encode the PackedUserOperation struct and call getUserOpHash
+# Get userOpHash
 USEROP_HASH=$(cast call --rpc-url "$RPC_URL" "$ENTRY_POINT" \
   "getUserOpHash((address,uint256,bytes,bytes,bytes32,uint256,bytes32,bytes,bytes))" \
   "($EOA,$NONCE,0x,$INNER_CALLDATA,$ACCOUNT_GAS,$PRE_VER_GAS,$GAS_FEES,0x,0x)")
-
 echo "  UserOp hash: $USEROP_HASH"
 
-# Sign with cast wallet sign
+# EOA signs (off-chain, 0 gas)
 SIGNATURE=$(cast wallet sign --private-key "$PRIVATE_KEY" --no-hash "$USEROP_HASH")
 echo "  Signature: ${SIGNATURE:0:20}..."
 
-pass "UserOp signed"
+pass "UserOp built & signed by EOA (off-chain)"
 echo ""
 
-# ─── Step 4: Submit via handleOps ────────────────────────────────────
+# ─── Step 4: Bundler submits handleOps ───────────────────────────────
 
-echo "🚀 Step 4: Submit via handleOps..."
+echo "🚀 Step 4: Bundler submits handleOps (pays gas)..."
 
 BAL1_BEFORE=$(cast balance "$T1" --rpc-url "$RPC_URL")
 BAL2_BEFORE=$(cast balance "$T2" --rpc-url "$RPC_URL")
 
-# handleOps(PackedUserOperation[] ops, address payable beneficiary)
 HANDLEOPS_CALLDATA=$(cast calldata \
   "handleOps((address,uint256,bytes,bytes,bytes32,uint256,bytes32,bytes,bytes)[],address)" \
   "[($EOA,$NONCE,0x,$INNER_CALLDATA,$ACCOUNT_GAS,$PRE_VER_GAS,$GAS_FEES,0x,$SIGNATURE)]" \
-  "$EOA")
+  "$BUNDLER")
 
-TX_OUTPUT=$(cast send --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY" \
-  --auth "$EXECUTOR" \
+# Bundler sends handleOps with EOA's signed delegation attached
+TX_OUTPUT=$(cast send --rpc-url "$RPC_URL" --private-key "$BUNDLER_PRIVATE_KEY" \
+  --auth "$SIGNED_AUTH" \
   "$ENTRY_POINT" \
   $HANDLEOPS_CALLDATA \
   2>&1)
@@ -126,7 +135,7 @@ TX_HASH=$(echo "$TX_OUTPUT" | grep "^transactionHash" | awk '{print $2}')
 TX_TYPE=$(echo "$TX_OUTPUT" | grep "^type" | awk '{print $2}')
 
 if [[ "$TX_STATUS" == "1" ]]; then
-  pass "handleOps succeeded (tx: $TX_HASH)"
+  pass "Bundler handleOps succeeded (tx: $TX_HASH)"
 else
   fail "handleOps" "status=$TX_STATUS tx=$TX_HASH"
   echo "$TX_OUTPUT"
@@ -161,7 +170,6 @@ else
   fail "T2 transfer" "Expected $AMOUNT, got $DIFF2"
 fi
 
-# Verify EntryPoint nonce incremented
 NEW_NONCE=$(cast call --rpc-url "$RPC_URL" "$ENTRY_POINT" "getNonce(address,uint192)(uint256)" "$EOA" 0 | awk '{print $1}')
 EXPECTED_NONCE=$((NONCE + 1))
 if [[ "$NEW_NONCE" -eq "$EXPECTED_NONCE" ]]; then
@@ -177,9 +185,9 @@ echo ""
 echo "═══════════════════════════════════════════════════════"
 echo "  Results: $PASS passed, $FAIL failed (out of $TOTAL)"
 echo "═══════════════════════════════════════════════════════"
-echo "  Flow: EOA → EIP-7702 delegation → EntryPoint.handleOps"
-echo "        → validateUserOp (ecrecover ✓) → executeBatch"
-echo "        → 2x ETH transfers"
+echo "  Flow:"
+echo "    EOA:     signed delegation + UserOp (1 delegation tx)"
+echo "    Bundler: deposit + handleOps (paid all gas)"
 echo "═══════════════════════════════════════════════════════"
 
 if [[ "$FAIL" -gt 0 ]]; then exit 1; fi

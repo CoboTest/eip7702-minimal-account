@@ -170,7 +170,9 @@ contract E2E4337 is Script {
         });
 
         bytes32 opHash = _getUserOpHash(op);
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(alicePk, opHash);
+        // EIP-191 prefix (personal_sign) — matches MinimalAccount._validateSignature
+        bytes32 prefixedHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", opHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(alicePk, prefixedHash);
         op.signature = abi.encodePacked(r, s, v);
 
         console.log("  Action: executeBatch -> 2x transfer to Deployer");

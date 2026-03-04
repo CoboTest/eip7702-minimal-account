@@ -222,7 +222,7 @@ contract MinimalAccountTest is Test {
     function test_validateUserOp_valid_signature() public {
         bytes32 userOpHash = keccak256("test-userop-hash");
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, userOpHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", userOpHash)));
         bytes memory signature = abi.encodePacked(r, s, v);
 
         PackedUserOperation memory userOp = _dummyUserOp(signature);
@@ -241,7 +241,7 @@ contract MinimalAccountTest is Test {
         bytes32 userOpHash = keccak256("test-userop-hash");
 
         uint256 wrongKey = 0xBAD;
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(wrongKey, userOpHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(wrongKey, keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", userOpHash)));
         bytes memory signature = abi.encodePacked(r, s, v);
 
         PackedUserOperation memory userOp = _dummyUserOp(signature);
@@ -275,7 +275,7 @@ contract MinimalAccountTest is Test {
 
     function test_validateUserOp_pays_prefund() public {
         bytes32 userOpHash = keccak256("test-userop-hash");
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, userOpHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", userOpHash)));
         bytes memory signature = abi.encodePacked(r, s, v);
 
         PackedUserOperation memory userOp = _dummyUserOp(signature);
@@ -299,7 +299,7 @@ contract MinimalAccountTest is Test {
 
     function test_validateUserOp_onlyEntryPoint() public {
         bytes32 userOpHash = keccak256("test-userop-hash");
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, userOpHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", userOpHash)));
         bytes memory signature = abi.encodePacked(r, s, v);
         PackedUserOperation memory userOp = _dummyUserOp(signature);
 

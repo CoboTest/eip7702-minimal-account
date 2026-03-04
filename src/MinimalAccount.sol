@@ -31,6 +31,9 @@ contract MinimalAccount is IAccount {
     /// @dev Cannot call self in a batch (prevents privilege escalation).
     error SelfCallNotAllowed();
 
+    /// @dev Prefund transfer to EntryPoint failed (insufficient balance).
+    error PrefundFailed();
+
     // ─── Constants ───────────────────────────────────────────────────────
 
     /// @notice ERC-4337 v0.7 EntryPoint (singleton).
@@ -121,10 +124,10 @@ contract MinimalAccount is IAccount {
         // Validate signature against the EOA address (address(this))
         validationData = _validateSignature(userOpHash, userOp.signature) ? 0 : 1;
 
-        // Pay prefund if needed
+        // Pay prefund if needed (MUST pay per ERC-4337 spec)
         if (missingAccountFunds > 0) {
             (bool ok, ) = payable(ENTRY_POINT).call{ value: missingAccountFunds }("");
-            (ok); // Ignore return value — EntryPoint will revert if underfunded.
+            if (!ok) revert PrefundFailed();
         }
     }
 
@@ -144,8 +147,10 @@ contract MinimalAccount is IAccount {
     // ─── Internal ────────────────────────────────────────────────────────
 
     /// @dev Validate an ECDSA signature against the EOA's own address.
-    /// @param hash The hash that was signed (already includes EIP-191 or EIP-712 prefix from EntryPoint).
-    /// @param signature The 65-byte ECDSA signature (r, s, v).
+    ///      Wraps the hash with EIP-191 personal_sign prefix to prevent
+    ///      blind-signing attacks (user sees the hash in wallet UI).
+    /// @param hash The userOpHash from EntryPoint.
+    /// @param signature The 65-byte ECDSA signature (r, s, v) over the EIP-191 prefixed hash.
     /// @return valid True if the recovered signer matches this account.
     function _validateSignature(
         bytes32 hash,
@@ -168,7 +173,13 @@ contract MinimalAccount is IAccount {
             return false;
         }
 
-        address recovered = ecrecover(hash, v, r, s);
+        // EIP-191 prefix: forces personal_sign in wallet UI,
+        // preventing blind-signing of raw UserOp hashes
+        bytes32 prefixedHash = keccak256(
+            abi.encodePacked("\x19Ethereum Signed Message:\n32", hash)
+        );
+
+        address recovered = ecrecover(prefixedHash, v, r, s);
         return recovered != address(0) && recovered == address(this);
     }
 }

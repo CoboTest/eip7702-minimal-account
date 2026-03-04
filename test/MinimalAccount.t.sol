@@ -344,6 +344,54 @@ contract MinimalAccountTest is Test {
         MinimalAccount(payable(eoaAddress)).validateUserOp(userOp, userOpHash, 0);
     }
 
+    function test_validateUserOp_prefund_failed_reverts() public {
+        bytes32 userOpHash = keccak256("test-userop-hash");
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", userOpHash)));
+        bytes memory signature = abi.encodePacked(r, s, v);
+
+        PackedUserOperation memory userOp = _dummyUserOp(signature);
+
+        // Drain EOA so prefund transfer fails
+        uint256 eoaBal = eoaAddress.balance;
+        vm.prank(eoaAddress);
+        (bool ok, ) = payable(address(0xdead)).call{ value: eoaBal }("");
+        assertTrue(ok);
+        assertEq(eoaAddress.balance, 0);
+
+        // Valid signature but insufficient balance → PrefundFailed
+        vm.prank(executor.ENTRY_POINT());
+        vm.expectRevert(MinimalAccount.PrefundFailed.selector);
+        MinimalAccount(payable(eoaAddress)).validateUserOp(
+            userOp,
+            userOpHash,
+            1 ether
+        );
+    }
+
+    function test_validateUserOp_malleable_signature_rejected() public {
+        bytes32 userOpHash = keccak256("test-userop-hash");
+        bytes32 prefixedHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", userOpHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, prefixedHash);
+
+        // Flip s to high-s (malleable signature)
+        // secp256k1 order n
+        uint256 n = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;
+        bytes32 highS = bytes32(n - uint256(s));
+        uint8 flippedV = v == 27 ? 28 : 27;
+
+        bytes memory malleableSig = abi.encodePacked(r, highS, flippedV);
+        PackedUserOperation memory userOp = _dummyUserOp(malleableSig);
+
+        vm.prank(executor.ENTRY_POINT());
+        uint256 result = MinimalAccount(payable(eoaAddress)).validateUserOp(
+            userOp,
+            userOpHash,
+            0
+        );
+
+        assertEq(result, 1, "Malleable (high-s) signature should be rejected");
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     //                      ERC-165
     // ═══════════════════════════════════════════════════════════════════

@@ -171,14 +171,31 @@ Alice signs: signDelegation(implementationAddress, alicePrivateKey)
 | `EXECUTOR` | E2EDirect phase2 | MinimalAccount address (from phase1 output) |
 | `RPC_URL` | Both | Sepolia RPC endpoint |
 
+## Signature Format (EIP-191)
+
+> **Important for integrators:** This contract uses `personal_sign` (EIP-191), not raw `eth_sign`.
+
+Standard ERC-4337 SDKs sign the `userOpHash` directly. This contract wraps it with `\x19Ethereum Signed Message:\n32` before `ecrecover`, so the signing side must use `personal_sign`:
+
+```javascript
+// ✅ Correct — personal_sign (EIP-191)
+const signature = await signer.signMessage(ethers.getBytes(userOpHash));
+
+// ❌ Wrong — raw sign
+const signature = await signer.signMessage(userOpHash);
+```
+
+**Why:** Raw signing of opaque 32-byte hashes allows blind-signing attacks. With `personal_sign`, wallet UIs display a distinct confirmation dialog, making it harder for malicious dApps to trick users into signing dangerous UserOps.
+
 ## Security
 
 - **No frontrunning risk** — Nothing to initialize, nothing to steal
-- **Signature validation** — Rejects malleable signatures (EIP-2)
+- **Signature validation** — EIP-191 prefix + rejects malleable signatures (EIP-2)
 - **Access control** — Only the EOA itself or EntryPoint can execute
 - **Self-call blocked** — Prevents re-entrant privilege escalation via batch
 - **No delegatecall** — All calls are regular `call`, preventing storage corruption
 - **validateUserOp** — Restricted to EntryPoint only (per ERC-4337 spec)
+- **Prefund gating** — Only pays EntryPoint prefund when signature is valid
 
 ## License
 

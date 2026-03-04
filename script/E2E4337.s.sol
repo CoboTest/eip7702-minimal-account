@@ -15,22 +15,19 @@ interface IEntryPoint {
 
 /// @title E2E4337 — Full ERC-4337 Sponsored Gasless Flow
 /// @notice Three actors:
-///   - Deployer: deploys BatchExecutor (skip if EXECUTOR env is set)
+///   - Deployer: deploys BatchExecutor (fresh each run)
 ///   - Bundler:  pays all gas (deposit, fund, handleOps)
 ///   - Alice:    fresh EOA with 0 ETH, signs delegation + UserOp off-chain
 ///
 /// @dev Usage:
-///   # Fresh deploy:
-///   source .env && forge script script/E2E4337.s.sol --rpc-url $RPC_URL --broadcast --slow
-///
-///   # Reuse existing contract:
-///   source .env && EXECUTOR=0x... forge script script/E2E4337.s.sol --rpc-url $RPC_URL --broadcast --slow
+///   source .env
+///   forge script script/E2E4337.s.sol --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
 contract E2E4337 is Script {
     IEntryPoint constant EP = IEntryPoint(0x0000000071727De22E5E9d8BAf0edAc6f37da032);
-    address constant T1 = 0x1111111111111111111111111111111111111111;
-    address constant T2 = 0x2222222222222222222222222222222222222222;
-    uint256 constant TRANSFER_AMT = 0.00001 ether;
+    uint256 constant FUND_AMT = 0.0001 ether; // Alice's total funds for transfers
 
+    uint256 deployerPk;
+    address deployer;
     uint256 bundlerPk;
     address bundler;
     uint256 alicePk;
@@ -38,15 +35,14 @@ contract E2E4337 is Script {
     address executorAddr;
 
     function run() external {
+        deployerPk = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        deployer = vm.addr(deployerPk);
         bundlerPk = vm.envUint("BUNDLER_PRIVATE_KEY");
         bundler = vm.addr(bundlerPk);
 
-        // Fresh Alice each run — use block.number for determinism within a single broadcast
-        // (vm.unixTime may differ between simulation phases)
+        // Fresh Alice each run — deterministic within a single broadcast
         alicePk = uint256(keccak256(abi.encodePacked("alice-e2e", block.number, block.timestamp)));
         alice = vm.addr(alicePk);
-
-        executorAddr = vm.envOr("EXECUTOR", address(0));
 
         _header();
         _step1_deploy();
@@ -65,30 +61,24 @@ contract E2E4337 is Script {
         console.log("================================================");
         console.log("  ERC-4337 Sponsored Gasless E2E");
         console.log("================================================");
-        console.log("  Alice (fresh):", alice);
-        console.log("  Bundler:      ", bundler);
-        console.log("  EntryPoint:   ", address(EP));
+        console.log("  Deployer:   ", deployer);
+        console.log("  Bundler:    ", bundler);
+        console.log("  Alice:      ", alice);
+        console.log("  EntryPoint: ", address(EP));
         console.log("================================================");
     }
 
     function _step1_deploy() internal {
-        if (executorAddr != address(0)) {
-            console.log("");
-            console.log("[1] Using existing BatchExecutor:", executorAddr);
-            return;
-        }
-
-        uint256 deployerPk = vm.envUint("PRIVATE_KEY");
         console.log("");
         console.log("[1] Deployer deploys BatchExecutor...");
-        console.log("  Deployer:", vm.addr(deployerPk));
 
         vm.broadcast(deployerPk);
         BatchExecutor impl = new BatchExecutor();
         executorAddr = address(impl);
 
         require(executorAddr.code.length > 0, "deploy failed");
-        console.log("  PASS: deployed at", executorAddr);
+        console.log("  Contract:", executorAddr);
+        console.log("  PASS: deployed");
     }
 
     function _step2_verifyAlice() internal view {
@@ -106,7 +96,7 @@ contract E2E4337 is Script {
         vm.broadcast(bundlerPk);
         EP.depositTo{ value: 0.01 ether }(alice);
 
-        console.log("  PASS: deposited 0.01 ETH");
+        console.log("  PASS: deposited 0.01 ETH to EP for Alice");
     }
 
     function _step4_fund() internal {
@@ -114,10 +104,11 @@ contract E2E4337 is Script {
         console.log("[4] Bundler funds Alice for transfer values...");
 
         vm.broadcast(bundlerPk);
-        (bool ok,) = alice.call{ value: 0.0001 ether }("");
+        (bool ok,) = alice.call{ value: FUND_AMT }("");
         require(ok, "fund failed");
 
-        console.log("  PASS: funded 0.0001 ETH");
+        console.log("  Amount:", FUND_AMT, "wei");
+        console.log("  PASS: funded");
     }
 
     /// @dev Compute userOpHash locally (same as EntryPoint.getUserOpHash)
@@ -147,9 +138,12 @@ contract E2E4337 is Script {
         console.log("");
         console.log("[5] Alice signs UserOp (off-chain, 0 gas)...");
 
+        // Transfer all funded ETH back to Deployer (Alice ends with 0)
+        // Split into 2 calls to test batch: half + half
+        uint256 half = FUND_AMT / 2;
         BatchExecutor.Call[] memory calls = new BatchExecutor.Call[](2);
-        calls[0] = BatchExecutor.Call(T1, TRANSFER_AMT, "");
-        calls[1] = BatchExecutor.Call(T2, TRANSFER_AMT, "");
+        calls[0] = BatchExecutor.Call(deployer, half, "");
+        calls[1] = BatchExecutor.Call(deployer, half, "");
 
         op = PackedUserOperation({
             sender: alice,
@@ -165,19 +159,19 @@ contract E2E4337 is Script {
             signature: ""
         });
 
-        // Compute hash locally to ensure simulation == on-chain
         bytes32 opHash = _getUserOpHash(op);
-
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(alicePk, opHash);
         op.signature = abi.encodePacked(r, s, v);
 
+        console.log("  Action: executeBatch -> 2x transfer to Deployer");
+        console.log("  Transfer total:", FUND_AMT, "wei");
         console.log("  UserOp hash:", vm.toString(opHash));
-        console.log("  PASS: signed by Alice");
+        console.log("  PASS: signed (no tx, pure off-chain)");
     }
 
     function _step6_handleOps(PackedUserOperation memory op) internal {
         console.log("");
-        console.log("[6] Bundler submits handleOps + delegation...");
+        console.log("[6] Bundler submits handleOps + delegation (type 4 tx)...");
 
         // Alice signs delegation (off-chain, nonce=0 for fresh account)
         vm.attachDelegation(vm.signDelegation(executorAddr, alicePk));
@@ -189,23 +183,28 @@ contract E2E4337 is Script {
         vm.broadcast(bundlerPk);
         EP.handleOps(ops, payable(bundler));
 
-        console.log("  PASS: handleOps executed");
+        console.log("  Delegation: Alice ->", executorAddr);
+        console.log("  PASS: handleOps executed on-chain");
     }
 
     function _step7_verify() internal view {
         console.log("");
-        console.log("[7] Verify results...");
+        console.log("[7] Verify on-chain results...");
 
         // Delegation active
         require(alice.code.length == 23, "delegation not set");
-        console.log("  PASS: delegation active (code.length = 23)");
+        console.log("  Delegation: active (code.length = 23)");
 
         // EP nonce incremented
-        require(EP.getNonce(alice, 0) == 1, "nonce should be 1");
-        console.log("  PASS: EP nonce = 1");
+        uint256 epNonce = EP.getNonce(alice, 0);
+        require(epNonce == 1, "EP nonce should be 1");
+        console.log("  EP nonce:", epNonce);
 
-        // Alice balance (still has leftover, spent 0 gas)
-        console.log("  Alice final balance:", alice.balance, "wei");
+        // Alice balance should be 0 (all transferred to Deployer)
+        require(alice.balance == 0, "Alice balance should be 0");
+        console.log("  Alice balance: 0 wei (all transferred)");
+
+        console.log("  PASS: all assertions passed");
     }
 
     function _footer() internal view {
@@ -216,6 +215,7 @@ contract E2E4337 is Script {
         console.log("  Alice:    ", alice);
         console.log("  Alice PK: ", vm.toString(bytes32(alicePk)));
         console.log("  Executor: ", executorAddr);
+        console.log("  Deployer: ", deployer);
         console.log("  Bundler:  ", bundler);
         console.log("================================================");
     }

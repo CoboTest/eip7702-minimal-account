@@ -104,8 +104,8 @@ contract MinimalAccountTest is Test {
 
     function test_execute_emits_Executed_event() public {
         vm.prank(eoaAddress);
-        vm.expectEmit(true, false, false, false);
-        emit MinimalAccount.Executed(address(target), 0, "");
+        vm.expectEmit(true, false, false, true);
+        emit MinimalAccount.Executed(address(target), 0);
         MinimalAccount(payable(eoaAddress)).execute(
             address(target),
             0,
@@ -150,11 +150,11 @@ contract MinimalAccountTest is Test {
         calls[1] = MinimalAccount.Call(address(target), 0, abi.encodeCall(MockTarget.setValue, (20)));
 
         vm.prank(eoaAddress);
-        vm.expectEmit(true, false, false, false);
-        emit MinimalAccount.Executed(address(target), 0, "");
-        vm.expectEmit(true, false, false, false);
-        emit MinimalAccount.Executed(address(target), 0, "");
-        vm.expectEmit(true, false, false, false);
+        vm.expectEmit(true, false, false, true);
+        emit MinimalAccount.Executed(address(target), 0);
+        vm.expectEmit(true, false, false, true);
+        emit MinimalAccount.Executed(address(target), 0);
+        vm.expectEmit(true, false, false, true);
         emit MinimalAccount.BatchExecuted(2);
         MinimalAccount(payable(eoaAddress)).executeBatch(calls);
     }

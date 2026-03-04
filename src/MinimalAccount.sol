@@ -67,7 +67,7 @@ contract MinimalAccount is IAccount {
     // ─── Events ──────────────────────────────────────────────────────────
 
     event BatchExecuted(uint256 indexed count);
-    event Executed(address indexed target, uint256 value, bytes returnData);
+    event Executed(address indexed target, uint256 value);
 
     // ─── Modifiers ───────────────────────────────────────────────────────
 
@@ -100,7 +100,7 @@ contract MinimalAccount is IAccount {
             if (c.target == address(this)) revert SelfCallNotAllowed();
             (bool ok, bytes memory ret) = c.target.call{ value: c.value }(c.data);
             if (!ok) revert ExecutionFailed(i, ret);
-            emit Executed(c.target, c.value, ret);
+            emit Executed(c.target, c.value);
             unchecked { ++i; }
         }
         emit BatchExecuted(len);
@@ -121,7 +121,7 @@ contract MinimalAccount is IAccount {
         bool ok;
         (ok, result) = target.call{ value: value }(data);
         if (!ok) revert ExecutionFailed(0, result);
-        emit Executed(target, value, result);
+        emit Executed(target, value);
     }
 
     // ─── ERC-4337 IAccount ───────────────────────────────────────────────

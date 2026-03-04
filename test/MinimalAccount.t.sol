@@ -544,6 +544,59 @@ contract MinimalAccountTest is Test {
         assertEq(eoaAddress.balance, eoaBalBefore - sendValue);
     }
 
+    function test_validateUserOp_nonstandard_v_values() public {
+        bytes32 userOpHash = keccak256("test-v-values");
+        bytes32 prefixedHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", userOpHash));
+        (, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, prefixedHash);
+
+        // v=0 (non-standard, ecrecover returns address(0))
+        bytes memory sig0 = abi.encodePacked(r, s, uint8(0));
+        PackedUserOperation memory userOp0 = _dummyUserOp(sig0);
+        vm.prank(executor.ENTRY_POINT());
+        assertEq(
+            MinimalAccount(payable(eoaAddress)).validateUserOp(userOp0, userOpHash, 0),
+            1, "v=0 should return SIG_VALIDATION_FAILED"
+        );
+
+        // v=1 (non-standard)
+        bytes memory sig1 = abi.encodePacked(r, s, uint8(1));
+        PackedUserOperation memory userOp1 = _dummyUserOp(sig1);
+        vm.prank(executor.ENTRY_POINT());
+        assertEq(
+            MinimalAccount(payable(eoaAddress)).validateUserOp(userOp1, userOpHash, 0),
+            1, "v=1 should return SIG_VALIDATION_FAILED"
+        );
+    }
+
+    function test_validateUserOp_overlong_signature() public {
+        bytes32 userOpHash = keccak256("test-overlong");
+        // 66 bytes — one too many
+        bytes memory longSig = new bytes(66);
+        PackedUserOperation memory userOp = _dummyUserOp(longSig);
+
+        vm.prank(executor.ENTRY_POINT());
+        assertEq(
+            MinimalAccount(payable(eoaAddress)).validateUserOp(userOp, userOpHash, 0),
+            1, "Overlong signature should return SIG_VALIDATION_FAILED"
+        );
+    }
+
+    function test_executeBatch_insufficient_value_reverts() public {
+        MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](2);
+        calls[0] = MinimalAccount.Call(address(target), 1 ether, "");
+        calls[1] = MinimalAccount.Call(address(target), 1 ether, "");
+
+        // Send only 1 ETH msg.value but calls need 2 ETH total
+        // EOA has 10 ETH so the deficit comes from EOA balance —
+        // but if EOA balance is also insufficient, it reverts
+        vm.deal(eoaAddress, 0.5 ether);
+        _setupDelegation();
+
+        vm.prank(eoaAddress);
+        vm.expectRevert();
+        MinimalAccount(payable(eoaAddress)).executeBatch{ value: 0.5 ether }(calls);
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     //                      HELPERS
     // ═══════════════════════════════════════════════════════════════════

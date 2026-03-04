@@ -110,7 +110,7 @@ forge script script/E2E4337.s.sol \
 
 #### E2E #2: Direct Execution Flow (no ERC-4337)
 
-Two actors, two phases — Deployer sets up delegation, Alice executes directly:
+Two actors — Deployer sets up delegation, Alice executes directly:
 
 | Actor | Role |
 |-------|------|
@@ -120,17 +120,9 @@ Two actors, two phases — Deployer sets up delegation, Alice executes directly:
 ```bash
 source .env  # DEPLOYER_PRIVATE_KEY, RPC_URL
 
-# Phase 1: Deployer sets up (deploy + fund + delegate)
-forge script script/E2EDirect.s.sol --sig "phase1()" \
-  --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
-
-# Phase 2: Alice executes (use ALICE_PRIVATE_KEY and EXECUTOR from phase1 output)
-ALICE_PRIVATE_KEY=<from phase1> EXECUTOR=<from phase1> \
-forge script script/E2EDirect.s.sol --sig "phase2()" \
+forge script script/E2EDirect.s.sol \
   --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
 ```
-
-> **Why two phases?** EIP-7702 delegation auth increments Alice's nonce on-chain. Forge caches nonces at simulation time and doesn't account for this, causing "nonce too low" if Alice sends txs in the same script run.
 
 **Flow:**
 1. Deployer deploys MinimalAccount
@@ -139,6 +131,8 @@ forge script script/E2EDirect.s.sol --sig "phase2()" \
 4. Alice calls `execute()` — single transfer to Deployer
 5. Alice calls `executeBatch()` — 2× transfer to Deployer
 6. Verify: delegation persistent, all transfers received
+
+> **Note:** Uses `vm.setNonce` to account for EIP-7702 auth nonce increment that forge simulation doesn't model.
 
 #### EIP-7702 Delegation Signing
 
@@ -167,8 +161,7 @@ Alice signs: signDelegation(implementationAddress, alicePrivateKey)
 | `DEPLOYER_PRIVATE_KEY` | Both | Deploys MinimalAccount |
 | `SPONSOR_PRIVATE_KEY` | E2E4337 | Deposits to EntryPoint + funds Alice |
 | `BUNDLER_PRIVATE_KEY` | E2E4337 | Submits handleOps tx |
-| `ALICE_PRIVATE_KEY` | E2EDirect phase2 | Alice's key (from phase1 output) |
-| `EXECUTOR` | E2EDirect phase2 | MinimalAccount address (from phase1 output) |
+
 | `RPC_URL` | Both | Sepolia RPC endpoint |
 
 ## Signature Format (EIP-191)

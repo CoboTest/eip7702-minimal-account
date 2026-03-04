@@ -6,58 +6,80 @@ import { Vm } from "forge-std/Vm.sol";
 import { MinimalAccount } from "../src/MinimalAccount.sol";
 
 /// @title E2EDirect - Direct Execution Flow (no ERC-4337)
-/// @notice Two phases, two actors:
+/// @notice Two actors:
 ///   - Deployer: deploys MinimalAccount, funds Alice, activates delegation (type 4 tx)
-///   - Alice:    calls execute() and executeBatch() directly (pays own gas)
+///   - Alice:    fresh EOA, calls execute() and executeBatch() directly (pays own gas)
 ///
-/// Phase 1 (Deployer sets up):
-///   forge script script/E2EDirect.s.sol --sig "phase1()" --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
+/// @dev Single-run script. Uses vm.setNonce to account for EIP-7702 auth nonce
+///      increment that forge simulation doesn't model.
 ///
-/// Phase 2 (Alice executes - after delegation is confirmed on-chain):
-///   ALICE_PRIVATE_KEY=<from phase1 output> EXECUTOR=<from phase1 output> \
-///   forge script script/E2EDirect.s.sol --sig "phase2()" --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
+///   source .env  # DEPLOYER_PRIVATE_KEY, RPC_URL
+///   forge script script/E2EDirect.s.sol --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
 contract E2EDirect is Script {
     uint256 constant TRANSFER_AMT = 0.00005 ether;
 
-    // ─── Phase 1: Deployer sets up ──────────────────────────────────
+    uint256 deployerPk;
+    address deployer;
+    uint256 alicePk;
+    address alice;
+    address executorAddr;
 
-    function phase1() external {
-        uint256 deployerPk = vm.envUint("DEPLOYER_PRIVATE_KEY");
-        address deployer = vm.addr(deployerPk);
+    function run() external {
+        deployerPk = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        deployer = vm.addr(deployerPk);
 
         // Fresh Alice each run
-        uint256 alicePk = uint256(keccak256(abi.encodePacked("alice-direct", block.number, block.timestamp)));
-        address alice = vm.addr(alicePk);
+        alicePk = uint256(keccak256(abi.encodePacked("alice-direct", block.number, block.timestamp)));
+        alice = vm.addr(alicePk);
 
+        _header();
+        _step1_deploy();
+        _step2_fund();
+        _step3_delegate();
+        _step4_execute();
+        _step5_executeBatch();
+        _step6_verify();
+        _footer();
+    }
+
+    function _header() internal view {
         console.log("================================================");
-        console.log("  Direct Execution E2E - Phase 1 (Setup)");
+        console.log("  Direct Execution E2E");
         console.log("================================================");
         console.log("  Deployer:", deployer);
         console.log("  Alice:   ", alice);
         console.log("================================================");
+    }
 
-        // [1] Deploy
+    function _step1_deploy() internal {
         console.log("");
         console.log("[1] Deployer deploys MinimalAccount...");
+
         vm.broadcast(deployerPk);
         MinimalAccount impl = new MinimalAccount();
-        address executorAddr = address(impl);
+        executorAddr = address(impl);
+
         require(executorAddr.code.length > 0, "deploy failed");
         console.log("  Contract:", executorAddr);
         console.log("  PASS: deployed");
+    }
 
-        // [2] Fund Alice
+    function _step2_fund() internal {
         console.log("");
         console.log("[2] Deployer funds Alice...");
+
         vm.broadcast(deployerPk);
         (bool ok,) = alice.call{ value: 0.01 ether }("");
         require(ok, "fund failed");
         console.log("  Amount: 0.01 ETH");
         console.log("  PASS: funded");
+    }
 
-        // [3] Activate delegation
+    function _step3_delegate() internal {
         console.log("");
         console.log("[3] Deployer activates Alice's delegation (type 4 tx)...");
+
+        // Alice signs EIP-7702 delegation off-chain
         Vm.SignedDelegation memory sd = vm.signDelegation(executorAddr, alicePk);
         vm.attachDelegation(sd);
         console.log("  Alice signed delegation (off-chain):");
@@ -66,44 +88,24 @@ contract E2EDirect is Script {
         console.log("    r:", vm.toString(sd.r));
         console.log("    s:", vm.toString(sd.s));
 
+        // Deployer sends type 4 tx carrying Alice's delegation
         vm.broadcast(deployerPk);
-        (ok,) = alice.call{ value: 0 }("");
+        (bool ok,) = alice.call{ value: 0 }("");
         require(ok, "delegation tx failed");
+
         require(alice.code.length == 23, "delegation not set");
         console.log("  PASS: delegation active");
 
-        // Print Phase 2 command
-        console.log("");
-        console.log("================================================");
-        console.log("  Phase 1 COMPLETE - Run Phase 2:");
-        console.log("================================================");
-        console.log("  ALICE_PRIVATE_KEY=", vm.toString(bytes32(alicePk)));
-        console.log("  EXECUTOR=", vm.toString(executorAddr));
-        console.log("================================================");
+        // EIP-7702 auth increments Alice's nonce on-chain (0 -> 1),
+        // but forge simulation doesn't model this. Sync manually
+        // so forge uses the correct nonce for Alice's subsequent txs.
+        vm.setNonce(alice, 1);
     }
 
-    // ─── Phase 2: Alice executes ────────────────────────────────────
-
-    function phase2() external {
-        uint256 alicePk = vm.envUint("ALICE_PRIVATE_KEY");
-        address alice = vm.addr(alicePk);
-        address executorAddr = vm.envAddress("EXECUTOR");
-        address deployer = vm.addr(vm.envUint("DEPLOYER_PRIVATE_KEY"));
-
-        console.log("================================================");
-        console.log("  Direct Execution E2E - Phase 2 (Execute)");
-        console.log("================================================");
-        console.log("  Alice:   ", alice);
-        console.log("  Executor:", executorAddr);
-        console.log("  Deployer:", deployer);
-        console.log("================================================");
-
-        // Verify delegation is set
-        require(alice.code.length == 23, "delegation not active - run phase1 first");
-
-        // [4] execute()
+    function _step4_execute() internal {
         console.log("");
         console.log("[4] Alice calls execute() - single transfer to Deployer...");
+
         uint256 balBefore = deployer.balance;
 
         vm.broadcast(alicePk);
@@ -113,11 +115,13 @@ contract E2EDirect is Script {
         require(received == TRANSFER_AMT, "execute transfer failed");
         console.log("  Transferred:", TRANSFER_AMT, "wei to Deployer");
         console.log("  PASS: execute() works");
+    }
 
-        // [5] executeBatch()
+    function _step5_executeBatch() internal {
         console.log("");
         console.log("[5] Alice calls executeBatch() - 2x transfer to Deployer...");
-        balBefore = deployer.balance;
+
+        uint256 balBefore = deployer.balance;
 
         MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](2);
         calls[0] = MinimalAccount.Call(deployer, TRANSFER_AMT, "");
@@ -126,23 +130,32 @@ contract E2EDirect is Script {
         vm.broadcast(alicePk);
         MinimalAccount(payable(alice)).executeBatch(calls);
 
-        received = deployer.balance - balBefore;
+        uint256 received = deployer.balance - balBefore;
         require(received == 2 * TRANSFER_AMT, "batch transfer failed");
         console.log("  Transferred: 2x", TRANSFER_AMT, "wei to Deployer");
         console.log("  PASS: executeBatch() works");
+    }
 
-        // [6] Verify
+    function _step6_verify() internal view {
         console.log("");
         console.log("[6] Final verification...");
+
         require(alice.code.length == 23, "delegation lost");
         console.log("  Delegation: still active");
         console.log("  Alice balance:", alice.balance, "wei");
         console.log("  Total transferred: 3x", TRANSFER_AMT, "wei to Deployer");
         console.log("  PASS: all assertions passed");
+    }
 
+    function _footer() internal view {
         console.log("");
         console.log("================================================");
         console.log("  ALL TESTS PASSED");
+        console.log("================================================");
+        console.log("  Alice:    ", alice);
+        console.log("  Alice PK: ", vm.toString(bytes32(alicePk)));
+        console.log("  Executor: ", executorAddr);
+        console.log("  Deployer: ", deployer);
         console.log("================================================");
     }
 }

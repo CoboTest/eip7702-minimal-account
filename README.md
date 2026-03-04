@@ -74,13 +74,14 @@ forge test -vvv
 
 ### E2E Test (Sepolia)
 
-Full ERC-4337 sponsored gasless flow via Forge Script. Three actors:
+Full ERC-4337 sponsored gasless flow via Forge Script. Four actors:
 - **Deployer** — deploys fresh MinimalAccount each run
-- **Bundler** — pays all gas (deposit, fund, handleOps)
-- **Alice** — fresh EOA with 0 ETH, signs off-chain only
+- **Sponsor** — deposits to EntryPoint for Alice + funds Alice with transfer values (in production this is typically a Paymaster contract)
+- **Bundler** — submits `handleOps` type 4 tx (gas recouped from UserOp prefund)
+- **Alice** — fresh EOA with 0 ETH, signs delegation + UserOp off-chain only
 
 ```bash
-source .env  # DEPLOYER_PRIVATE_KEY, BUNDLER_PRIVATE_KEY, RPC_URL
+source .env  # DEPLOYER_PRIVATE_KEY, SPONSOR_PRIVATE_KEY, BUNDLER_PRIVATE_KEY, RPC_URL
 
 forge script script/E2E4337.s.sol \
   --rpc-url $RPC_URL \
@@ -89,13 +90,13 @@ forge script script/E2E4337.s.sol \
 ```
 
 **What it tests:**
-1. Fresh contract deployment
+1. Deployer deploys fresh MinimalAccount
 2. Alice starts with 0 ETH (no code, no balance)
-3. Bundler deposits to EntryPoint for Alice (gas sponsorship)
-4. Bundler funds Alice with transfer values only
+3. Sponsor deposits to EntryPoint for Alice (gas sponsorship)
+4. Sponsor funds Alice with transfer values
 5. Alice signs UserOp off-chain (0 gas consumed)
 6. Bundler submits `handleOps` + EIP-7702 delegation in single type 4 tx
-7. Verify: delegation active, EP nonce incremented, Alice balance = 0 (all transferred)
+7. Verify: delegation active, EP nonce incremented, Alice balance = 0 (all transferred to Deployer)
 
 > **Note:** Forge underestimates gas for type 4 (EIP-7702) txs. Use `--gas-estimate-multiplier 500`.
 

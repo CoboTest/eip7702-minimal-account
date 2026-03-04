@@ -110,30 +110,35 @@ forge script script/E2E4337.s.sol \
 
 #### E2E #2: Direct Execution Flow (no ERC-4337)
 
-Two actors — Alice delegates and calls `executeBatch` directly:
+Two actors, two phases — Deployer sets up delegation, Alice executes directly:
 
 | Actor | Role |
 |-------|------|
-| **Deployer** | Deploys MinimalAccount + funds Alice |
-| **Alice** | Fresh EOA, signs delegation + sends type 4 tx |
+| **Deployer** | Deploys MinimalAccount, funds Alice, activates delegation (type 4 tx) |
+| **Alice** | Fresh EOA, calls `execute()` + `executeBatch()` directly (pays own gas) |
 
 ```bash
 source .env  # DEPLOYER_PRIVATE_KEY, RPC_URL
 
-./script/run-e2e.exp forge script script/E2EDirect.s.sol \
-  --rpc-url $RPC_URL \
-  --broadcast --slow \
-  --gas-estimate-multiplier 500
+# Phase 1: Deployer sets up (deploy + fund + delegate)
+forge script script/E2EDirect.s.sol --sig "phase1()" \
+  --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
+
+# Phase 2: Alice executes (use ALICE_PRIVATE_KEY and EXECUTOR from phase1 output)
+ALICE_PRIVATE_KEY=<from phase1> EXECUTOR=<from phase1> \
+forge script script/E2EDirect.s.sol --sig "phase2()" \
+  --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
 ```
 
-> Requires `expect` (`run-e2e.exp`) — forge prompts for confirmation when sending to addresses without code.
+> **Why two phases?** EIP-7702 delegation auth increments Alice's nonce on-chain. Forge caches nonces at simulation time and doesn't account for this, causing "nonce too low" if Alice sends txs in the same script run.
 
 **Flow:**
 1. Deployer deploys MinimalAccount
 2. Deployer funds Alice with 0.01 ETH
-3. **Alice signs EIP-7702 delegation off-chain** → `(v, r, s)` authorizing MinimalAccount
-4. Alice sends type 4 tx: delegation + `executeBatch(3× transfer)` in one shot
-5. Verify: transfers received, delegation active during execution
+3. **Alice signs EIP-7702 delegation off-chain** → Deployer carries it in type 4 tx
+4. Alice calls `execute()` — single transfer to Deployer
+5. Alice calls `executeBatch()` — 2× transfer to Deployer
+6. Verify: delegation persistent, all transfers received
 
 #### EIP-7702 Delegation Signing
 
@@ -147,7 +152,7 @@ Alice signs: signDelegation(implementationAddress, alicePrivateKey)
   → Delegation is active when contract calls run
 ```
 
-Key difference: in ERC-4337 flow, the **Bundler** carries Alice's delegation in their type 4 tx. In direct flow, **Alice** carries her own delegation.
+**Important:** The delegation must be carried by a **third party** (Bundler or Deployer), not Alice herself. When Alice sends her own type 4 tx, the auth nonce and tx nonce both start at 0, causing a nonce conflict that invalidates the delegation.
 
 ### Notes
 
@@ -162,6 +167,8 @@ Key difference: in ERC-4337 flow, the **Bundler** carries Alice's delegation in 
 | `DEPLOYER_PRIVATE_KEY` | Both | Deploys MinimalAccount |
 | `SPONSOR_PRIVATE_KEY` | E2E4337 | Deposits to EntryPoint + funds Alice |
 | `BUNDLER_PRIVATE_KEY` | E2E4337 | Submits handleOps tx |
+| `ALICE_PRIVATE_KEY` | E2EDirect phase2 | Alice's key (from phase1 output) |
+| `EXECUTOR` | E2EDirect phase2 | MinimalAccount address (from phase1 output) |
 | `RPC_URL` | Both | Sepolia RPC endpoint |
 
 ## Security

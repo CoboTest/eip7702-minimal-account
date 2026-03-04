@@ -72,7 +72,7 @@ forge build
 forge test -vvv
 ```
 
-23 tests covering: access control, delegation, batch execution, UserOp validation, ERC-165, edge cases.
+26 tests covering: access control, delegation, batch execution, UserOp validation (EIP-191, malleable sig, prefund), ERC-165, edge cases.
 
 ### E2E Tests (Sepolia)
 
@@ -151,7 +151,7 @@ Alice signs: signDelegation(implementationAddress, alicePrivateKey)
 ### Notes
 
 - **Gas estimation**: Forge underestimates gas for type 4 (EIP-7702) txs → use `--gas-estimate-multiplier 500`
-- **Deterministic Alice**: Each run generates a fresh Alice keypair from `keccak256("alice-...", block.number, block.timestamp)`
+- **Random Alice**: Each run generates a fresh Alice keypair via `vm.randomUint()`
 - Test reports are saved to `test-reports/`
 
 ## Environment Variables
@@ -161,8 +161,9 @@ Alice signs: signDelegation(implementationAddress, alicePrivateKey)
 | `DEPLOYER_PRIVATE_KEY` | Both | Deploys MinimalAccount |
 | `SPONSOR_PRIVATE_KEY` | E2E4337 | Deposits to EntryPoint + funds Alice |
 | `BUNDLER_PRIVATE_KEY` | E2E4337 | Submits handleOps tx |
-
 | `RPC_URL` | Both | Sepolia RPC endpoint |
+
+> Alice's key is generated via `vm.randomUint()` — fresh random keypair each run, no env var needed.
 
 ## Signature Format (EIP-191)
 

@@ -14,22 +14,30 @@ interface IEntryPoint {
     function depositTo(address account) external payable;
 }
 
-/// @title E2E4337 — Full ERC-4337 Sponsored Gasless Flow
+interface IERC20 {
+    function balanceOf(address) external view returns (uint256);
+    function transfer(address to, uint256 amount) external returns (bool);
+}
+
+/// @title E2E4337 — Full ERC-4337 Sponsored Gasless USDC Flow
 /// @notice Four actors:
 ///   - Deployer: deploys MinimalAccount (fresh each run)
-///   - Sponsor:  deposits to EntryPoint for Alice (gas sponsorship) and
-///              funds Alice with ETH for transfers. In production this role
-///              is typically a Paymaster contract; here we use a plain EOA.
-///   - Bundler:  submits handleOps tx to EntryPoint (pays tx gas, recouped
-///              from UserOp prefund)
-///   - Alice:    fresh EOA with 0 ETH, signs delegation + UserOp off-chain
+///   - Sponsor:  deposits to EntryPoint for Alice (gas) + transfers USDC to Alice.
+///              In production this role is typically a Paymaster; here plain EOA.
+///   - Bundler:  submits handleOps tx to EntryPoint (pays tx gas, recouped from prefund)
+///   - Alice:    fresh EOA with 0 ETH at all times, signs delegation + UserOp off-chain.
+///              Receives USDC from Sponsor, sends it to Deployer via ERC-4337 batch.
 ///
-/// @dev Usage:
+/// @dev Alice never holds ETH — fully gasless via EntryPoint sponsorship.
+///
 ///   source .env
 ///   forge script script/E2E4337.s.sol --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
 contract E2E4337 is Script {
     IEntryPoint constant EP = IEntryPoint(0x0000000071727De22E5E9d8BAf0edAc6f37da032);
-    uint256 constant FUND_AMT = 0.0001 ether; // Alice's total funds for transfers
+
+    /// @dev Circle USDC on Sepolia (6 decimals)
+    IERC20 constant USDC = IERC20(0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238);
+    uint256 constant USDC_AMOUNT = 5e6; // 5 USDC
 
     uint256 deployerPk;
     address deployer;
@@ -49,7 +57,7 @@ contract E2E4337 is Script {
         bundlerPk = vm.envUint("BUNDLER_PRIVATE_KEY");
         bundler = vm.addr(bundlerPk);
 
-        // Fresh Alice each run — deterministic within a single broadcast
+        // Fresh Alice each run
         alicePk = vm.randomUint();
         alice = vm.addr(alicePk);
 
@@ -57,7 +65,7 @@ contract E2E4337 is Script {
         _step1_deploy();
         _step2_verifyAlice();
         _step3_deposit();
-        _step4_fund();
+        _step4_fundUSDC();
 
         PackedUserOperation memory op = _step5_signUserOp();
 
@@ -68,13 +76,14 @@ contract E2E4337 is Script {
 
     function _header() internal view {
         console.log("================================================");
-        console.log("  ERC-4337 Sponsored Gasless E2E");
+        console.log("  ERC-4337 Sponsored Gasless USDC E2E");
         console.log("================================================");
         console.log("  Deployer:   ", deployer);
         console.log("  Sponsor:    ", sponsor);
         console.log("  Bundler:    ", bundler);
         console.log("  Alice:      ", alice);
         console.log("  EntryPoint: ", address(EP));
+        console.log("  USDC:       ", address(USDC));
         console.log("================================================");
     }
 
@@ -93,15 +102,18 @@ contract E2E4337 is Script {
 
     function _step2_verifyAlice() internal view {
         console.log("");
-        console.log("[2] Verify Alice starts with 0 ETH...");
-        require(alice.balance == 0, "Alice should have 0 balance");
+        console.log("[2] Verify Alice starts empty...");
+        require(alice.balance == 0, "Alice should have 0 ETH");
         require(alice.code.length == 0, "Alice should have no code");
-        console.log("  PASS: balance = 0, no code");
+        require(USDC.balanceOf(alice) == 0, "Alice should have 0 USDC");
+        console.log("  ETH: 0");
+        console.log("  USDC: 0");
+        console.log("  PASS: empty");
     }
 
     function _step3_deposit() internal {
         console.log("");
-        console.log("[3] Sponsor deposits to EntryPoint for Alice...");
+        console.log("[3] Sponsor deposits to EntryPoint for Alice (gas)...");
 
         vm.broadcast(sponsorPk);
         EP.depositTo{ value: 0.01 ether }(alice);
@@ -109,20 +121,25 @@ contract E2E4337 is Script {
         console.log("  PASS: deposited 0.01 ETH to EP for Alice");
     }
 
-    function _step4_fund() internal {
+    function _step4_fundUSDC() internal {
         console.log("");
-        console.log("[4] Sponsor funds Alice for transfer values...");
+        console.log("[4] Sponsor transfers USDC to Alice...");
+
+        uint256 sponsorBefore = USDC.balanceOf(sponsor);
+        require(sponsorBefore >= USDC_AMOUNT, "Sponsor needs USDC");
+        console.log("  Sponsor USDC before:", sponsorBefore / 1e6, "USDC");
 
         vm.broadcast(sponsorPk);
-        (bool ok,) = alice.call{ value: FUND_AMT }("");
-        require(ok, "fund failed");
+        USDC.transfer(alice, USDC_AMOUNT);
 
-        console.log("  Amount:", FUND_AMT, "wei");
+        require(USDC.balanceOf(alice) == USDC_AMOUNT, "Alice USDC mismatch");
+        require(alice.balance == 0, "Alice should still have 0 ETH");
+        console.log("  Alice USDC:", USDC_AMOUNT / 1e6, "USDC");
+        console.log("  Alice ETH: 0 (gasless)");
         console.log("  PASS: funded");
     }
 
     /// @dev Compute userOpHash locally (same as EntryPoint.getUserOpHash)
-    ///      to avoid simulation vs on-chain divergence.
     function _packUserOp(PackedUserOperation memory op) internal pure returns (bytes32) {
         return keccak256(abi.encode(
             op.sender,
@@ -148,16 +165,26 @@ contract E2E4337 is Script {
         console.log("");
         console.log("[5] Alice signs UserOp (off-chain, 0 gas)...");
 
-        // Transfer all funded ETH back to Deployer (Alice ends with 0)
-        // Split into 2 calls to test batch: half + half
-        uint256 half = FUND_AMT / 2;
+        // Alice sends all USDC to Deployer via executeBatch
+        // Split into 2 calls to exercise batch: 3 USDC + 2 USDC
+        uint256 part1 = 3e6; // 3 USDC
+        uint256 part2 = 2e6; // 2 USDC
+
         MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](2);
-        calls[0] = MinimalAccount.Call(deployer, half, "");
-        calls[1] = MinimalAccount.Call(deployer, half, "");
+        calls[0] = MinimalAccount.Call(
+            address(USDC),
+            0,
+            abi.encodeCall(IERC20.transfer, (deployer, part1))
+        );
+        calls[1] = MinimalAccount.Call(
+            address(USDC),
+            0,
+            abi.encodeCall(IERC20.transfer, (deployer, part2))
+        );
 
         op = PackedUserOperation({
             sender: alice,
-            nonce: 0,  // Fresh Alice, always 0
+            nonce: 0,
             initCode: "",
             callData: abi.encodeCall(MinimalAccount.executeBatch, (calls)),
             // verificationGasLimit=200k, callGasLimit=300k
@@ -170,13 +197,12 @@ contract E2E4337 is Script {
         });
 
         bytes32 opHash = _getUserOpHash(op);
-        // EIP-191 prefix (personal_sign) — matches MinimalAccount._validateSignature
         bytes32 prefixedHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", opHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(alicePk, prefixedHash);
         op.signature = abi.encodePacked(r, s, v);
 
-        console.log("  Action: executeBatch -> 2x transfer to Deployer");
-        console.log("  Transfer total:", FUND_AMT, "wei");
+        console.log("  Action: executeBatch -> 2x USDC transfer to Deployer");
+        console.log("  Transfer: 3 + 2 = 5 USDC");
         console.log("  UserOp hash:", vm.toString(opHash));
         console.log("  PASS: signed (no tx, pure off-chain)");
     }
@@ -185,7 +211,6 @@ contract E2E4337 is Script {
         console.log("");
         console.log("[6] Bundler submits handleOps + delegation (type 4 tx)...");
 
-        // Alice signs EIP-7702 delegation off-chain (authorizes executorAddr)
         Vm.SignedDelegation memory signedDelegation = vm.signDelegation(executorAddr, alicePk);
         vm.attachDelegation(signedDelegation);
         console.log("  Alice signed delegation (off-chain):");
@@ -197,7 +222,6 @@ contract E2E4337 is Script {
         PackedUserOperation[] memory ops = new PackedUserOperation[](1);
         ops[0] = op;
 
-        // Bundler sends type 4 tx: sets delegation + executes handleOps
         vm.broadcast(bundlerPk);
         EP.handleOps(ops, payable(bundler));
 
@@ -210,16 +234,23 @@ contract E2E4337 is Script {
 
         // Delegation active
         require(alice.code.length == 23, "delegation not set");
-        console.log("  Delegation: active (code.length = 23)");
+        console.log("  Delegation: active");
 
         // EP nonce incremented
         uint256 epNonce = EP.getNonce(alice, 0);
         require(epNonce == 1, "EP nonce should be 1");
         console.log("  EP nonce:", epNonce);
 
-        // Alice balance should be 0 (all transferred to Deployer)
-        require(alice.balance == 0, "Alice balance should be 0");
-        console.log("  Alice balance: 0 wei (all transferred)");
+        // Alice: 0 ETH, 0 USDC
+        require(alice.balance == 0, "Alice ETH should be 0");
+        console.log("  Alice ETH: 0");
+
+        uint256 aliceUsdc = USDC.balanceOf(alice);
+        require(aliceUsdc == 0, "Alice USDC should be 0");
+        console.log("  Alice USDC: 0");
+
+        // Deployer received USDC
+        console.log("  Deployer USDC:", USDC.balanceOf(deployer) / 1e6, "USDC");
 
         console.log("  PASS: all assertions passed");
     }
@@ -235,6 +266,7 @@ contract E2E4337 is Script {
         console.log("  Deployer: ", deployer);
         console.log("  Sponsor:  ", sponsor);
         console.log("  Bundler:  ", bundler);
+        console.log("  USDC:     ", address(USDC));
         console.log("================================================");
     }
 }

@@ -14,12 +14,13 @@ interface IEntryPoint {
 }
 
 /// @title E2E4337 — Full ERC-4337 Sponsored Gasless Flow
-/// @notice Three actors:
+/// @notice Four actors:
 ///   - Deployer: deploys MinimalAccount (fresh each run)
-///   - Bundler:  submits handleOps tx to EntryPoint. Also acts as sponsor
-///              (deposits to EP on Alice's behalf). In production this
-///              sponsorship role is typically handled by a Paymaster contract;
-///              here we skip the Paymaster for simplicity.
+///   - Sponsor:  deposits to EntryPoint for Alice (gas sponsorship) and
+///              funds Alice with ETH for transfers. In production this role
+///              is typically a Paymaster contract; here we use a plain EOA.
+///   - Bundler:  submits handleOps tx to EntryPoint (pays tx gas, recouped
+///              from UserOp prefund)
 ///   - Alice:    fresh EOA with 0 ETH, signs delegation + UserOp off-chain
 ///
 /// @dev Usage:
@@ -31,6 +32,8 @@ contract E2E4337 is Script {
 
     uint256 deployerPk;
     address deployer;
+    uint256 sponsorPk;
+    address sponsor;
     uint256 bundlerPk;
     address bundler;
     uint256 alicePk;
@@ -40,6 +43,8 @@ contract E2E4337 is Script {
     function run() external {
         deployerPk = vm.envUint("DEPLOYER_PRIVATE_KEY");
         deployer = vm.addr(deployerPk);
+        sponsorPk = vm.envUint("SPONSOR_PRIVATE_KEY");
+        sponsor = vm.addr(sponsorPk);
         bundlerPk = vm.envUint("BUNDLER_PRIVATE_KEY");
         bundler = vm.addr(bundlerPk);
 
@@ -65,6 +70,7 @@ contract E2E4337 is Script {
         console.log("  ERC-4337 Sponsored Gasless E2E");
         console.log("================================================");
         console.log("  Deployer:   ", deployer);
+        console.log("  Sponsor:    ", sponsor);
         console.log("  Bundler:    ", bundler);
         console.log("  Alice:      ", alice);
         console.log("  EntryPoint: ", address(EP));
@@ -94,9 +100,9 @@ contract E2E4337 is Script {
 
     function _step3_deposit() internal {
         console.log("");
-        console.log("[3] Bundler deposits to EntryPoint for Alice...");
+        console.log("[3] Sponsor deposits to EntryPoint for Alice...");
 
-        vm.broadcast(bundlerPk);
+        vm.broadcast(sponsorPk);
         EP.depositTo{ value: 0.01 ether }(alice);
 
         console.log("  PASS: deposited 0.01 ETH to EP for Alice");
@@ -104,9 +110,9 @@ contract E2E4337 is Script {
 
     function _step4_fund() internal {
         console.log("");
-        console.log("[4] Bundler funds Alice for transfer values...");
+        console.log("[4] Sponsor funds Alice for transfer values...");
 
-        vm.broadcast(bundlerPk);
+        vm.broadcast(sponsorPk);
         (bool ok,) = alice.call{ value: FUND_AMT }("");
         require(ok, "fund failed");
 
@@ -219,6 +225,7 @@ contract E2E4337 is Script {
         console.log("  Alice PK: ", vm.toString(bytes32(alicePk)));
         console.log("  Executor: ", executorAddr);
         console.log("  Deployer: ", deployer);
+        console.log("  Sponsor:  ", sponsor);
         console.log("  Bundler:  ", bundler);
         console.log("================================================");
     }

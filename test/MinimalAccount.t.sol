@@ -144,6 +144,21 @@ contract MinimalAccountTest is Test {
         assertEq(address(target2).balance, 0.3 ether);
     }
 
+    function test_executeBatch_emits_per_call_events() public {
+        MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](2);
+        calls[0] = MinimalAccount.Call(address(target), 0, abi.encodeCall(MockTarget.setValue, (10)));
+        calls[1] = MinimalAccount.Call(address(target), 0, abi.encodeCall(MockTarget.setValue, (20)));
+
+        vm.prank(eoaAddress);
+        vm.expectEmit(true, false, false, false);
+        emit MinimalAccount.Executed(address(target), 0, "");
+        vm.expectEmit(true, false, false, false);
+        emit MinimalAccount.Executed(address(target), 0, "");
+        vm.expectEmit(true, false, false, false);
+        emit MinimalAccount.BatchExecuted(2);
+        MinimalAccount(payable(eoaAddress)).executeBatch(calls);
+    }
+
     function test_executeBatch_empty() public {
         MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](0);
 

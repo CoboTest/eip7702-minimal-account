@@ -99,6 +99,7 @@ contract MinimalAccount is IAccount {
             if (c.target == address(this)) revert SelfCallNotAllowed();
             (bool ok, bytes memory ret) = c.target.call{ value: c.value }(c.data);
             if (!ok) revert ExecutionFailed(i, ret);
+            emit Executed(c.target, c.value, ret);
             unchecked { ++i; }
         }
         emit BatchExecuted(len);

@@ -50,7 +50,7 @@ contract E2E4337 is Script {
         bundler = vm.addr(bundlerPk);
 
         // Fresh Alice each run — deterministic within a single broadcast
-        alicePk = uint256(keccak256(abi.encodePacked(block.number, block.timestamp, block.prevrandao)));
+        alicePk = vm.randomUint();
         alice = vm.addr(alicePk);
 
         _header();

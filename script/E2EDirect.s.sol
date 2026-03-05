@@ -35,6 +35,9 @@ contract E2EDirect is Script {
         alice = vm.addr(alicePk);
 
         _header();
+        // Verify Alice starts fresh
+        require(vm.getNonce(alice) == 0, "Alice nonce should be 0");
+        console.log("  Alice nonce before: 0");
         _step1_deploy();
         _step2_fund();
         _step3_delegate();
@@ -147,6 +150,12 @@ contract E2EDirect is Script {
         require(alice.code.length == 23, "delegation lost");
         console.log("  Delegation: still active");
         console.log("  Alice balance:", alice.balance, "wei (gas remainder)");
+
+        // Alice nonce: 3 = 1 (delegation auth) + 1 (execute) + 1 (executeBatch)
+        uint256 nonceAfter = vm.getNonce(alice);
+        require(nonceAfter == 3, "Alice nonce should be 3");
+        console.log("  Alice nonce:", nonceAfter, "(1 auth + 1 execute + 1 batch)");
+
         console.log("  Total transferred: 3x", TRANSFER_AMT, "wei to Deployer");
         console.log("  PASS: all assertions passed");
     }

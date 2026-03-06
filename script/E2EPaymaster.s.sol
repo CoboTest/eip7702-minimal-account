@@ -101,13 +101,13 @@ contract E2EPaymaster is Script {
         console.log("[3] Deployer funds paymaster (deposit + stake to EP)...");
 
         vm.startBroadcast(deployerPk);
-        paymaster.deposit{ value: 0.05 ether }();
-        paymaster.addStake{ value: 0.01 ether }(1);
+        paymaster.deposit{ value: 0.005 ether }();
+        paymaster.addStake{ value: 0.001 ether }(1);
         vm.stopBroadcast();
 
         uint256 pmDeposit = EP.balanceOf(address(paymaster));
         console.log("  Paymaster EP deposit:", pmDeposit, "wei");
-        require(pmDeposit >= 0.05 ether, "Paymaster deposit too low");
+        require(pmDeposit >= 0.005 ether, "Paymaster deposit too low");
         console.log("  PASS: paymaster funded");
     }
 

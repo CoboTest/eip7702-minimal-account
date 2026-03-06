@@ -175,7 +175,7 @@ forge script script/E2EDirect.s.sol \
 | 变量 | 使用场景 | 说明 |
 |------|---------|------|
 | `DEPLOYER_PRIVATE_KEY` | 所有脚本 | 部署 MinimalAccount |
-| `SPONSOR_PRIVATE_KEY` | E2E4337 | 向 EntryPoint 存款 + 为 Alice 提供资金 |
+| `SPONSOR_PRIVATE_KEY` | E2E4337, E2EPaymaster | 为 Alice 提供资金（ETH 存款 / USDC 转账） |
 | `BUNDLER_PRIVATE_KEY` | E2E4337, E2EPaymaster | 提交 handleOps 交易 |
 | `RPC_URL` | 所有脚本 | Sepolia RPC 端点 |
 

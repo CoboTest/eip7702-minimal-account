@@ -154,10 +154,14 @@ contract VerifyingPaymaster is IPaymaster, Ownable2Step, Pausable, ReentrancyGua
     //                     IPaymaster
     // ═══════════════════════════════════════════════════════════════════
 
-    /// @dev paymasterAndData layout (after EntryPoint strips address + gas limits):
+    /// @dev paymasterAndData layout (full array, absolute offsets):
+    ///   [0:20]   paymaster address
+    ///   [20:36]  pmVerificationGasLimit (uint128)
+    ///   [36:52]  pmPostOpGasLimit (uint128)
     ///   [52:58]  validUntil (uint48, 6 bytes)
     ///   [58:64]  validAfter (uint48, 6 bytes)
     ///   [64:129] signature  (65 bytes: r[32] + s[32] + v[1])
+    /// Code below slices from [52:] to skip the first 52 bytes.
     function validatePaymasterUserOp(
         PackedUserOperation calldata userOp,
         bytes32 /* userOpHash */,

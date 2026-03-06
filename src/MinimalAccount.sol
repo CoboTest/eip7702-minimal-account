@@ -25,11 +25,12 @@ contract MinimalAccount is Account, SignerEIP7702, ERC7821, ERC721Holder, ERC115
     }
 
     /// @dev Register IAccount, IERC7821, and IERC721Receiver interface IDs.
+    ///      IERC1155Receiver is covered by super via ERC1155Holder.
     function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {
         return interfaceId == type(IAccount).interfaceId
             || interfaceId == type(IERC7821).interfaceId
             || interfaceId == type(IERC721Receiver).interfaceId
-            || super.supportsInterface(interfaceId);
+            || super.supportsInterface(interfaceId); // includes IERC1155Receiver from ERC1155Holder
     }
 
     /// @dev Allow EntryPoint to call execute() in addition to self (default).

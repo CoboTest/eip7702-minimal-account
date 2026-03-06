@@ -175,7 +175,7 @@ Detailed E2E test reports with per-step signature analysis:
 | Variable | Used By | Description |
 |----------|---------|-------------|
 | `DEPLOYER_PRIVATE_KEY` | All | Deploys MinimalAccount |
-| `SPONSOR_PRIVATE_KEY` | E2E4337 | Deposits to EntryPoint + funds Alice |
+| `SPONSOR_PRIVATE_KEY` | E2E4337, E2EPaymaster | Funds Alice (ETH deposit / USDC transfer) |
 | `BUNDLER_PRIVATE_KEY` | E2E4337, E2EPaymaster | Submits handleOps tx |
 | `RPC_URL` | All | Sepolia RPC endpoint |
 

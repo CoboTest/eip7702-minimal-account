@@ -119,23 +119,7 @@ forge script script/E2E4337.s.sol \
   --gas-estimate-multiplier 500
 ```
 
-#### E2E #2: 直接执行流程（`E2EDirect.s.sol`）
-
-两个参与者 — Deployer 设置 delegation，Alice 直接执行：
-
-| 参与者 | 角色 |
-|--------|------|
-| **Deployer** | 部署 MinimalAccount，为 Alice 注资，激活 delegation（type 4 交易）|
-| **Alice** | 全新 EOA，直接调用 `execute()`（自付 gas）|
-
-```bash
-source .env  # DEPLOYER_PRIVATE_KEY, RPC_URL
-
-forge script script/E2EDirect.s.sol \
-  --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
-```
-
-#### E2E #3: Paymaster 赞助流程（`E2EPaymaster.s.sol`）
+#### E2E #2: Paymaster 赞助流程（`E2EPaymaster.s.sol`）
 
 三个参与者 — Alice 使用 VerifyingPaymaster 实现完全无 gas 执行：
 
@@ -154,6 +138,22 @@ forge script script/E2EPaymaster.s.sol \
 # unstakeDelay 后回收 Paymaster 资金：
 PAYMASTER=0x... forge script script/PaymasterCleanup.s.sol \
   --rpc-url $RPC_URL --broadcast
+```
+
+#### E2E #3: 直接执行流程（`E2EDirect.s.sol`）
+
+两个参与者 — Deployer 设置 delegation，Alice 直接执行：
+
+| 参与者 | 角色 |
+|--------|------|
+| **Deployer** | 部署 MinimalAccount，为 Alice 注资，激活 delegation（type 4 交易）|
+| **Alice** | 全新 EOA，直接调用 `execute()`（自付 gas）|
+
+```bash
+source .env  # DEPLOYER_PRIVATE_KEY, RPC_URL
+
+forge script script/E2EDirect.s.sol \
+  --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
 ```
 
 ### 测试报告

@@ -119,23 +119,7 @@ forge script script/E2E4337.s.sol \
   --gas-estimate-multiplier 500
 ```
 
-#### E2E #2: Direct Execution Flow (`E2EDirect.s.sol`)
-
-Two actors — Deployer sets up delegation, Alice executes directly:
-
-| Actor | Role |
-|-------|------|
-| **Deployer** | Deploys MinimalAccount, funds Alice, activates delegation (type 4 tx) |
-| **Alice** | Fresh EOA, calls `execute()` directly (pays own gas) |
-
-```bash
-source .env  # DEPLOYER_PRIVATE_KEY, RPC_URL
-
-forge script script/E2EDirect.s.sol \
-  --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
-```
-
-#### E2E #3: Paymaster-Sponsored Flow (`E2EPaymaster.s.sol`)
+#### E2E #2: Paymaster-Sponsored Flow (`E2EPaymaster.s.sol`)
 
 Three actors — Alice uses a VerifyingPaymaster for fully gasless execution:
 
@@ -154,6 +138,22 @@ forge script script/E2EPaymaster.s.sol \
 # After unstakeDelay, recover paymaster funds:
 PAYMASTER=0x... forge script script/PaymasterCleanup.s.sol \
   --rpc-url $RPC_URL --broadcast
+```
+
+#### E2E #3: Direct Execution Flow (`E2EDirect.s.sol`)
+
+Two actors — Deployer sets up delegation, Alice executes directly:
+
+| Actor | Role |
+|-------|------|
+| **Deployer** | Deploys MinimalAccount, funds Alice, activates delegation (type 4 tx) |
+| **Alice** | Fresh EOA, calls `execute()` directly (pays own gas) |
+
+```bash
+source .env  # DEPLOYER_PRIVATE_KEY, RPC_URL
+
+forge script script/E2EDirect.s.sol \
+  --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
 ```
 
 ### Test Reports

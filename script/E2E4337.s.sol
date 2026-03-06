@@ -149,7 +149,12 @@ contract E2E4337 is Script {
 
     function _step5_signUserOp() internal returns (PackedUserOperation memory op) {
         console.log("");
-        console.log("[5] Alice signs UserOp (off-chain, 0 gas)...");
+        console.log("[5] Alice signs delegation + UserOp (off-chain, 0 gas)...");
+
+        // Attach delegation first so EP.getUserOpHash() can read Alice's delegation address
+        Vm.SignedDelegation memory signedDelegation = vm.signDelegation(executorAddr, alicePk);
+        vm.attachDelegation(signedDelegation);
+        console.log("  Alice signed delegation (off-chain) -> target:", executorAddr);
 
         // Alice sends all USDC back to Sponsor via ERC-7821 batch
         uint256 part1 = 3e6; // 3 USDC
@@ -172,7 +177,7 @@ contract E2E4337 is Script {
         op = PackedUserOperation({
             sender: alice,
             nonce: 0,
-            initCode: "",
+            initCode: abi.encodePacked(bytes20(bytes2(0x7702))), // EIP-7702 marker -> EP includes delegation address in hash
             callData: abi.encodeCall(IERC7821.execute, (BATCH_MODE, executionData)),
             // verificationGasLimit=200k, callGasLimit=300k
             accountGasLimits: bytes32(uint256(uint128(200_000)) << 128 | uint128(300_000)),
@@ -188,24 +193,20 @@ contract E2E4337 is Script {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(alicePk, opHash);
         op.signature = abi.encodePacked(r, s, v);
 
+        console.log("  initCode: 0x7702 +", executorAddr, "(native EIP-7702 marker)");
         console.log("  Action: execute(BATCH_MODE) -> 2x USDC transfer to Sponsor");
         console.log("  Transfer: 3 + 2 = 5 USDC");
         console.log("  UserOp hash:", vm.toString(opHash));
+        console.log("  Note: hash includes delegation address via EP v0.8 native EIP-7702 support");
         console.log("  PASS: signed (no tx, pure off-chain)");
     }
 
     function _step6_handleOps(PackedUserOperation memory op) internal {
         console.log("");
-        console.log("[6] Bundler submits handleOps + delegation (type 4 tx)...");
+        console.log("[6] Bundler submits handleOps (type 4 tx, delegation already attached)...");
 
-        Vm.SignedDelegation memory signedDelegation = vm.signDelegation(executorAddr, alicePk);
-        vm.attachDelegation(signedDelegation);
-        console.log("  Alice signed delegation (off-chain):");
-        console.log("    target:", executorAddr);
-        console.log("    v:", signedDelegation.v);
-        console.log("    r:", vm.toString(signedDelegation.r));
-        console.log("    s:", vm.toString(signedDelegation.s));
-
+        // Delegation was already signed and attached in step 5
+        // Bundler broadcasts handleOps — delegation goes in authorizationList
         PackedUserOperation[] memory ops = new PackedUserOperation[](1);
         ops[0] = op;
 

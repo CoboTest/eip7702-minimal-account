@@ -7,44 +7,34 @@ import { MinimalAccount } from "../src/MinimalAccount.sol";
 import { PackedUserOperation, IEntryPoint } from "@openzeppelin/contracts/interfaces/draft-IERC4337.sol";
 import { Execution } from "@openzeppelin/contracts/interfaces/draft-IERC7579.sol";
 import { IERC7821 } from "@openzeppelin/contracts/interfaces/draft-IERC7821.sol";
+import { MessageHashUtils } from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import { MockVerifyingPaymaster } from "../test/mocks/MockVerifyingPaymaster.sol";
 
-interface IERC20 {
-    function balanceOf(address) external view returns (uint256);
-    function transfer(address to, uint256 amount) external returns (bool);
-}
-
-/// @title E2E4337 — Full ERC-4337 Sponsored Gasless USDC Flow
-/// @notice Four actors:
-///   - Deployer: deploys MinimalAccount (fresh each run)
-///   - Sponsor:  deposits to EntryPoint for Alice (gas) + transfers USDC to Alice.
-///   - Bundler:  submits handleOps tx to EntryPoint (pays tx gas, recouped from prefund)
-///   - Alice:    fresh EOA with 0 ETH at all times, signs delegation + UserOp off-chain.
-///              Receives USDC from Sponsor, sends it back to Sponsor via ERC-4337 batch.
-contract E2E4337 is Script {
+/// @title E2EPaymaster — ERC-4337 Paymaster-Sponsored E2E Flow
+/// @notice Three actors:
+///   - Deployer: deploys MinimalAccount + MockVerifyingPaymaster, funds paymaster
+///   - Bundler:  submits handleOps tx
+///   - Alice:    fresh EOA with 0 ETH, uses paymaster for gas sponsorship
+///
+/// @dev Alice never holds ETH — fully gasless via Paymaster sponsorship.
+contract E2EPaymaster is Script {
     IEntryPoint constant EP = IEntryPoint(0x0000000071727De22E5E9d8BAf0edAc6f37da032);
-
-    /// @dev Circle USDC on Sepolia (6 decimals)
-    IERC20 constant USDC = IERC20(0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238);
-    uint256 constant USDC_AMOUNT = 5e6; // 5 USDC
 
     /// @dev ERC-7579 batch mode: callType=0x01, rest zeros
     bytes32 constant BATCH_MODE = bytes32(uint256(0x01) << 248);
 
     uint256 deployerPk;
     address deployer;
-    uint256 sponsorPk;
-    address sponsor;
     uint256 bundlerPk;
     address bundler;
     uint256 alicePk;
     address alice;
     address executorAddr;
+    MockVerifyingPaymaster paymaster;
 
     function run() external {
         deployerPk = vm.envUint("DEPLOYER_PRIVATE_KEY");
         deployer = vm.addr(deployerPk);
-        sponsorPk = vm.envUint("SPONSOR_PRIVATE_KEY");
-        sponsor = vm.addr(sponsorPk);
         bundlerPk = vm.envUint("BUNDLER_PRIVATE_KEY");
         bundler = vm.addr(bundlerPk);
 
@@ -55,39 +45,42 @@ contract E2E4337 is Script {
         _header();
         _step1_deploy();
         _step2_verifyAlice();
-        _step3_deposit();
-        _step4_fundUSDC();
+        _step3_fundPaymaster();
 
-        PackedUserOperation memory op = _step5_signUserOp();
+        PackedUserOperation memory op = _step4_signUserOp();
 
-        _step6_handleOps(op);
-        _step7_verify();
+        _step5_handleOps(op);
+        _step6_verify();
         _footer();
     }
 
     function _header() internal view {
         console.log("================================================");
-        console.log("  ERC-4337 Sponsored Gasless USDC E2E");
+        console.log("  ERC-4337 Paymaster-Sponsored E2E");
         console.log("================================================");
         console.log("  Deployer:   ", deployer);
-        console.log("  Sponsor:    ", sponsor);
         console.log("  Bundler:    ", bundler);
         console.log("  Alice:      ", alice);
         console.log("  EntryPoint: ", address(EP));
-        console.log("  USDC:       ", address(USDC));
         console.log("================================================");
     }
 
     function _step1_deploy() internal {
         console.log("");
-        console.log("[1] Deployer deploys MinimalAccount...");
+        console.log("[1] Deployer deploys MinimalAccount + MockVerifyingPaymaster...");
 
-        vm.broadcast(deployerPk);
+        vm.startBroadcast(deployerPk);
         MinimalAccount impl = new MinimalAccount();
         executorAddr = address(impl);
 
-        require(executorAddr.code.length > 0, "deploy failed");
-        console.log("  Contract:", executorAddr);
+        paymaster = new MockVerifyingPaymaster(EP, deployer);
+        vm.stopBroadcast();
+
+        require(executorAddr.code.length > 0, "MinimalAccount deploy failed");
+        require(address(paymaster).code.length > 0, "Paymaster deploy failed");
+        console.log("  MinimalAccount:", executorAddr);
+        console.log("  Paymaster:", address(paymaster));
+        console.log("  Paymaster owner:", deployer);
         console.log("  PASS: deployed");
     }
 
@@ -96,41 +89,26 @@ contract E2E4337 is Script {
         console.log("[2] Verify Alice starts empty...");
         require(alice.balance == 0, "Alice should have 0 ETH");
         require(alice.code.length == 0, "Alice should have no code");
-        require(USDC.balanceOf(alice) == 0, "Alice should have 0 USDC");
         uint256 nonceBefore = vm.getNonce(alice);
         require(nonceBefore == 0, "Alice nonce should be 0");
         console.log("  ETH: 0");
-        console.log("  USDC: 0");
         console.log("  Nonce:", nonceBefore);
         console.log("  PASS: empty");
     }
 
-    function _step3_deposit() internal {
+    function _step3_fundPaymaster() internal {
         console.log("");
-        console.log("[3] Sponsor deposits to EntryPoint for Alice (gas)...");
+        console.log("[3] Deployer funds paymaster (deposit + stake to EP)...");
 
-        vm.broadcast(sponsorPk);
-        EP.depositTo{ value: 0.01 ether }(alice);
+        vm.startBroadcast(deployerPk);
+        paymaster.deposit{ value: 0.05 ether }();
+        paymaster.addStake{ value: 0.01 ether }(1);
+        vm.stopBroadcast();
 
-        console.log("  PASS: deposited 0.01 ETH to EP for Alice");
-    }
-
-    function _step4_fundUSDC() internal {
-        console.log("");
-        console.log("[4] Sponsor transfers USDC to Alice...");
-
-        uint256 sponsorBefore = USDC.balanceOf(sponsor);
-        require(sponsorBefore >= USDC_AMOUNT, "Sponsor needs USDC");
-        console.log("  Sponsor USDC before:", sponsorBefore / 1e6, "USDC");
-
-        vm.broadcast(sponsorPk);
-        USDC.transfer(alice, USDC_AMOUNT);
-
-        require(USDC.balanceOf(alice) == USDC_AMOUNT, "Alice USDC mismatch");
-        require(alice.balance == 0, "Alice should still have 0 ETH");
-        console.log("  Alice USDC:", USDC_AMOUNT / 1e6, "USDC");
-        console.log("  Alice ETH: 0 (gasless)");
-        console.log("  PASS: funded");
+        uint256 pmDeposit = EP.balanceOf(address(paymaster));
+        console.log("  Paymaster EP deposit:", pmDeposit, "wei");
+        require(pmDeposit >= 0.05 ether, "Paymaster deposit too low");
+        console.log("  PASS: paymaster funded");
     }
 
     /// @dev Compute userOpHash locally (same as EntryPoint.getUserOpHash)
@@ -155,26 +133,37 @@ contract E2E4337 is Script {
         ));
     }
 
-    function _step5_signUserOp() internal returns (PackedUserOperation memory op) {
+    function _buildPaymasterAndData() internal returns (bytes memory) {
+        uint48 validUntil = uint48(block.timestamp + 1 hours);
+        uint48 validAfter = 0;
+
+        bytes32 pmHash = keccak256(abi.encode(alice, uint256(0), validUntil, validAfter));
+        bytes32 pmEthHash = MessageHashUtils.toEthSignedMessageHash(pmHash);
+        (uint8 pmV, bytes32 pmR, bytes32 pmS) = vm.sign(deployerPk, pmEthHash);
+
+        return abi.encodePacked(
+            address(paymaster),
+            uint128(100_000),  // pmVerificationGas
+            uint128(50_000),   // pmPostOpGas
+            bytes6(validUntil),
+            bytes6(validAfter),
+            pmR, pmS, pmV
+        );
+    }
+
+    function _signUserOp(PackedUserOperation memory op) internal returns (bytes memory) {
+        bytes32 opHash = _getUserOpHash(op);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(alicePk, opHash);
+        console.log("  UserOp hash:", vm.toString(opHash));
+        return abi.encodePacked(r, s, v);
+    }
+
+    function _step4_signUserOp() internal returns (PackedUserOperation memory op) {
         console.log("");
-        console.log("[5] Alice signs UserOp (off-chain, 0 gas)...");
+        console.log("[4] Alice signs UserOp with Paymaster (off-chain, 0 gas)...");
 
-        // Alice sends all USDC back to Sponsor via ERC-7821 batch
-        uint256 part1 = 3e6; // 3 USDC
-        uint256 part2 = 2e6; // 2 USDC
-
-        Execution[] memory batch = new Execution[](2);
-        batch[0] = Execution(
-            address(USDC),
-            0,
-            abi.encodeCall(IERC20.transfer, (sponsor, part1))
-        );
-        batch[1] = Execution(
-            address(USDC),
-            0,
-            abi.encodeCall(IERC20.transfer, (sponsor, part2))
-        );
-
+        Execution[] memory batch = new Execution[](1);
+        batch[0] = Execution(deployer, 0, ""); // zero-value call
         bytes memory executionData = abi.encode(batch);
 
         op = PackedUserOperation({
@@ -182,37 +171,28 @@ contract E2E4337 is Script {
             nonce: 0,
             initCode: "",
             callData: abi.encodeCall(IERC7821.execute, (BATCH_MODE, executionData)),
-            // verificationGasLimit=200k, callGasLimit=300k
             accountGasLimits: bytes32(uint256(uint128(200_000)) << 128 | uint128(300_000)),
             preVerificationGas: 100_000,
-            // maxPriorityFeePerGas=1gwei, maxFeePerGas=3gwei
             gasFees: bytes32(uint256(uint128(1 gwei)) << 128 | uint128(3 gwei)),
-            paymasterAndData: "",
+            paymasterAndData: _buildPaymasterAndData(),
             signature: ""
         });
 
-        // OZ SignerEIP7702 uses raw signature (no personal_sign prefix)
-        bytes32 opHash = _getUserOpHash(op);
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(alicePk, opHash);
-        op.signature = abi.encodePacked(r, s, v);
+        op.signature = _signUserOp(op);
 
-        console.log("  Action: execute(BATCH_MODE) -> 2x USDC transfer to Sponsor");
-        console.log("  Transfer: 3 + 2 = 5 USDC");
-        console.log("  UserOp hash:", vm.toString(opHash));
+        console.log("  Action: execute(BATCH_MODE) -> zero-value call to Deployer");
+        console.log("  Paymaster:", address(paymaster));
         console.log("  PASS: signed (no tx, pure off-chain)");
     }
 
-    function _step6_handleOps(PackedUserOperation memory op) internal {
+    function _step5_handleOps(PackedUserOperation memory op) internal {
         console.log("");
-        console.log("[6] Bundler submits handleOps + delegation (type 4 tx)...");
+        console.log("[5] Bundler submits handleOps + delegation (type 4 tx)...");
 
         Vm.SignedDelegation memory signedDelegation = vm.signDelegation(executorAddr, alicePk);
         vm.attachDelegation(signedDelegation);
         console.log("  Alice signed delegation (off-chain):");
         console.log("    target:", executorAddr);
-        console.log("    v:", signedDelegation.v);
-        console.log("    r:", vm.toString(signedDelegation.r));
-        console.log("    s:", vm.toString(signedDelegation.s));
 
         PackedUserOperation[] memory ops = new PackedUserOperation[](1);
         ops[0] = op;
@@ -222,12 +202,12 @@ contract E2E4337 is Script {
 
         vm.setNonce(alice, 1);
 
-        console.log("  PASS: delegation activated + handleOps executed on-chain");
+        console.log("  PASS: delegation activated + handleOps executed via paymaster");
     }
 
-    function _step7_verify() internal view {
+    function _step6_verify() internal view {
         console.log("");
-        console.log("[7] Verify on-chain results...");
+        console.log("[6] Verify on-chain results...");
 
         // Delegation active
         require(alice.code.length == 23, "delegation not set");
@@ -238,21 +218,14 @@ contract E2E4337 is Script {
         require(epNonce == 1, "EP nonce should be 1");
         console.log("  EP nonce:", epNonce);
 
-        // Alice: 0 ETH, 0 USDC
+        // Alice still has 0 ETH (paymaster paid gas)
         require(alice.balance == 0, "Alice ETH should be 0");
-        console.log("  Alice ETH: 0");
-
-        uint256 aliceUsdc = USDC.balanceOf(alice);
-        require(aliceUsdc == 0, "Alice USDC should be 0");
-        console.log("  Alice USDC: 0");
+        console.log("  Alice ETH: 0 (paymaster sponsored)");
 
         // Alice nonce: 1 (from EIP-7702 delegation auth)
         uint256 nonceAfter = vm.getNonce(alice);
         require(nonceAfter == 1, "Alice nonce should be 1 (delegation auth)");
         console.log("  Alice nonce:", nonceAfter, "(delegation auth)");
-
-        // Sponsor recovered USDC
-        console.log("  Sponsor USDC:", USDC.balanceOf(sponsor) / 1e6, "USDC");
 
         console.log("  PASS: all assertions passed");
     }
@@ -262,13 +235,12 @@ contract E2E4337 is Script {
         console.log("================================================");
         console.log("  ALL TESTS PASSED");
         console.log("================================================");
-        console.log("  Alice:    ", alice);
-        console.log("  Alice PK: ", vm.toString(bytes32(alicePk)));
-        console.log("  Executor: ", executorAddr);
-        console.log("  Deployer: ", deployer);
-        console.log("  Sponsor:  ", sponsor);
-        console.log("  Bundler:  ", bundler);
-        console.log("  USDC:     ", address(USDC));
+        console.log("  Alice:      ", alice);
+        console.log("  Alice PK:   ", vm.toString(bytes32(alicePk)));
+        console.log("  Executor:   ", executorAddr);
+        console.log("  Paymaster:  ", address(paymaster));
+        console.log("  Deployer:   ", deployer);
+        console.log("  Bundler:    ", bundler);
         console.log("================================================");
     }
 }

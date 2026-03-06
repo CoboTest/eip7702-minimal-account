@@ -28,3 +28,9 @@ jobs:
 
       - name: Gas report
         run: forge test --gas-report
+
+      - name: Coverage summary
+        run: forge coverage --report summary
+
+      - name: Gas snapshot
+        run: forge snapshot

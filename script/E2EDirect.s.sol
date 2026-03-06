@@ -4,21 +4,19 @@ pragma solidity ^0.8.28;
 import { Script, console } from "forge-std/Script.sol";
 import { Vm } from "forge-std/Vm.sol";
 import { MinimalAccount } from "../src/MinimalAccount.sol";
+import { Execution } from "@openzeppelin/contracts/interfaces/draft-IERC7579.sol";
 
 /// @title E2EDirect - Direct Execution Flow (no ERC-4337)
 /// @notice Two actors:
 ///   - Deployer: deploys MinimalAccount, funds Alice, activates delegation (type 4 tx)
-///   - Alice:    fresh EOA, calls execute() and executeBatch() directly (pays own gas)
-///
-/// @dev Single-run script. Uses vm.setNonce to account for EIP-7702 auth nonce
-///      increment that forge simulation doesn't model.
-///
-///   source .env  # DEPLOYER_PRIVATE_KEY, RPC_URL
-///   forge script script/E2EDirect.s.sol --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
+///   - Alice:    fresh EOA, calls execute() directly via ERC-7821 (pays own gas)
 contract E2EDirect is Script {
     uint256 constant TRANSFER_AMT = 0.00005 ether;
     uint256 constant FUND_AMT = 3 * TRANSFER_AMT; // Exact amount for transfers
-    uint256 constant GAS_AMT = 0.0002 ether;       // Gas budget for Alice's 3 txs
+    uint256 constant GAS_AMT = 0.0002 ether;       // Gas budget for Alice's 2 txs
+
+    /// @dev ERC-7579 batch mode: callType=0x01, rest zeros
+    bytes32 constant BATCH_MODE = bytes32(uint256(0x01) << 248);
 
     uint256 deployerPk;
     address deployer;
@@ -41,7 +39,7 @@ contract E2EDirect is Script {
         _step1_deploy();
         _step2_fund();
         _step3_delegate();
-        _step4_execute();
+        _step4_executeSingle();
         _step5_executeBatch();
         _step6_verify();
         _footer();
@@ -73,7 +71,6 @@ contract E2EDirect is Script {
         console.log("");
         console.log("[2] Deployer funds Alice...");
 
-        // Fund exact transfer amount + gas budget
         vm.broadcast(deployerPk);
         (bool ok,) = alice.call{ value: FUND_AMT + GAS_AMT }("");
         require(ok, "fund failed");
@@ -86,7 +83,6 @@ contract E2EDirect is Script {
         console.log("");
         console.log("[3] Deployer activates Alice's delegation (type 4 tx)...");
 
-        // Alice signs EIP-7702 delegation off-chain
         Vm.SignedDelegation memory sd = vm.signDelegation(executorAddr, alicePk);
         vm.attachDelegation(sd);
         console.log("  Alice signed delegation (off-chain):");
@@ -95,7 +91,6 @@ contract E2EDirect is Script {
         console.log("    r:", vm.toString(sd.r));
         console.log("    s:", vm.toString(sd.s));
 
-        // Deployer sends type 4 tx carrying Alice's delegation
         vm.broadcast(deployerPk);
         (bool ok,) = alice.call{ value: 0 }("");
         require(ok, "delegation tx failed");
@@ -103,20 +98,20 @@ contract E2EDirect is Script {
         require(alice.code.length == 23, "delegation not set");
         console.log("  PASS: delegation active");
 
-        // EIP-7702 auth increments Alice's nonce on-chain (0 -> 1),
-        // but forge simulation doesn't model this. Sync manually
-        // so forge uses the correct nonce for Alice's subsequent txs.
         vm.setNonce(alice, 1);
     }
 
-    function _step4_execute() internal {
+    function _step4_executeSingle() internal {
         console.log("");
         console.log("[4] Alice calls execute() - single transfer to Deployer...");
 
         uint256 balBefore = deployer.balance;
 
+        Execution[] memory batch = new Execution[](1);
+        batch[0] = Execution(deployer, TRANSFER_AMT, "");
+
         vm.broadcast(alicePk);
-        MinimalAccount(payable(alice)).execute(deployer, TRANSFER_AMT, "");
+        MinimalAccount(payable(alice)).execute(BATCH_MODE, abi.encode(batch));
 
         uint256 received = deployer.balance - balBefore;
         require(received == TRANSFER_AMT, "execute transfer failed");
@@ -126,16 +121,16 @@ contract E2EDirect is Script {
 
     function _step5_executeBatch() internal {
         console.log("");
-        console.log("[5] Alice calls executeBatch() - 2x transfer to Deployer...");
+        console.log("[5] Alice calls execute() batch - 2x transfer to Deployer...");
 
         uint256 balBefore = deployer.balance;
 
-        MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](2);
-        calls[0] = MinimalAccount.Call(deployer, TRANSFER_AMT, "");
-        calls[1] = MinimalAccount.Call(deployer, TRANSFER_AMT, "");
+        Execution[] memory batch = new Execution[](2);
+        batch[0] = Execution(deployer, TRANSFER_AMT, "");
+        batch[1] = Execution(deployer, TRANSFER_AMT, "");
 
         vm.broadcast(alicePk);
-        MinimalAccount(payable(alice)).executeBatch(calls);
+        MinimalAccount(payable(alice)).execute(BATCH_MODE, abi.encode(batch));
 
         uint256 received = deployer.balance - balBefore;
         require(received == 2 * TRANSFER_AMT, "batch transfer failed");
@@ -151,7 +146,6 @@ contract E2EDirect is Script {
         console.log("  Delegation: still active");
         console.log("  Alice balance:", alice.balance, "wei (gas remainder)");
 
-        // Alice nonce: 3 = 1 (delegation auth) + 1 (execute) + 1 (executeBatch)
         uint256 nonceAfter = vm.getNonce(alice);
         require(nonceAfter == 3, "Alice nonce should be 3");
         console.log("  Alice nonce:", nonceAfter, "(1 auth + 1 execute + 1 batch)");

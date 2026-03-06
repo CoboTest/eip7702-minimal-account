@@ -4,19 +4,20 @@ pragma solidity ^0.8.28;
 import { Script, console } from "forge-std/Script.sol";
 import { Vm } from "forge-std/Vm.sol";
 import { MinimalAccount } from "../src/MinimalAccount.sol";
+import { VerifyingPaymaster } from "../src/VerifyingPaymaster.sol";
 import { PackedUserOperation, IEntryPoint } from "@openzeppelin/contracts/interfaces/draft-IERC4337.sol";
 import { Execution } from "@openzeppelin/contracts/interfaces/draft-IERC7579.sol";
 import { IERC7821 } from "@openzeppelin/contracts/interfaces/draft-IERC7821.sol";
-import { MessageHashUtils } from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import { MockVerifyingPaymaster } from "../test/mocks/MockVerifyingPaymaster.sol";
 
 /// @title E2EPaymaster — ERC-4337 Paymaster-Sponsored E2E Flow
 /// @notice Three actors:
-///   - Deployer: deploys MinimalAccount + MockVerifyingPaymaster, funds paymaster
+///   - Deployer: deploys MinimalAccount + VerifyingPaymaster, funds paymaster
+///              Acts as both owner and verifyingSigner for testing simplicity
 ///   - Bundler:  submits handleOps tx
 ///   - Alice:    fresh EOA with 0 ETH, uses paymaster for gas sponsorship
 ///
 /// @dev Alice never holds ETH — fully gasless via Paymaster sponsorship.
+///      Uses EIP-712 typed data for paymaster authorization signatures.
 contract E2EPaymaster is Script {
     IEntryPoint constant EP = IEntryPoint(0x0000000071727De22E5E9d8BAf0edAc6f37da032);
 
@@ -30,7 +31,7 @@ contract E2EPaymaster is Script {
     uint256 alicePk;
     address alice;
     address executorAddr;
-    MockVerifyingPaymaster paymaster;
+    VerifyingPaymaster paymaster;
 
     function run() external {
         deployerPk = vm.envUint("DEPLOYER_PRIVATE_KEY");
@@ -68,13 +69,14 @@ contract E2EPaymaster is Script {
 
     function _step1_deploy() internal {
         console.log("");
-        console.log("[1] Deployer deploys MinimalAccount + MockVerifyingPaymaster...");
+        console.log("[1] Deployer deploys MinimalAccount + VerifyingPaymaster...");
 
         vm.startBroadcast(deployerPk);
         MinimalAccount impl = new MinimalAccount();
         executorAddr = address(impl);
 
-        paymaster = new MockVerifyingPaymaster(EP, deployer);
+        // deployer is both owner and verifyingSigner for E2E simplicity
+        paymaster = new VerifyingPaymaster(EP, deployer, deployer);
         vm.stopBroadcast();
 
         require(executorAddr.code.length > 0, "MinimalAccount deploy failed");
@@ -82,6 +84,7 @@ contract E2EPaymaster is Script {
         console.log("  MinimalAccount:", executorAddr);
         console.log("  Paymaster:", address(paymaster));
         console.log("  Paymaster owner:", deployer);
+        console.log("  Paymaster signer:", deployer);
         console.log("  PASS: deployed");
     }
 
@@ -106,7 +109,7 @@ contract E2EPaymaster is Script {
         paymaster.addStake{ value: 0.001 ether }(1);
         vm.stopBroadcast();
 
-        uint256 pmDeposit = EP.balanceOf(address(paymaster));
+        uint256 pmDeposit = paymaster.getDeposit();
         console.log("  Paymaster EP deposit:", pmDeposit, "wei");
         require(pmDeposit >= 0.005 ether, "Paymaster deposit too low");
         console.log("  PASS: paymaster funded");
@@ -138,9 +141,11 @@ contract E2EPaymaster is Script {
         uint48 validUntil = uint48(block.timestamp + 1 hours);
         uint48 validAfter = 0;
 
-        bytes32 pmHash = keccak256(abi.encode(alice, uint256(0), validUntil, validAfter));
-        bytes32 pmEthHash = MessageHashUtils.toEthSignedMessageHash(pmHash);
-        (uint8 pmV, bytes32 pmR, bytes32 pmS) = vm.sign(deployerPk, pmEthHash);
+        // EIP-712 typed data hash via VerifyingPaymaster.getHash()
+        bytes32 pmHash = paymaster.getHash(alice, 0, validUntil, validAfter);
+        (uint8 pmV, bytes32 pmR, bytes32 pmS) = vm.sign(deployerPk, pmHash);
+
+        console.log("  PM authorization hash (EIP-712):", vm.toString(pmHash));
 
         return abi.encodePacked(
             address(paymaster),
@@ -183,6 +188,7 @@ contract E2EPaymaster is Script {
 
         console.log("  Action: execute(BATCH_MODE) -> zero-value call to Deployer");
         console.log("  Paymaster:", address(paymaster));
+        console.log("  Signature scheme: EIP-712 (paymaster) + raw ECDSA (userOp)");
         console.log("  PASS: signed (no tx, pure off-chain)");
     }
 
@@ -235,7 +241,7 @@ contract E2EPaymaster is Script {
         console.log("");
         console.log("[7] Cleanup: withdraw paymaster deposit + stake...");
 
-        uint256 pmDeposit = EP.balanceOf(address(paymaster));
+        uint256 pmDeposit = paymaster.getDeposit();
         console.log("  Remaining deposit:", pmDeposit, "wei");
 
         vm.startBroadcast(deployerPk);

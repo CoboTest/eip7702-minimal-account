@@ -14,9 +14,15 @@ contract MockVerifyingPaymaster is IPaymaster {
     address public immutable owner;
 
     error OnlyEntryPoint();
+    error OnlyOwner();
 
     modifier onlyEP() {
         if (msg.sender != address(entryPoint)) revert OnlyEntryPoint();
+        _;
+    }
+
+    modifier onlyOwner() {
+        if (msg.sender != owner) revert OnlyOwner();
         _;
     }
 
@@ -75,6 +81,21 @@ contract MockVerifyingPaymaster is IPaymaster {
     /// @dev Stake to the EntryPoint
     function addStake(uint32 unstakeDelaySec) external payable {
         entryPoint.addStake{ value: msg.value }(unstakeDelaySec);
+    }
+
+    /// @dev Withdraw deposit from EntryPoint
+    function withdrawTo(address payable to, uint256 amount) external onlyOwner {
+        entryPoint.withdrawTo(to, amount);
+    }
+
+    /// @dev Unlock stake (starts unstake delay countdown)
+    function unlockStake() external onlyOwner {
+        entryPoint.unlockStake();
+    }
+
+    /// @dev Withdraw stake after unstake delay
+    function withdrawStake(address payable to) external onlyOwner {
+        entryPoint.withdrawStake(to);
     }
 
     function _packValidation(bool success, uint48 validAfter, uint48 validUntil)

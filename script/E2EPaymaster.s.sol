@@ -51,6 +51,7 @@ contract E2EPaymaster is Script {
 
         _step5_handleOps(op);
         _step6_verify();
+        _step7_cleanup();
         _footer();
     }
 
@@ -228,6 +229,34 @@ contract E2EPaymaster is Script {
         console.log("  Alice nonce:", nonceAfter, "(delegation auth)");
 
         console.log("  PASS: all assertions passed");
+    }
+
+    function _step7_cleanup() internal {
+        console.log("");
+        console.log("[7] Cleanup: withdraw paymaster deposit + stake...");
+
+        uint256 pmDeposit = EP.balanceOf(address(paymaster));
+        console.log("  Remaining deposit:", pmDeposit, "wei");
+
+        vm.startBroadcast(deployerPk);
+
+        // Withdraw remaining deposit
+        if (pmDeposit > 0) {
+            paymaster.withdrawTo(payable(deployer), pmDeposit);
+            console.log("  Withdrew deposit to deployer");
+        }
+
+        // Unlock stake (starts unstake delay countdown)
+        paymaster.unlockStake();
+        console.log("  Unlocked stake (unstakeDelay=1s)");
+
+        // Withdraw stake (delay=1s, should be immediate in same block)
+        paymaster.withdrawStake(payable(deployer));
+        console.log("  Withdrew stake to deployer");
+
+        vm.stopBroadcast();
+
+        console.log("  PASS: paymaster funds recovered");
     }
 
     function _footer() internal view {

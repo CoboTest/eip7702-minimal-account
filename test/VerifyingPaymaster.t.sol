@@ -53,7 +53,7 @@ contract VerifyingPaymasterTest is Test {
     function setUp() public {
         owner = vm.addr(ownerPk);
         signer = vm.addr(signerPk);
-        ep = ERC4337Utils.ENTRYPOINT_V07;
+        ep = ERC4337Utils.ENTRYPOINT_V08;
 
         // Deploy a mock EP stub that accepts all calls
         MockEntryPointStub stub = new MockEntryPointStub();

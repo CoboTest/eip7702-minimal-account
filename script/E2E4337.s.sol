@@ -21,7 +21,7 @@ interface IERC20 {
 ///   - Alice:    fresh EOA with 0 ETH at all times, signs delegation + UserOp off-chain.
 ///              Receives USDC from Sponsor, sends it back to Sponsor via ERC-4337 batch.
 contract E2E4337 is Script {
-    IEntryPoint constant EP = IEntryPoint(0x0000000071727De22E5E9d8BAf0edAc6f37da032);
+    IEntryPoint constant EP = IEntryPoint(0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108);
 
     /// @dev Circle USDC on Sepolia (6 decimals)
     IERC20 constant USDC = IERC20(0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238);
@@ -133,26 +133,18 @@ contract E2E4337 is Script {
         console.log("  PASS: funded");
     }
 
-    /// @dev Compute userOpHash locally (same as EntryPoint.getUserOpHash)
-    function _packUserOp(PackedUserOperation memory op) internal pure returns (bytes32) {
-        return keccak256(abi.encode(
-            op.sender,
-            op.nonce,
-            keccak256(op.initCode),
-            keccak256(op.callData),
-            op.accountGasLimits,
-            op.preVerificationGas,
-            op.gasFees,
-            keccak256(op.paymasterAndData)
-        ));
-    }
-
+    /// @dev v0.8 userOpHash is EIP-712 — must call EntryPoint directly.
+    ///      Cannot replicate locally (depends on EP's domain separator).
     function _getUserOpHash(PackedUserOperation memory op) internal view returns (bytes32) {
-        return keccak256(abi.encode(
-            _packUserOp(op),
-            address(EP),
-            block.chainid
-        ));
+        // Pack into calldata-compatible format for the EP call
+        PackedUserOperation[] memory ops = new PackedUserOperation[](1);
+        ops[0] = op;
+        // Use staticcall to EP.getUserOpHash()
+        (bool ok, bytes memory ret) = address(EP).staticcall(
+            abi.encodeWithSignature("getUserOpHash((address,uint256,bytes,bytes,bytes32,uint256,bytes32,bytes,bytes))", op)
+        );
+        require(ok, "getUserOpHash failed");
+        return abi.decode(ret, (bytes32));
     }
 
     function _step5_signUserOp() internal returns (PackedUserOperation memory op) {

@@ -19,12 +19,12 @@ A minimal EIP-7702 delegate contract for EOAs built on **OpenZeppelin Contracts 
 | `ERC7821` | OZ — `execute(bytes32 mode, bytes executionData)` with ERC-7579 encoding |
 | `ERC721Holder` | OZ — safe ERC-721 token receive |
 | `ERC1155Holder` | OZ — safe ERC-1155 token receive |
-| EntryPoint | ERC-4337 v0.7 (`0x0000000071727De22E5E9d8BAf0edAc6f37da032`) |
+| EntryPoint | ERC-4337 v0.8 (`0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108`) |
 
 ## Features
 
 - **ERC-7821 Batch Execution** — `execute(bytes32 mode, bytes executionData)` with ERC-7579 batch encoding
-- **Gas Sponsorship** — ERC-4337 v0.7 compatible (`IAccount.validateUserOp`)
+- **Gas Sponsorship** — ERC-4337 v0.8 compatible (`IAccount.validateUserOp`)
 - **Raw ECDSA Signing** — `SignerEIP7702` validates signatures directly (no EIP-191 prefix)
 - **Token Holders** — Safely receive ERC-721 and ERC-1155 tokens
 - **Zero State** — No `initialize()`, no owner storage. EOA private key = sole authority

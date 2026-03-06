@@ -19,7 +19,7 @@ import { IERC7821 } from "@openzeppelin/contracts/interfaces/draft-IERC7821.sol"
 /// @dev Alice never holds ETH — fully gasless via Paymaster sponsorship.
 ///      Uses EIP-712 typed data for paymaster authorization signatures.
 contract E2EPaymaster is Script {
-    IEntryPoint constant EP = IEntryPoint(0x0000000071727De22E5E9d8BAf0edAc6f37da032);
+    IEntryPoint constant EP = IEntryPoint(0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108);
 
     /// @dev ERC-7579 batch mode: callType=0x01, rest zeros
     bytes32 constant BATCH_MODE = bytes32(uint256(0x01) << 248);
@@ -115,26 +115,13 @@ contract E2EPaymaster is Script {
         console.log("  PASS: paymaster funded");
     }
 
-    /// @dev Compute userOpHash locally (same as EntryPoint.getUserOpHash)
-    function _packUserOp(PackedUserOperation memory op) internal pure returns (bytes32) {
-        return keccak256(abi.encode(
-            op.sender,
-            op.nonce,
-            keccak256(op.initCode),
-            keccak256(op.callData),
-            op.accountGasLimits,
-            op.preVerificationGas,
-            op.gasFees,
-            keccak256(op.paymasterAndData)
-        ));
-    }
-
+    /// @dev v0.8 userOpHash is EIP-712 — must call EntryPoint directly.
     function _getUserOpHash(PackedUserOperation memory op) internal view returns (bytes32) {
-        return keccak256(abi.encode(
-            _packUserOp(op),
-            address(EP),
-            block.chainid
-        ));
+        (bool ok, bytes memory ret) = address(EP).staticcall(
+            abi.encodeWithSignature("getUserOpHash((address,uint256,bytes,bytes,bytes32,uint256,bytes32,bytes,bytes))", op)
+        );
+        require(ok, "getUserOpHash failed");
+        return abi.decode(ret, (bytes32));
     }
 
     function _buildPaymasterAndData() internal returns (bytes memory) {
@@ -239,30 +226,22 @@ contract E2EPaymaster is Script {
 
     function _step7_cleanup() internal {
         console.log("");
-        console.log("[7] Cleanup: withdraw paymaster deposit + stake...");
-
-        uint256 pmDeposit = paymaster.getDeposit();
-        console.log("  Remaining deposit:", pmDeposit, "wei");
+        console.log("[7] Cleanup: unlock paymaster stake...");
 
         vm.startBroadcast(deployerPk);
 
-        // Withdraw remaining deposit
-        if (pmDeposit > 0) {
-            paymaster.withdrawTo(payable(deployer), pmDeposit);
-            console.log("  Withdrew deposit to deployer");
-        }
-
         // Unlock stake (starts unstake delay countdown)
+        // Note: withdrawStake requires waiting unstakeDelay seconds after unlock,
+        // which cannot happen in the same transaction/block.
         paymaster.unlockStake();
-        console.log("  Unlocked stake (unstakeDelay=1s)");
-
-        // Withdraw stake (delay=1s, should be immediate in same block)
-        paymaster.withdrawStake(payable(deployer));
-        console.log("  Withdrew stake to deployer");
+        console.log("  Unlocked stake (withdraw after unstakeDelay expires)");
 
         vm.stopBroadcast();
 
-        console.log("  PASS: paymaster funds recovered");
+        uint256 pmDeposit = paymaster.getDeposit();
+        console.log("  Remaining deposit:", pmDeposit, "wei");
+        console.log("  To recover: call paymaster.withdrawTo() and paymaster.withdrawStake()");
+        console.log("  PASS: stake unlock initiated");
     }
 
     function _footer() internal view {

@@ -73,15 +73,16 @@ to_hex() { printf "0x%x" "$1"; }
 # =============================================================================
 echo "[1] Deploy MinimalAccount..."
 
-DEPLOY_OUT=$($FORGE create src/MinimalAccount.sol:MinimalAccount \
+# Use cast to deploy (forge create --json output varies by version)
+BYTECODE=$($FORGE inspect src/MinimalAccount.sol:MinimalAccount bytecode 2>/dev/null)
+DEPLOY_TX_HASH=$($CAST send \
     --rpc-url "$RPC_URL" \
     --private-key "$DEPLOYER_PRIVATE_KEY" \
-    --json 2>/dev/null)
-
-EXECUTOR=$( echo "$DEPLOY_OUT" | jq -r '.deployedTo')
-DEPLOY_TX=$(echo "$DEPLOY_OUT" | jq -r '.transactionHash')
+    --json \
+    --create "$BYTECODE" 2>/dev/null | jq -r '.transactionHash')
+EXECUTOR=$($CAST receipt "$DEPLOY_TX_HASH" contractAddress --rpc-url "$RPC_URL" 2>/dev/null)
 echo "  MinimalAccount: $EXECUTOR"
-echo "  Tx: $DEPLOY_TX"
+echo "  Tx: $DEPLOY_TX_HASH"
 echo "  PASS: deployed"
 echo ""
 
@@ -151,6 +152,9 @@ echo "  Tx: $TX3_HASH"
 ALICE_BAL=$($CAST call "$USDC" "balanceOf(address)(uint256)" "$ALICE" --rpc-url "$RPC_URL")
 echo "  Alice USDC: $ALICE_BAL"
 echo "  PASS: funded"
+
+# Wait for block propagation (bundler simulates against latest confirmed state)
+sleep 6
 echo ""
 
 # =============================================================================
@@ -249,12 +253,12 @@ PAYMASTER_AND_DATA="0x${PM_ADDR_BARE}${PM_VGAS_HEX}${PM_PGAS_HEX}${PM_DATA_BARE}
 # Pack accountGasLimits = uint128(verGas) << 128 | uint128(callGas)
 VG_DEC=$(printf "%d" "$R_VGAS")
 CG_DEC=$(printf "%d" "$R_CGAS")
-ACCOUNT_GAS_LIMITS=$(python3 -c "print(hex(($VG_DEC << 128) | $CG_DEC))")
+ACCOUNT_GAS_LIMITS=$(python3 -c "print('0x' + hex(($VG_DEC << 128) | $CG_DEC)[2:].zfill(64))")
 
 # Pack gasFees = uint128(maxPriority) << 128 | uint128(maxFee)
 MP_DEC=$(printf "%d" "$MAX_PRIO")
 MF_DEC=$(printf "%d" "$MAX_FEE")
-GAS_FEES=$(python3 -c "print(hex(($MP_DEC << 128) | $MF_DEC))")
+GAS_FEES=$(python3 -c "print('0x' + hex(($MP_DEC << 128) | $MF_DEC)[2:].zfill(64))")
 
 PVG_DEC=$(printf "%d" "$R_PVGAS")
 

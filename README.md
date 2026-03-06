@@ -19,12 +19,14 @@ A minimal EIP-7702 delegate contract for EOAs built on **OpenZeppelin Contracts 
 | `ERC7821` | OZ — `execute(bytes32 mode, bytes executionData)` with ERC-7579 encoding |
 | `ERC721Holder` | OZ — safe ERC-721 token receive |
 | `ERC1155Holder` | OZ — safe ERC-1155 token receive |
+| `VerifyingPaymaster` | Custom — EIP-712, Ownable2Step, Pausable, ReentrancyGuard, signer/owner separation |
 | EntryPoint | ERC-4337 v0.7 (`0x0000000071727De22E5E9d8BAf0edAc6f37da032`) |
 
 ## Features
 
 - **ERC-7821 Batch Execution** — `execute(bytes32 mode, bytes executionData)` with ERC-7579 batch encoding
 - **Gas Sponsorship** — ERC-4337 v0.7 compatible (`IAccount.validateUserOp`)
+- **VerifyingPaymaster** — Production-grade paymaster with EIP-712 typed data, signer/owner separation, Pausable, ReentrancyGuard
 - **Raw ECDSA Signing** — `SignerEIP7702` validates signatures directly (no EIP-191 prefix)
 - **Token Holders** — Safely receive ERC-721 and ERC-1155 tokens
 - **Zero State** — No `initialize()`, no owner storage. EOA private key = sole authority
@@ -139,7 +141,7 @@ Three actors — Alice uses a VerifyingPaymaster for fully gasless execution:
 
 | Actor | Role |
 |-------|------|
-| **Deployer** | Deploys MinimalAccount + MockVerifyingPaymaster, funds paymaster |
+| **Deployer** | Deploys MinimalAccount + VerifyingPaymaster, funds paymaster |
 | **Bundler** | Submits `handleOps` type 4 tx |
 | **Alice** | Fresh EOA (0 ETH), signs delegation + UserOp off-chain |
 
@@ -148,6 +150,10 @@ source .env  # DEPLOYER_PRIVATE_KEY, BUNDLER_PRIVATE_KEY, RPC_URL
 
 forge script script/E2EPaymaster.s.sol \
   --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
+
+# After unstakeDelay, recover paymaster funds:
+PAYMASTER=0x... forge script script/PaymasterCleanup.s.sol \
+  --rpc-url $RPC_URL --broadcast
 ```
 
 ### Test Reports

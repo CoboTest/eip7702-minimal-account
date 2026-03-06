@@ -168,14 +168,38 @@ contract E2EPaymaster is Script {
         return keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, structHash));
     }
 
+    // ── Paymaster EIP-712 constants ──
+
+    bytes32 constant PM_DOMAIN_NAME_HASH = keccak256("VerifyingPaymaster");
+    bytes32 constant PM_DOMAIN_VERSION_HASH = keccak256("1");
+    bytes32 constant PAYMASTER_DATA_TYPEHASH = keccak256(
+        "PaymasterData(address sender,uint256 nonce,uint48 validUntil,uint48 validAfter)"
+    );
+
+    /// @dev Compute paymaster authorization hash locally (EIP-712).
+    function _getPaymasterHash(address sender, uint256 nonce, uint48 validUntil, uint48 validAfter) internal view returns (bytes32) {
+        bytes32 pmDomain = keccak256(abi.encode(
+            DOMAIN_TYPEHASH, PM_DOMAIN_NAME_HASH, PM_DOMAIN_VERSION_HASH, block.chainid, address(paymaster)
+        ));
+        bytes32 structHash = keccak256(abi.encode(
+            PAYMASTER_DATA_TYPEHASH, sender, nonce, validUntil, validAfter
+        ));
+        return keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), pmDomain, structHash));
+    }
+
     function _buildPaymasterAndData() internal returns (bytes memory) {
         uint48 validUntil = uint48(block.timestamp + 1 hours);
         uint48 validAfter = 0;
 
-        // EIP-712 typed data hash via VerifyingPaymaster.getHash()
-        bytes32 pmHash = paymaster.getHash(alice, 0, validUntil, validAfter);
-        (uint8 pmV, bytes32 pmR, bytes32 pmS) = vm.sign(deployerPk, pmHash);
+        // Local EIP-712 computation
+        bytes32 pmHash = _getPaymasterHash(alice, 0, validUntil, validAfter);
 
+        // Cross-verify against on-chain getHash()
+        bytes32 onChainPmHash = paymaster.getHash(alice, 0, validUntil, validAfter);
+        require(pmHash == onChainPmHash, "LOCAL vs ON-CHAIN pmHash mismatch!");
+        console.log("  VERIFIED: local pmHash matches paymaster.getHash()");
+
+        (uint8 pmV, bytes32 pmR, bytes32 pmS) = vm.sign(deployerPk, pmHash);
         console.log("  PM authorization hash (EIP-712):", vm.toString(pmHash));
 
         return abi.encodePacked(
@@ -190,6 +214,18 @@ contract E2EPaymaster is Script {
 
     function _signUserOp(PackedUserOperation memory op) internal returns (bytes memory) {
         bytes32 opHash = _getUserOpHash(op);
+
+        // Cross-verify against EP.getUserOpHash() (need delegation attached)
+        Vm.SignedDelegation memory tempDelegation = vm.signDelegation(executorAddr, alicePk);
+        vm.attachDelegation(tempDelegation);
+        (bool ok, bytes memory ret) = address(EP).staticcall(
+            abi.encodeWithSignature("getUserOpHash((address,uint256,bytes,bytes,bytes32,uint256,bytes32,bytes,bytes))", op)
+        );
+        require(ok, "EP.getUserOpHash staticcall failed");
+        bytes32 epHash = abi.decode(ret, (bytes32));
+        require(opHash == epHash, "LOCAL vs EP userOpHash mismatch!");
+        console.log("  VERIFIED: local userOpHash matches EP.getUserOpHash()");
+
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(alicePk, opHash);
         console.log("  UserOp hash:", vm.toString(opHash));
         return abi.encodePacked(r, s, v);

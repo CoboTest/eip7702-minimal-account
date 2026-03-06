@@ -239,30 +239,24 @@ contract E2EPaymaster is Script {
 
     function _step7_cleanup() internal {
         console.log("");
-        console.log("[7] Cleanup: withdraw paymaster deposit + stake...");
-
-        uint256 pmDeposit = paymaster.getDeposit();
-        console.log("  Remaining deposit:", pmDeposit, "wei");
+        console.log("[7] Cleanup: unlock paymaster stake...");
 
         vm.startBroadcast(deployerPk);
 
-        // Withdraw remaining deposit
-        if (pmDeposit > 0) {
-            paymaster.withdrawTo(payable(deployer), pmDeposit);
-            console.log("  Withdrew deposit to deployer");
-        }
-
         // Unlock stake (starts unstake delay countdown)
+        // Note: withdrawStake requires waiting unstakeDelay seconds after unlock.
+        // Deposit withdrawal skipped here — simulation/broadcast gas delta causes
+        // "Withdraw amount too large" when exact amount is computed during simulation.
+        // Use paymaster.withdrawTo() and paymaster.withdrawStake() after script completes.
         paymaster.unlockStake();
-        console.log("  Unlocked stake (unstakeDelay=1s)");
-
-        // Withdraw stake (delay=1s, should be immediate in same block)
-        paymaster.withdrawStake(payable(deployer));
-        console.log("  Withdrew stake to deployer");
+        console.log("  Unlocked stake (withdraw after unstakeDelay expires)");
 
         vm.stopBroadcast();
 
-        console.log("  PASS: paymaster funds recovered");
+        uint256 pmDeposit = paymaster.getDeposit();
+        console.log("  Remaining deposit:", pmDeposit, "wei");
+        console.log("  To recover: call paymaster.withdrawTo() and paymaster.withdrawStake()");
+        console.log("  PASS: stake unlock initiated");
     }
 
     function _footer() internal view {

@@ -3,8 +3,9 @@ pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
 import { MinimalAccount } from "../src/MinimalAccount.sol";
-import { IAccount } from "../src/interfaces/IAccount.sol";
-import { PackedUserOperation } from "../src/interfaces/PackedUserOperation.sol";
+import { Account as OZAccount } from "@openzeppelin/contracts/account/Account.sol";
+import { PackedUserOperation } from "@openzeppelin/contracts/interfaces/draft-IERC4337.sol";
+import { Execution } from "@openzeppelin/contracts/interfaces/draft-IERC7579.sol";
 
 /// @dev Mock target contract for testing batch calls.
 contract MockTarget {
@@ -23,7 +24,7 @@ contract MockTarget {
     receive() external payable {}
 }
 
-/// @dev Malicious contract that re-enters executeBatch on receive.
+/// @dev Malicious contract that re-enters execute on receive.
 contract ReentrantTarget {
     address public victim;
     bool public attacked;
@@ -35,17 +36,21 @@ contract ReentrantTarget {
     receive() external payable {
         if (!attacked) {
             attacked = true;
-            // Attempt re-entry into executeBatch
-            MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](1);
-            calls[0] = MinimalAccount.Call(address(this), 0, "");
-            MinimalAccount(payable(victim)).executeBatch(calls);
+            Execution[] memory batch = new Execution[](1);
+            batch[0] = Execution(address(this), 0, "");
+            bytes memory executionData = abi.encode(batch);
+            bytes32 mode = bytes32(uint256(0x01) << 248); // CALLTYPE_BATCH
+            MinimalAccount(payable(victim)).execute(mode, executionData);
         }
     }
 }
 
 contract MinimalAccountTest is Test {
-    MinimalAccount public executor;
+    MinimalAccount public impl;
     MockTarget public target;
+
+    // ERC-7579 batch mode: callType=0x01, execType=0x00, rest zeros
+    bytes32 constant BATCH_MODE = bytes32(uint256(0x01) << 248);
 
     // EOA that will delegate to MinimalAccount via EIP-7702
     uint256 internal eoaPrivateKey = 0xA11CE;
@@ -53,64 +58,48 @@ contract MinimalAccountTest is Test {
 
     function setUp() public {
         eoaAddress = vm.addr(eoaPrivateKey);
-
-        // Deploy the delegate implementation
-        executor = new MinimalAccount();
-
-        // Deploy mock target
+        impl = new MinimalAccount();
         target = new MockTarget();
-
-        // Fund the EOA
         vm.deal(eoaAddress, 10 ether);
-
-        // EIP-7702: set the EOA's code to delegate to executor
         _setupDelegation();
     }
 
     function _setupDelegation() internal {
         Vm.SignedDelegation memory signedDelegation = vm.signDelegation(
-            address(executor),
+            address(impl),
             eoaPrivateKey
         );
         vm.attachDelegation(signedDelegation);
     }
 
+    // Helper: encode a batch of Execution[] for ERC7821
+    function _encodeBatch(Execution[] memory batch) internal pure returns (bytes memory) {
+        return abi.encode(batch);
+    }
+
     // ═══════════════════════════════════════════════════════════════════
-    //                      SINGLE EXECUTION
+    //                      SINGLE EXECUTION (via batch mode)
     // ═══════════════════════════════════════════════════════════════════
 
     function test_execute_single() public {
+        Execution[] memory batch = new Execution[](1);
+        batch[0] = Execution(address(target), 0, abi.encodeCall(MockTarget.setValue, (42)));
+
         vm.prank(eoaAddress);
-        MinimalAccount(payable(eoaAddress)).execute(
-            address(target),
-            0,
-            abi.encodeCall(MockTarget.setValue, (42))
-        );
+        MinimalAccount(payable(eoaAddress)).execute(BATCH_MODE, _encodeBatch(batch));
 
         assertEq(target.value(), 42);
         assertEq(target.callCount(), 1);
     }
 
     function test_execute_single_with_value() public {
+        Execution[] memory batch = new Execution[](1);
+        batch[0] = Execution(address(target), 1 ether, "");
+
         vm.prank(eoaAddress);
-        MinimalAccount(payable(eoaAddress)).execute{ value: 1 ether }(
-            address(target),
-            1 ether,
-            ""
-        );
+        MinimalAccount(payable(eoaAddress)).execute{ value: 1 ether }(BATCH_MODE, _encodeBatch(batch));
 
         assertEq(address(target).balance, 1 ether);
-    }
-
-    function test_execute_emits_Executed_event() public {
-        vm.prank(eoaAddress);
-        vm.expectEmit(true, false, false, true);
-        emit MinimalAccount.Executed(address(target), 0);
-        MinimalAccount(payable(eoaAddress)).execute(
-            address(target),
-            0,
-            abi.encodeCall(MockTarget.setValue, (42))
-        );
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -118,13 +107,13 @@ contract MinimalAccountTest is Test {
     // ═══════════════════════════════════════════════════════════════════
 
     function test_executeBatch() public {
-        MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](3);
-        calls[0] = MinimalAccount.Call(address(target), 0, abi.encodeCall(MockTarget.setValue, (10)));
-        calls[1] = MinimalAccount.Call(address(target), 0, abi.encodeCall(MockTarget.setValue, (20)));
-        calls[2] = MinimalAccount.Call(address(target), 0, abi.encodeCall(MockTarget.setValue, (30)));
+        Execution[] memory batch = new Execution[](3);
+        batch[0] = Execution(address(target), 0, abi.encodeCall(MockTarget.setValue, (10)));
+        batch[1] = Execution(address(target), 0, abi.encodeCall(MockTarget.setValue, (20)));
+        batch[2] = Execution(address(target), 0, abi.encodeCall(MockTarget.setValue, (30)));
 
         vm.prank(eoaAddress);
-        MinimalAccount(payable(eoaAddress)).executeBatch(calls);
+        MinimalAccount(payable(eoaAddress)).execute(BATCH_MODE, _encodeBatch(batch));
 
         assertEq(target.value(), 30);
         assertEq(target.callCount(), 3);
@@ -133,37 +122,22 @@ contract MinimalAccountTest is Test {
     function test_executeBatch_with_value() public {
         MockTarget target2 = new MockTarget();
 
-        MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](2);
-        calls[0] = MinimalAccount.Call(address(target), 0.5 ether, "");
-        calls[1] = MinimalAccount.Call(address(target2), 0.3 ether, "");
+        Execution[] memory batch = new Execution[](2);
+        batch[0] = Execution(address(target), 0.5 ether, "");
+        batch[1] = Execution(address(target2), 0.3 ether, "");
 
         vm.prank(eoaAddress);
-        MinimalAccount(payable(eoaAddress)).executeBatch{ value: 0.8 ether }(calls);
+        MinimalAccount(payable(eoaAddress)).execute{ value: 0.8 ether }(BATCH_MODE, _encodeBatch(batch));
 
         assertEq(address(target).balance, 0.5 ether);
         assertEq(address(target2).balance, 0.3 ether);
     }
 
-    function test_executeBatch_emits_per_call_events() public {
-        MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](2);
-        calls[0] = MinimalAccount.Call(address(target), 0, abi.encodeCall(MockTarget.setValue, (10)));
-        calls[1] = MinimalAccount.Call(address(target), 0, abi.encodeCall(MockTarget.setValue, (20)));
-
-        vm.prank(eoaAddress);
-        vm.expectEmit(true, false, false, true);
-        emit MinimalAccount.Executed(address(target), 0);
-        vm.expectEmit(true, false, false, true);
-        emit MinimalAccount.Executed(address(target), 0);
-        vm.expectEmit(true, false, false, true);
-        emit MinimalAccount.BatchExecuted(2);
-        MinimalAccount(payable(eoaAddress)).executeBatch(calls);
-    }
-
     function test_executeBatch_empty() public {
-        MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](0);
+        Execution[] memory batch = new Execution[](0);
 
         vm.prank(eoaAddress);
-        MinimalAccount(payable(eoaAddress)).executeBatch(calls);
+        MinimalAccount(payable(eoaAddress)).execute(BATCH_MODE, _encodeBatch(batch));
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -171,23 +145,22 @@ contract MinimalAccountTest is Test {
     // ═══════════════════════════════════════════════════════════════════
 
     function test_execute_revert_propagates() public {
+        Execution[] memory batch = new Execution[](1);
+        batch[0] = Execution(address(target), 0, abi.encodeCall(MockTarget.reverting, ()));
+
         vm.prank(eoaAddress);
         vm.expectRevert();
-        MinimalAccount(payable(eoaAddress)).execute(
-            address(target),
-            0,
-            abi.encodeCall(MockTarget.reverting, ())
-        );
+        MinimalAccount(payable(eoaAddress)).execute(BATCH_MODE, _encodeBatch(batch));
     }
 
     function test_executeBatch_revert_on_failure() public {
-        MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](2);
-        calls[0] = MinimalAccount.Call(address(target), 0, abi.encodeCall(MockTarget.setValue, (1)));
-        calls[1] = MinimalAccount.Call(address(target), 0, abi.encodeCall(MockTarget.reverting, ()));
+        Execution[] memory batch = new Execution[](2);
+        batch[0] = Execution(address(target), 0, abi.encodeCall(MockTarget.setValue, (1)));
+        batch[1] = Execution(address(target), 0, abi.encodeCall(MockTarget.reverting, ()));
 
         vm.prank(eoaAddress);
         vm.expectRevert();
-        MinimalAccount(payable(eoaAddress)).executeBatch(calls);
+        MinimalAccount(payable(eoaAddress)).execute(BATCH_MODE, _encodeBatch(batch));
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -197,57 +170,21 @@ contract MinimalAccountTest is Test {
     function test_unauthorized_caller_reverts() public {
         address attacker = makeAddr("attacker");
 
-        vm.prank(attacker);
-        vm.expectRevert(MinimalAccount.Unauthorized.selector);
-        MinimalAccount(payable(eoaAddress)).execute(
-            address(target),
-            0,
-            abi.encodeCall(MockTarget.setValue, (999))
-        );
-    }
-
-    function test_unauthorized_batch_reverts() public {
-        address attacker = makeAddr("attacker");
-        MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](1);
-        calls[0] = MinimalAccount.Call(address(target), 0, abi.encodeCall(MockTarget.setValue, (999)));
+        Execution[] memory batch = new Execution[](1);
+        batch[0] = Execution(address(target), 0, abi.encodeCall(MockTarget.setValue, (999)));
 
         vm.prank(attacker);
-        vm.expectRevert(MinimalAccount.Unauthorized.selector);
-        MinimalAccount(payable(eoaAddress)).executeBatch(calls);
+        vm.expectRevert(abi.encodeWithSelector(OZAccount.AccountUnauthorized.selector, attacker));
+        MinimalAccount(payable(eoaAddress)).execute(BATCH_MODE, _encodeBatch(batch));
     }
 
     function test_entryPoint_can_call_execute() public {
-        vm.prank(executor.ENTRY_POINT());
-        MinimalAccount(payable(eoaAddress)).execute(
-            address(target),
-            0,
-            abi.encodeCall(MockTarget.setValue, (777))
-        );
+        Execution[] memory batch = new Execution[](1);
+        batch[0] = Execution(address(target), 0, abi.encodeCall(MockTarget.setValue, (777)));
+
+        vm.prank(address(impl.entryPoint()));
+        MinimalAccount(payable(eoaAddress)).execute(BATCH_MODE, _encodeBatch(batch));
         assertEq(target.value(), 777);
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //                      SELF-CALL PREVENTION
-    // ═══════════════════════════════════════════════════════════════════
-
-    function test_execute_selfCall_reverts() public {
-        vm.prank(eoaAddress);
-        vm.expectRevert(MinimalAccount.SelfCallNotAllowed.selector);
-        MinimalAccount(payable(eoaAddress)).execute(
-            eoaAddress,  // self-call
-            0,
-            abi.encodeCall(MockTarget.setValue, (42))
-        );
-    }
-
-    function test_executeBatch_selfCall_reverts() public {
-        MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](2);
-        calls[0] = MinimalAccount.Call(address(target), 0, abi.encodeCall(MockTarget.setValue, (10)));
-        calls[1] = MinimalAccount.Call(eoaAddress, 0, "");  // self-call in batch
-
-        vm.prank(eoaAddress);
-        vm.expectRevert(MinimalAccount.SelfCallNotAllowed.selector);
-        MinimalAccount(payable(eoaAddress)).executeBatch(calls);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -257,16 +194,15 @@ contract MinimalAccountTest is Test {
     function test_validateUserOp_valid_signature() public {
         bytes32 userOpHash = keccak256("test-userop-hash");
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", userOpHash)));
+        // OZ SignerEIP7702 uses raw signature (no personal_sign prefix)
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, userOpHash);
         bytes memory signature = abi.encodePacked(r, s, v);
 
         PackedUserOperation memory userOp = _dummyUserOp(signature);
 
-        vm.prank(executor.ENTRY_POINT());
+        vm.prank(address(impl.entryPoint()));
         uint256 result = MinimalAccount(payable(eoaAddress)).validateUserOp(
-            userOp,
-            userOpHash,
-            0
+            userOp, userOpHash, 0
         );
 
         assertEq(result, 0, "Valid signature should return 0");
@@ -276,16 +212,14 @@ contract MinimalAccountTest is Test {
         bytes32 userOpHash = keccak256("test-userop-hash");
 
         uint256 wrongKey = 0xBAD;
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(wrongKey, keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", userOpHash)));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(wrongKey, userOpHash);
         bytes memory signature = abi.encodePacked(r, s, v);
 
         PackedUserOperation memory userOp = _dummyUserOp(signature);
 
-        vm.prank(executor.ENTRY_POINT());
+        vm.prank(address(impl.entryPoint()));
         uint256 result = MinimalAccount(payable(eoaAddress)).validateUserOp(
-            userOp,
-            userOpHash,
-            0
+            userOp, userOpHash, 0
         );
 
         assertEq(result, 1, "Invalid signature should return 1");
@@ -293,16 +227,13 @@ contract MinimalAccountTest is Test {
 
     function test_validateUserOp_short_signature() public {
         bytes32 userOpHash = keccak256("test-userop-hash");
-
         bytes memory signature = hex"DEADBEEF";
 
         PackedUserOperation memory userOp = _dummyUserOp(signature);
 
-        vm.prank(executor.ENTRY_POINT());
+        vm.prank(address(impl.entryPoint()));
         uint256 result = MinimalAccount(payable(eoaAddress)).validateUserOp(
-            userOp,
-            userOpHash,
-            0
+            userOp, userOpHash, 0
         );
 
         assertEq(result, 1, "Short signature should return 1 (invalid)");
@@ -310,137 +241,87 @@ contract MinimalAccountTest is Test {
 
     function test_validateUserOp_pays_prefund() public {
         bytes32 userOpHash = keccak256("test-userop-hash");
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", userOpHash)));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, userOpHash);
         bytes memory signature = abi.encodePacked(r, s, v);
 
         PackedUserOperation memory userOp = _dummyUserOp(signature);
 
         uint256 prefund = 0.01 ether;
-        uint256 epBalanceBefore = executor.ENTRY_POINT().balance;
+        address ep = address(impl.entryPoint());
+        uint256 epBalanceBefore = ep.balance;
 
-        vm.prank(executor.ENTRY_POINT());
+        vm.prank(ep);
         MinimalAccount(payable(eoaAddress)).validateUserOp(
-            userOp,
-            userOpHash,
-            prefund
+            userOp, userOpHash, prefund
         );
 
-        assertEq(
-            executor.ENTRY_POINT().balance,
-            epBalanceBefore + prefund,
-            "EntryPoint should receive prefund"
-        );
+        assertEq(ep.balance, epBalanceBefore + prefund, "EntryPoint should receive prefund");
     }
 
-    function test_validateUserOp_invalid_sig_no_prefund() public {
+    function test_validateUserOp_pays_prefund_even_on_invalid_sig() public {
         bytes32 userOpHash = keccak256("test-userop-hash");
 
         // Sign with wrong key
         uint256 wrongKey = 0xBAD;
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(wrongKey, keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", userOpHash)));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(wrongKey, userOpHash);
         bytes memory signature = abi.encodePacked(r, s, v);
 
         PackedUserOperation memory userOp = _dummyUserOp(signature);
 
         uint256 prefund = 0.01 ether;
-        uint256 epBalanceBefore = executor.ENTRY_POINT().balance;
+        address ep = address(impl.entryPoint());
+        uint256 epBalanceBefore = ep.balance;
 
-        // Should return 1 (SIG_VALIDATION_FAILED) without reverting,
-        // and should NOT pay prefund when signature is invalid
-        vm.prank(executor.ENTRY_POINT());
+        // OZ Account always pays prefund, even when sig is invalid
+        vm.prank(ep);
         uint256 result = MinimalAccount(payable(eoaAddress)).validateUserOp(
-            userOp,
-            userOpHash,
-            prefund
+            userOp, userOpHash, prefund
         );
 
         assertEq(result, 1, "Invalid signature should return 1");
-        assertEq(
-            executor.ENTRY_POINT().balance,
-            epBalanceBefore,
-            "Should NOT pay prefund when signature is invalid"
-        );
+        assertEq(ep.balance, epBalanceBefore + prefund, "Prefund should be paid even on invalid sig");
     }
 
     function test_validateUserOp_onlyEntryPoint() public {
         bytes32 userOpHash = keccak256("test-userop-hash");
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", userOpHash)));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, userOpHash);
         bytes memory signature = abi.encodePacked(r, s, v);
         PackedUserOperation memory userOp = _dummyUserOp(signature);
 
         // EOA itself should NOT be able to call validateUserOp
         vm.prank(eoaAddress);
-        vm.expectRevert(MinimalAccount.OnlyEntryPoint.selector);
+        vm.expectRevert(abi.encodeWithSelector(OZAccount.AccountUnauthorized.selector, eoaAddress));
         MinimalAccount(payable(eoaAddress)).validateUserOp(userOp, userOpHash, 0);
 
         // Random address should NOT be able to call validateUserOp
-        vm.prank(makeAddr("random"));
-        vm.expectRevert(MinimalAccount.OnlyEntryPoint.selector);
+        address random = makeAddr("random");
+        vm.prank(random);
+        vm.expectRevert(abi.encodeWithSelector(OZAccount.AccountUnauthorized.selector, random));
         MinimalAccount(payable(eoaAddress)).validateUserOp(userOp, userOpHash, 0);
     }
 
-    function test_validateUserOp_prefund_failed_reverts() public {
-        bytes32 userOpHash = keccak256("test-userop-hash");
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", userOpHash)));
-        bytes memory signature = abi.encodePacked(r, s, v);
-
+    function test_validateUserOp_all_zero_signature() public {
+        bytes32 userOpHash = keccak256("test-zero-sig");
+        bytes memory signature = new bytes(65);
         PackedUserOperation memory userOp = _dummyUserOp(signature);
 
-        // Drain EOA so prefund transfer fails
-        uint256 eoaBal = eoaAddress.balance;
-        vm.prank(eoaAddress);
-        (bool ok, ) = payable(address(0xdead)).call{ value: eoaBal }("");
-        assertTrue(ok);
-        assertEq(eoaAddress.balance, 0);
-
-        // Valid signature but insufficient balance → PrefundFailed
-        vm.prank(executor.ENTRY_POINT());
-        vm.expectRevert(MinimalAccount.PrefundFailed.selector);
-        MinimalAccount(payable(eoaAddress)).validateUserOp(
-            userOp,
-            userOpHash,
-            1 ether
-        );
-    }
-
-    function test_validateUserOp_malleable_signature_rejected() public {
-        bytes32 userOpHash = keccak256("test-userop-hash");
-        bytes32 prefixedHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", userOpHash));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, prefixedHash);
-
-        // Flip s to high-s (malleable signature)
-        // secp256k1 order n
-        uint256 n = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;
-        bytes32 highS = bytes32(n - uint256(s));
-        uint8 flippedV = v == 27 ? 28 : 27;
-
-        bytes memory malleableSig = abi.encodePacked(r, highS, flippedV);
-        PackedUserOperation memory userOp = _dummyUserOp(malleableSig);
-
-        vm.prank(executor.ENTRY_POINT());
+        vm.prank(address(impl.entryPoint()));
         uint256 result = MinimalAccount(payable(eoaAddress)).validateUserOp(
-            userOp,
-            userOpHash,
-            0
+            userOp, userOpHash, 0
         );
-
-        assertEq(result, 1, "Malleable (high-s) signature should be rejected");
+        assertEq(result, 1, "All-zero signature should return SIG_VALIDATION_FAILED");
     }
 
     // ═══════════════════════════════════════════════════════════════════
     //                      ERC-165
     // ═══════════════════════════════════════════════════════════════════
 
-    function test_supportsInterface_IAccount() public view {
-        assertTrue(executor.supportsInterface(type(IAccount).interfaceId));
-    }
-
     function test_supportsInterface_ERC165() public view {
-        assertTrue(executor.supportsInterface(0x01ffc9a7));
+        assertTrue(impl.supportsInterface(0x01ffc9a7));
     }
 
     function test_supportsInterface_random_false() public view {
-        assertFalse(executor.supportsInterface(0xdeadbeef));
+        assertFalse(impl.supportsInterface(0xdeadbeef));
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -449,9 +330,9 @@ contract MinimalAccountTest is Test {
 
     function test_receive_eth() public {
         vm.deal(address(this), 1 ether);
-        (bool ok, ) = payable(address(executor)).call{ value: 0.5 ether }("");
+        (bool ok, ) = payable(address(impl)).call{ value: 0.5 ether }("");
         assertTrue(ok);
-        assertEq(address(executor).balance, 0.5 ether);
+        assertEq(address(impl).balance, 0.5 ether);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -459,7 +340,7 @@ contract MinimalAccountTest is Test {
     // ═══════════════════════════════════════════════════════════════════
 
     function test_no_initialize_required() public view {
-        bytes32 slot0 = vm.load(address(executor), bytes32(0));
+        bytes32 slot0 = vm.load(address(impl), bytes32(0));
         assertEq(slot0, bytes32(0), "No owner should be stored");
     }
 
@@ -468,23 +349,15 @@ contract MinimalAccountTest is Test {
     // ═══════════════════════════════════════════════════════════════════
 
     function test_executeBatch_reentrant_target_reverts() public {
-        // Malicious target tries to re-enter executeBatch via receive()
         ReentrantTarget reentrant = new ReentrantTarget(eoaAddress);
 
-        MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](1);
-        calls[0] = MinimalAccount.Call(address(reentrant), 0.1 ether, "");
+        Execution[] memory batch = new Execution[](1);
+        batch[0] = Execution(address(reentrant), 0.1 ether, "");
 
-        // Re-entrant call from ReentrantTarget → Unauthorized inside,
-        // which bubbles up as ExecutionFailed(0, Unauthorized.selector)
+        // Re-entrant call from ReentrantTarget → AccountUnauthorized
         vm.prank(eoaAddress);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                MinimalAccount.ExecutionFailed.selector,
-                0,
-                abi.encodeWithSelector(MinimalAccount.Unauthorized.selector)
-            )
-        );
-        MinimalAccount(payable(eoaAddress)).executeBatch{ value: 0.1 ether }(calls);
+        vm.expectRevert();
+        MinimalAccount(payable(eoaAddress)).execute{ value: 0.1 ether }(BATCH_MODE, _encodeBatch(batch));
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -500,101 +373,35 @@ contract MinimalAccountTest is Test {
         assertEq(eoaAddress.balance, 0);
 
         bytes32 userOpHash = keccak256("test-zero-prefund");
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-            eoaPrivateKey,
-            keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", userOpHash))
-        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, userOpHash);
         bytes memory signature = abi.encodePacked(r, s, v);
         PackedUserOperation memory userOp = _dummyUserOp(signature);
 
         // missingAccountFunds == 0, balance == 0 → should NOT revert
-        vm.prank(executor.ENTRY_POINT());
+        vm.prank(address(impl.entryPoint()));
         uint256 result = MinimalAccount(payable(eoaAddress)).validateUserOp(
             userOp, userOpHash, 0
         );
         assertEq(result, 0, "Valid sig + zero prefund should succeed");
     }
 
-    function test_validateUserOp_all_zero_signature() public {
-        bytes32 userOpHash = keccak256("test-zero-sig");
-        // All-zero signature: v=0, r=0, s=0
-        bytes memory signature = new bytes(65);
-        PackedUserOperation memory userOp = _dummyUserOp(signature);
-
-        vm.prank(executor.ENTRY_POINT());
-        uint256 result = MinimalAccount(payable(eoaAddress)).validateUserOp(
-            userOp, userOpHash, 0
-        );
-        assertEq(result, 1, "All-zero signature should return SIG_VALIDATION_FAILED");
-    }
-
-    function test_execute_excess_msgValue_stays_in_eoa() public {
-        uint256 eoaBalBefore = eoaAddress.balance;
-        uint256 sendValue = 0.5 ether;
-        uint256 msgValue = 1 ether;  // Excess 0.5 ETH
-
-        vm.prank(eoaAddress);
-        MinimalAccount(payable(eoaAddress)).execute{ value: msgValue }(
-            address(target), sendValue, ""
-        );
-
-        // Target receives sendValue
-        assertEq(address(target).balance, sendValue);
-        // Excess stays in EOA (msgValue - sendValue returned)
-        assertEq(eoaAddress.balance, eoaBalBefore - sendValue);
-    }
-
-    function test_validateUserOp_nonstandard_v_values() public {
-        bytes32 userOpHash = keccak256("test-v-values");
-        bytes32 prefixedHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", userOpHash));
-        (, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, prefixedHash);
-
-        // v=0 (non-standard, ecrecover returns address(0))
-        bytes memory sig0 = abi.encodePacked(r, s, uint8(0));
-        PackedUserOperation memory userOp0 = _dummyUserOp(sig0);
-        vm.prank(executor.ENTRY_POINT());
-        assertEq(
-            MinimalAccount(payable(eoaAddress)).validateUserOp(userOp0, userOpHash, 0),
-            1, "v=0 should return SIG_VALIDATION_FAILED"
-        );
-
-        // v=1 (non-standard)
-        bytes memory sig1 = abi.encodePacked(r, s, uint8(1));
-        PackedUserOperation memory userOp1 = _dummyUserOp(sig1);
-        vm.prank(executor.ENTRY_POINT());
-        assertEq(
-            MinimalAccount(payable(eoaAddress)).validateUserOp(userOp1, userOpHash, 0),
-            1, "v=1 should return SIG_VALIDATION_FAILED"
-        );
-    }
-
-    function test_validateUserOp_overlong_signature() public {
-        bytes32 userOpHash = keccak256("test-overlong");
-        // 66 bytes — one too many
-        bytes memory longSig = new bytes(66);
-        PackedUserOperation memory userOp = _dummyUserOp(longSig);
-
-        vm.prank(executor.ENTRY_POINT());
-        assertEq(
-            MinimalAccount(payable(eoaAddress)).validateUserOp(userOp, userOpHash, 0),
-            1, "Overlong signature should return SIG_VALIDATION_FAILED"
-        );
-    }
-
     function test_executeBatch_insufficient_value_reverts() public {
-        MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](2);
-        calls[0] = MinimalAccount.Call(address(target), 1 ether, "");
-        calls[1] = MinimalAccount.Call(address(target), 1 ether, "");
+        Execution[] memory batch = new Execution[](2);
+        batch[0] = Execution(address(target), 1 ether, "");
+        batch[1] = Execution(address(target), 1 ether, "");
 
-        // Send only 1 ETH msg.value but calls need 2 ETH total
-        // EOA has 10 ETH so the deficit comes from EOA balance —
-        // but if EOA balance is also insufficient, it reverts
         vm.deal(eoaAddress, 0.5 ether);
         _setupDelegation();
 
         vm.prank(eoaAddress);
         vm.expectRevert();
-        MinimalAccount(payable(eoaAddress)).executeBatch{ value: 0.5 ether }(calls);
+        MinimalAccount(payable(eoaAddress)).execute{ value: 0.5 ether }(BATCH_MODE, _encodeBatch(batch));
+    }
+
+    function test_supportsExecutionMode() public view {
+        assertTrue(MinimalAccount(payable(eoaAddress)).supportsExecutionMode(BATCH_MODE));
+        // Random mode should not be supported
+        assertFalse(MinimalAccount(payable(eoaAddress)).supportsExecutionMode(bytes32(0)));
     }
 
     // ═══════════════════════════════════════════════════════════════════

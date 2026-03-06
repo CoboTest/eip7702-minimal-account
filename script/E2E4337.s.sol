@@ -4,15 +4,9 @@ pragma solidity ^0.8.28;
 import { Script, console } from "forge-std/Script.sol";
 import { Vm } from "forge-std/Vm.sol";
 import { MinimalAccount } from "../src/MinimalAccount.sol";
-import { PackedUserOperation } from "../src/interfaces/PackedUserOperation.sol";
-
-interface IEntryPoint {
-    function handleOps(PackedUserOperation[] calldata ops, address payable beneficiary) external;
-    function getUserOpHash(PackedUserOperation calldata userOp) external view returns (bytes32);
-    function getNonce(address sender, uint192 key) external view returns (uint256);
-    function balanceOf(address account) external view returns (uint256);
-    function depositTo(address account) external payable;
-}
+import { PackedUserOperation, IEntryPoint } from "@openzeppelin/contracts/interfaces/draft-IERC4337.sol";
+import { Execution } from "@openzeppelin/contracts/interfaces/draft-IERC7579.sol";
+import { IERC7821 } from "@openzeppelin/contracts/interfaces/draft-IERC7821.sol";
 
 interface IERC20 {
     function balanceOf(address) external view returns (uint256);
@@ -23,21 +17,18 @@ interface IERC20 {
 /// @notice Four actors:
 ///   - Deployer: deploys MinimalAccount (fresh each run)
 ///   - Sponsor:  deposits to EntryPoint for Alice (gas) + transfers USDC to Alice.
-///              In production this role is typically a Paymaster; here plain EOA.
 ///   - Bundler:  submits handleOps tx to EntryPoint (pays tx gas, recouped from prefund)
 ///   - Alice:    fresh EOA with 0 ETH at all times, signs delegation + UserOp off-chain.
 ///              Receives USDC from Sponsor, sends it back to Sponsor via ERC-4337 batch.
-///
-/// @dev Alice never holds ETH — fully gasless via EntryPoint sponsorship.
-///
-///   source .env
-///   forge script script/E2E4337.s.sol --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
 contract E2E4337 is Script {
     IEntryPoint constant EP = IEntryPoint(0x0000000071727De22E5E9d8BAf0edAc6f37da032);
 
     /// @dev Circle USDC on Sepolia (6 decimals)
     IERC20 constant USDC = IERC20(0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238);
     uint256 constant USDC_AMOUNT = 5e6; // 5 USDC
+
+    /// @dev ERC-7579 batch mode: callType=0x01, rest zeros
+    bytes32 constant BATCH_MODE = bytes32(uint256(0x01) << 248);
 
     uint256 deployerPk;
     address deployer;
@@ -168,28 +159,29 @@ contract E2E4337 is Script {
         console.log("");
         console.log("[5] Alice signs UserOp (off-chain, 0 gas)...");
 
-        // Alice sends all USDC back to Sponsor via executeBatch
-        // Split into 2 calls to exercise batch: 3 USDC + 2 USDC
+        // Alice sends all USDC back to Sponsor via ERC-7821 batch
         uint256 part1 = 3e6; // 3 USDC
         uint256 part2 = 2e6; // 2 USDC
 
-        MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](2);
-        calls[0] = MinimalAccount.Call(
+        Execution[] memory batch = new Execution[](2);
+        batch[0] = Execution(
             address(USDC),
             0,
             abi.encodeCall(IERC20.transfer, (sponsor, part1))
         );
-        calls[1] = MinimalAccount.Call(
+        batch[1] = Execution(
             address(USDC),
             0,
             abi.encodeCall(IERC20.transfer, (sponsor, part2))
         );
 
+        bytes memory executionData = abi.encode(batch);
+
         op = PackedUserOperation({
             sender: alice,
             nonce: 0,
             initCode: "",
-            callData: abi.encodeCall(MinimalAccount.executeBatch, (calls)),
+            callData: abi.encodeCall(IERC7821.execute, (BATCH_MODE, executionData)),
             // verificationGasLimit=200k, callGasLimit=300k
             accountGasLimits: bytes32(uint256(uint128(200_000)) << 128 | uint128(300_000)),
             preVerificationGas: 100_000,
@@ -199,12 +191,12 @@ contract E2E4337 is Script {
             signature: ""
         });
 
+        // OZ SignerEIP7702 uses raw signature (no personal_sign prefix)
         bytes32 opHash = _getUserOpHash(op);
-        bytes32 prefixedHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", opHash));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(alicePk, prefixedHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(alicePk, opHash);
         op.signature = abi.encodePacked(r, s, v);
 
-        console.log("  Action: executeBatch -> 2x USDC transfer to Sponsor");
+        console.log("  Action: execute(BATCH_MODE) -> 2x USDC transfer to Sponsor");
         console.log("  Transfer: 3 + 2 = 5 USDC");
         console.log("  UserOp hash:", vm.toString(opHash));
         console.log("  PASS: signed (no tx, pure off-chain)");
@@ -228,8 +220,6 @@ contract E2E4337 is Script {
         vm.broadcast(bundlerPk);
         EP.handleOps(ops, payable(bundler));
 
-        // EIP-7702 auth increments Alice's nonce on-chain but forge
-        // simulation doesn't model this. Sync manually for assertions.
         vm.setNonce(alice, 1);
 
         console.log("  PASS: delegation activated + handleOps executed on-chain");

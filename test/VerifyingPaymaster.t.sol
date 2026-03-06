@@ -79,6 +79,11 @@ contract VerifyingPaymasterTest is Test {
         new VerifyingPaymaster(ep, owner, address(0));
     }
 
+    function test_constructor_reverts_zero_entrypoint() public {
+        vm.expectRevert(VerifyingPaymaster.InvalidEntryPoint.selector);
+        new VerifyingPaymaster(IEntryPoint(address(0)), owner, signer);
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     //                      SIGNER MANAGEMENT
     // ═══════════════════════════════════════════════════════════════════

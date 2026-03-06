@@ -66,6 +66,7 @@ contract VerifyingPaymaster is IPaymaster, Ownable2Step, Pausable, ReentrancyGua
     // ═══════════════════════════════════════════════════════════════════
 
     error OnlyEntryPoint();
+    error InvalidEntryPoint();
     error InvalidSignerAddress();
     error InvalidPaymasterDataLength();
     error InsufficientDeposit();
@@ -91,6 +92,7 @@ contract VerifyingPaymaster is IPaymaster, Ownable2Step, Pausable, ReentrancyGua
         address _owner,
         address _signer
     ) Ownable(_owner) {
+        if (address(_ep) == address(0)) revert InvalidEntryPoint();
         if (_signer == address(0)) revert InvalidSignerAddress();
         entryPoint = _ep;
         verifyingSigner = _signer;

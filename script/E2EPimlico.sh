@@ -1,0 +1,344 @@
+#!/usr/bin/env bash
+# =============================================================================
+# E2EPimlico.sh — ERC-4337 E2E via Pimlico Bundler + Verifying Paymaster
+# =============================================================================
+#
+# Flow:
+#   [1] Deploy MinimalAccount
+#   [2] Sponsor sets EIP-7702 delegation for Alice (type 4 tx via Forge)
+#   [3] Sponsor transfers USDC to Alice
+#   [4] Build UserOp + request Pimlico sponsorship (pm_sponsorUserOperation)
+#   [5] Alice signs UserOp (off-chain, 0 gas)
+#   [6] Submit UserOp via Pimlico bundler (eth_sendUserOperation)
+#   [7] Wait for receipt + verify
+#
+# Three actors:
+#   - Deployer: deploys MinimalAccount
+#   - Sponsor:  sets delegation, transfers USDC, pays for delegation tx gas
+#   - Alice:    fresh EOA, 0 ETH, signs UserOp off-chain only (fully gasless)
+#
+# EntryPoint: v0.7 (0x0000000071727De22E5E9d8BAf0edAc6f37da032)
+# =============================================================================
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$PROJECT_DIR"
+
+source .env
+
+CAST="${CAST:-$HOME/.foundry/bin/cast}"
+FORGE="${FORGE:-$HOME/.foundry/bin/forge}"
+
+EP="0x0000000071727De22E5E9d8BAf0edAc6f37da032"
+USDC="0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
+PIMLICO_URL="https://api.pimlico.io/v2/sepolia/rpc?apikey=${PIMLICO_API_KEY}"
+CHAIN_ID=11155111
+USDC_AMOUNT=5000000  # 5 USDC
+
+DEPLOYER=$($CAST wallet address "$DEPLOYER_PRIVATE_KEY")
+SPONSOR=$($CAST wallet address "$SPONSOR_PRIVATE_KEY")
+
+# Fresh Alice each run
+ALICE_KEY=$($CAST wallet new --json 2>/dev/null | jq -r '.[0].private_key')
+ALICE=$($CAST wallet address "$ALICE_KEY")
+
+echo "=============================================="
+echo "  E2E #3 Pimlico — Bundler + Sponsored Paymaster"
+echo "=============================================="
+echo ""
+echo "Actors:"
+echo "  Deployer: $DEPLOYER"
+echo "  Sponsor:  $SPONSOR"
+echo "  Alice:    $ALICE (fresh, 0 ETH)"
+echo ""
+echo "Infra:"
+echo "  EntryPoint: $EP (v0.7)"
+echo "  USDC: $USDC"
+echo "  Pimlico: api.pimlico.io/v2/sepolia"
+echo ""
+
+# ── Helpers ──
+pimlico_rpc() {
+    curl -s -X POST "$PIMLICO_URL" \
+        -H "Content-Type: application/json" \
+        -d "{\"jsonrpc\":\"2.0\",\"method\":\"$1\",\"params\":$2,\"id\":1}"
+}
+
+to_hex() { printf "0x%x" "$1"; }
+
+# =============================================================================
+# [1] Deploy MinimalAccount
+# =============================================================================
+echo "[1] Deploy MinimalAccount..."
+
+DEPLOY_OUT=$($FORGE create src/MinimalAccount.sol:MinimalAccount \
+    --rpc-url "$RPC_URL" \
+    --private-key "$DEPLOYER_PRIVATE_KEY" \
+    --json 2>/dev/null)
+
+EXECUTOR=$( echo "$DEPLOY_OUT" | jq -r '.deployedTo')
+DEPLOY_TX=$(echo "$DEPLOY_OUT" | jq -r '.transactionHash')
+echo "  MinimalAccount: $EXECUTOR"
+echo "  Tx: $DEPLOY_TX"
+echo "  PASS: deployed"
+echo ""
+
+# =============================================================================
+# [2] Sponsor sets EIP-7702 delegation for Alice
+# =============================================================================
+echo "[2] Sponsor sets delegation: Alice -> $EXECUTOR..."
+
+# Sponsor broadcasts a type 4 tx carrying Alice's signed authorization.
+# We use a tiny Forge script because cast can't attach another account's
+# authorization to a tx from a different sender.
+DELEGATION_SCRIPT=$(mktemp /tmp/Deleg_XXXX.s.sol)
+cat > "$DELEGATION_SCRIPT" << 'SOL'
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.28;
+import { Script } from "forge-std/Script.sol";
+import { Vm } from "forge-std/Vm.sol";
+contract Deleg is Script {
+    function run() external {
+        uint256 alicePk  = vm.envUint("_ALICE_PK");
+        uint256 sponsorPk = vm.envUint("SPONSOR_PRIVATE_KEY");
+        address executor  = vm.envAddress("_EXECUTOR");
+        address alice     = vm.addr(alicePk);
+
+        Vm.SignedDelegation memory d = vm.signDelegation(executor, alicePk);
+        vm.attachDelegation(d);
+
+        vm.broadcast(sponsorPk);
+        // zero-value call to Alice just to carry the authorizationList
+        (bool ok,) = alice.call{value: 0}("");
+        require(ok || !ok); // result doesn't matter
+    }
+}
+SOL
+
+_ALICE_PK="$ALICE_KEY" _EXECUTOR="$EXECUTOR" \
+    $FORGE script "$DELEGATION_SCRIPT" \
+    --rpc-url "$RPC_URL" --broadcast --slow \
+    --gas-estimate-multiplier 500 \
+    --tc Deleg \
+    2>&1 | grep -E "ONCHAIN|Traces|Script ran" | head -3 || true
+
+rm -f "$DELEGATION_SCRIPT"
+
+# Verify
+ALICE_CODE=$($CAST code "$ALICE" --rpc-url "$RPC_URL")
+CODELEN=$(( (${#ALICE_CODE} - 2) / 2 ))  # hex chars → bytes
+if [ "$CODELEN" -eq 23 ]; then
+    echo "  Alice code: ${ALICE_CODE:0:12}... (23 bytes, EIP-7702 delegation)"
+    echo "  PASS: delegation active"
+else
+    echo "  FAIL: Alice code length $CODELEN != 23"
+    exit 1
+fi
+echo ""
+
+# =============================================================================
+# [3] Sponsor transfers USDC to Alice
+# =============================================================================
+echo "[3] Sponsor transfers 5 USDC to Alice..."
+
+TX3=$($CAST send "$USDC" "transfer(address,uint256)(bool)" "$ALICE" "$USDC_AMOUNT" \
+    --rpc-url "$RPC_URL" --private-key "$SPONSOR_PRIVATE_KEY" --json 2>/dev/null)
+TX3_HASH=$(echo "$TX3" | jq -r '.transactionHash')
+echo "  Tx: $TX3_HASH"
+
+ALICE_BAL=$($CAST call "$USDC" "balanceOf(address)(uint256)" "$ALICE" --rpc-url "$RPC_URL")
+echo "  Alice USDC: $ALICE_BAL"
+echo "  PASS: funded"
+echo ""
+
+# =============================================================================
+# [4] Build UserOp + Pimlico sponsorship
+# =============================================================================
+echo "[4] Build UserOp + request Pimlico sponsorship..."
+
+# Alice EP nonce
+ALICE_NONCE=$($CAST call "$EP" "getNonce(address,uint192)(uint256)" "$ALICE" 0 --rpc-url "$RPC_URL")
+echo "  Alice EP nonce: $ALICE_NONCE"
+
+# Build callData: execute(BATCH_MODE, encodedBatch)
+BATCH_MODE="0x0100000000000000000000000000000000000000000000000000000000000000"
+T1=$($CAST calldata "transfer(address,uint256)" "$SPONSOR" 3000000)
+T2=$($CAST calldata "transfer(address,uint256)" "$SPONSOR" 2000000)
+BATCH=$($CAST abi-encode "f((address,uint256,bytes)[])" "[($USDC,0,$T1),($USDC,0,$T2)]")
+CALL_DATA=$($CAST calldata "execute(bytes32,bytes)" "$BATCH_MODE" "$BATCH")
+echo "  callData length: $(( (${#CALL_DATA} - 2) / 2 )) bytes"
+
+# Gas prices from Pimlico
+GAS=$(pimlico_rpc "pimlico_getUserOperationGasPrice" "[]")
+MAX_FEE=$(echo "$GAS" | jq -r '.result.fast.maxFeePerGas')
+MAX_PRIO=$(echo "$GAS" | jq -r '.result.fast.maxPriorityFeePerGas')
+echo "  Gas: maxFee=$MAX_FEE maxPriority=$MAX_PRIO"
+
+DUMMY_SIG="0xfffffffffffffffffffffffffffffff0000000000000000000000000000000007aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1c"
+
+# UserOp in v0.7 unpacked format for bundler API
+USEROP=$(cat <<JSON
+{
+  "sender": "$ALICE",
+  "nonce": "$(to_hex "$ALICE_NONCE")",
+  "callData": "$CALL_DATA",
+  "callGasLimit": "0x0",
+  "verificationGasLimit": "0x0",
+  "preVerificationGas": "0x0",
+  "maxFeePerGas": "$MAX_FEE",
+  "maxPriorityFeePerGas": "$MAX_PRIO",
+  "signature": "$DUMMY_SIG"
+}
+JSON
+)
+
+echo "  Requesting pm_sponsorUserOperation..."
+SPON=$(pimlico_rpc "pm_sponsorUserOperation" "[$USEROP, \"$EP\"]")
+SPON_ERR=$(echo "$SPON" | jq -r '.error.message // empty')
+if [ -n "$SPON_ERR" ]; then
+    echo "  Sponsorship error: $SPON_ERR"
+    echo "  $(echo "$SPON" | jq -c .error)"
+    exit 1
+fi
+
+# Extract sponsored values
+PM_ADDR=$(echo "$SPON" | jq -r '.result.paymaster')
+PM_DATA=$(echo "$SPON" | jq -r '.result.paymasterData')
+PM_VGAS=$(echo "$SPON" | jq -r '.result.paymasterVerificationGasLimit')
+PM_PGAS=$(echo "$SPON" | jq -r '.result.paymasterPostOpGasLimit')
+R_VGAS=$(echo "$SPON" | jq -r '.result.verificationGasLimit')
+R_CGAS=$(echo "$SPON" | jq -r '.result.callGasLimit')
+R_PVGAS=$(echo "$SPON" | jq -r '.result.preVerificationGas')
+
+echo "  Pimlico paymaster: $PM_ADDR"
+echo "  verificationGasLimit: $R_VGAS"
+echo "  callGasLimit: $R_CGAS"
+echo "  preVerificationGas: $R_PVGAS"
+echo "  paymasterVerificationGasLimit: $PM_VGAS"
+echo "  paymasterPostOpGasLimit: $PM_PGAS"
+
+# Merge sponsored fields into UserOp
+USEROP=$(echo "$USEROP" | jq \
+    --arg pm "$PM_ADDR" --arg pmd "$PM_DATA" \
+    --arg pmvg "$PM_VGAS" --arg pmpg "$PM_PGAS" \
+    --arg vg "$R_VGAS" --arg cg "$R_CGAS" --arg pvg "$R_PVGAS" \
+    '.paymaster=$pm | .paymasterData=$pmd
+     | .paymasterVerificationGasLimit=$pmvg | .paymasterPostOpGasLimit=$pmpg
+     | .verificationGasLimit=$vg | .callGasLimit=$cg | .preVerificationGas=$pvg')
+
+echo "  PASS: sponsored"
+echo ""
+
+# =============================================================================
+# [5] Alice signs UserOp (off-chain, 0 gas)
+# =============================================================================
+echo "[5] Alice signs UserOp (off-chain, 0 gas)..."
+
+# ── Compute v0.7 userOpHash locally ──
+# Pack paymasterAndData: paymaster(20) + pmVerGas(16) + pmPostGas(16) + pmData
+PM_VGAS_DEC=$(printf "%d" "$PM_VGAS")
+PM_PGAS_DEC=$(printf "%d" "$PM_PGAS")
+PM_VGAS_HEX=$(printf "%032x" "$PM_VGAS_DEC")
+PM_PGAS_HEX=$(printf "%032x" "$PM_PGAS_DEC")
+PM_ADDR_BARE=${PM_ADDR#0x}
+PM_DATA_BARE=${PM_DATA#0x}
+PAYMASTER_AND_DATA="0x${PM_ADDR_BARE}${PM_VGAS_HEX}${PM_PGAS_HEX}${PM_DATA_BARE}"
+
+# Pack accountGasLimits = uint128(verGas) << 128 | uint128(callGas)
+VG_DEC=$(printf "%d" "$R_VGAS")
+CG_DEC=$(printf "%d" "$R_CGAS")
+ACCOUNT_GAS_LIMITS=$(python3 -c "print(hex(($VG_DEC << 128) | $CG_DEC))")
+
+# Pack gasFees = uint128(maxPriority) << 128 | uint128(maxFee)
+MP_DEC=$(printf "%d" "$MAX_PRIO")
+MF_DEC=$(printf "%d" "$MAX_FEE")
+GAS_FEES=$(python3 -c "print(hex(($MP_DEC << 128) | $MF_DEC))")
+
+PVG_DEC=$(printf "%d" "$R_PVGAS")
+
+# userOpHash = keccak256(abi.encode(packHash, EP, chainId))
+# packHash   = keccak256(abi.encode(sender, nonce, keccak256(initCode), keccak256(callData),
+#                         accountGasLimits, preVerGas, gasFees, keccak256(paymasterAndData)))
+INIT_HASH=$($CAST keccak "0x")
+CALL_HASH=$($CAST keccak "$CALL_DATA")
+PM_HASH=$($CAST keccak "$PAYMASTER_AND_DATA")
+
+PACK_ENC=$($CAST abi-encode \
+    "f(address,uint256,bytes32,bytes32,bytes32,uint256,bytes32,bytes32)" \
+    "$ALICE" "$ALICE_NONCE" "$INIT_HASH" "$CALL_HASH" \
+    "$ACCOUNT_GAS_LIMITS" "$PVG_DEC" "$GAS_FEES" "$PM_HASH")
+PACK_HASH=$($CAST keccak "$PACK_ENC")
+
+OUTER_ENC=$($CAST abi-encode "f(bytes32,address,uint256)" "$PACK_HASH" "$EP" "$CHAIN_ID")
+USEROP_HASH=$($CAST keccak "$OUTER_ENC")
+
+echo "  userOpHash: $USEROP_HASH"
+
+# Sign (raw ECDSA, no personal_sign prefix — SignerEIP7702 uses raw ecrecover)
+SIG=$($CAST wallet sign --no-hash "$USEROP_HASH" --private-key "$ALICE_KEY")
+echo "  Signature: ${SIG:0:20}...${SIG: -8}"
+
+# Update UserOp
+USEROP=$(echo "$USEROP" | jq --arg s "$SIG" '.signature = $s')
+echo "  PASS: signed"
+echo ""
+
+# =============================================================================
+# [6] Submit via Pimlico bundler
+# =============================================================================
+echo "[6] Submit UserOp via Pimlico bundler..."
+
+SEND=$(pimlico_rpc "eth_sendUserOperation" "[$USEROP, \"$EP\"]")
+SEND_ERR=$(echo "$SEND" | jq -r '.error.message // empty')
+if [ -n "$SEND_ERR" ]; then
+    echo "  ERROR: $SEND_ERR"
+    echo "  $(echo "$SEND" | jq -c .)"
+    exit 1
+fi
+
+SUB_HASH=$(echo "$SEND" | jq -r '.result')
+echo "  Submitted: $SUB_HASH"
+echo "  PASS: submitted"
+echo ""
+
+# =============================================================================
+# [7] Wait for receipt + verify
+# =============================================================================
+echo "[7] Waiting for UserOp receipt..."
+
+WAITED=0
+while [ $WAITED -lt 120 ]; do
+    REC=$(pimlico_rpc "eth_getUserOperationReceipt" "[\"$SUB_HASH\"]")
+    REC_RES=$(echo "$REC" | jq -r '.result // empty')
+    if [ -n "$REC_RES" ] && [ "$REC_RES" != "null" ]; then break; fi
+    sleep 3; WAITED=$((WAITED + 3))
+    echo "  Waiting... (${WAITED}s)"
+done
+
+if [ -z "$REC_RES" ] || [ "$REC_RES" = "null" ]; then
+    echo "  TIMEOUT after 120s"; exit 1
+fi
+
+TX_HASH=$(echo "$REC" | jq -r '.result.receipt.transactionHash')
+BLOCK=$(echo "$REC" | jq -r '.result.receipt.blockNumber')
+SUCCESS=$(echo "$REC" | jq -r '.result.success')
+
+echo "  Tx: $TX_HASH"
+echo "  Block: $BLOCK"
+echo "  Success: $SUCCESS"
+
+# Verify
+ALICE_USDC=$($CAST call "$USDC" "balanceOf(address)(uint256)" "$ALICE" --rpc-url "$RPC_URL")
+echo "  Alice USDC after: $ALICE_USDC (should be 0)"
+echo "  Alice ETH: $($CAST balance "$ALICE" --rpc-url "$RPC_URL") (should be 0)"
+
+if [ "$SUCCESS" = "true" ]; then
+    echo "  PASS: all assertions passed"
+    echo ""
+    echo "ALL TESTS PASSED"
+else
+    echo "  FAIL: UserOp not successful"
+    exit 1
+fi

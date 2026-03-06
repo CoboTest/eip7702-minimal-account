@@ -19,12 +19,14 @@ A minimal EIP-7702 delegate contract for EOAs built on **OpenZeppelin Contracts 
 | `ERC7821` | OZ — `execute(bytes32 mode, bytes executionData)` with ERC-7579 encoding |
 | `ERC721Holder` | OZ — safe ERC-721 token receive |
 | `ERC1155Holder` | OZ — safe ERC-1155 token receive |
+| `VerifyingPaymaster` | Custom — EIP-712, Ownable2Step, Pausable, ReentrancyGuard, signer/owner separation |
 | EntryPoint | ERC-4337 v0.8 (`0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108`) |
 
 ## Features
 
 - **ERC-7821 Batch Execution** — `execute(bytes32 mode, bytes executionData)` with ERC-7579 batch encoding
 - **Gas Sponsorship** — ERC-4337 v0.8 compatible (`IAccount.validateUserOp`)
+- **VerifyingPaymaster** — Production-grade paymaster with EIP-712 typed data, signer/owner separation, Pausable, ReentrancyGuard
 - **Raw ECDSA Signing** — `SignerEIP7702` validates signatures directly (no EIP-191 prefix)
 - **Token Holders** — Safely receive ERC-721 and ERC-1155 tokens
 - **Zero State** — No `initialize()`, no owner storage. EOA private key = sole authority
@@ -117,7 +119,29 @@ forge script script/E2E4337.s.sol \
   --gas-estimate-multiplier 500
 ```
 
-#### E2E #2: Direct Execution Flow (`E2EDirect.s.sol`)
+#### E2E #2: Paymaster-Sponsored Flow (`E2EPaymaster.s.sol`)
+
+Four actors — Alice uses a VerifyingPaymaster for fully gasless USDC transfers:
+
+| Actor | Role |
+|-------|------|
+| **Deployer** | Deploys MinimalAccount + VerifyingPaymaster, funds paymaster |
+| **Sponsor** | Transfers USDC to Alice (demo-only, not needed in production) |
+| **Bundler** | Submits `handleOps` type 4 tx |
+| **Alice** | Fresh EOA (0 ETH), signs delegation + UserOp off-chain, batch transfers USDC |
+
+```bash
+source .env  # DEPLOYER_PRIVATE_KEY, BUNDLER_PRIVATE_KEY, RPC_URL
+
+forge script script/E2EPaymaster.s.sol \
+  --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
+
+# After unstakeDelay, recover paymaster funds:
+PAYMASTER=0x... forge script script/PaymasterCleanup.s.sol \
+  --rpc-url $RPC_URL --broadcast
+```
+
+#### E2E #3: Direct Execution Flow (`E2EDirect.s.sol`)
 
 Two actors — Deployer sets up delegation, Alice executes directly:
 
@@ -130,23 +154,6 @@ Two actors — Deployer sets up delegation, Alice executes directly:
 source .env  # DEPLOYER_PRIVATE_KEY, RPC_URL
 
 forge script script/E2EDirect.s.sol \
-  --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
-```
-
-#### E2E #3: Paymaster-Sponsored Flow (`E2EPaymaster.s.sol`)
-
-Three actors — Alice uses a VerifyingPaymaster for fully gasless execution:
-
-| Actor | Role |
-|-------|------|
-| **Deployer** | Deploys MinimalAccount + MockVerifyingPaymaster, funds paymaster |
-| **Bundler** | Submits `handleOps` type 4 tx |
-| **Alice** | Fresh EOA (0 ETH), signs delegation + UserOp off-chain |
-
-```bash
-source .env  # DEPLOYER_PRIVATE_KEY, BUNDLER_PRIVATE_KEY, RPC_URL
-
-forge script script/E2EPaymaster.s.sol \
   --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
 ```
 
@@ -168,7 +175,7 @@ Detailed E2E test reports with per-step signature analysis:
 | Variable | Used By | Description |
 |----------|---------|-------------|
 | `DEPLOYER_PRIVATE_KEY` | All | Deploys MinimalAccount |
-| `SPONSOR_PRIVATE_KEY` | E2E4337 | Deposits to EntryPoint + funds Alice |
+| `SPONSOR_PRIVATE_KEY` | E2E4337, E2EPaymaster | Deposits to EntryPoint + transfers USDC to Alice |
 | `BUNDLER_PRIVATE_KEY` | E2E4337, E2EPaymaster | Submits handleOps tx |
 | `RPC_URL` | All | Sepolia RPC endpoint |
 

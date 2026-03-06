@@ -8,24 +8,30 @@ import { VerifyingPaymaster } from "../src/VerifyingPaymaster.sol";
 import { PackedUserOperation, IEntryPoint } from "@openzeppelin/contracts/interfaces/draft-IERC4337.sol";
 import { Execution } from "@openzeppelin/contracts/interfaces/draft-IERC7579.sol";
 import { IERC7821 } from "@openzeppelin/contracts/interfaces/draft-IERC7821.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title E2EPaymaster — ERC-4337 Paymaster-Sponsored E2E Flow
-/// @notice Three actors:
-///   - Deployer: deploys MinimalAccount + VerifyingPaymaster, funds paymaster
-///              Acts as both owner and verifyingSigner for testing simplicity
+/// @notice Four actors:
+///   - Deployer: deploys MinimalAccount + VerifyingPaymaster, funds paymaster.
+///              Acts as both owner and verifyingSigner.
+///   - Sponsor:  transfers USDC to Alice (demo-only, not needed in production)
 ///   - Bundler:  submits handleOps tx
 ///   - Alice:    fresh EOA with 0 ETH, uses paymaster for gas sponsorship
 ///
 /// @dev Alice never holds ETH — fully gasless via Paymaster sponsorship.
+///      Alice transfers USDC back to Deployer to demonstrate real token operations.
 ///      Uses EIP-712 typed data for paymaster authorization signatures.
 contract E2EPaymaster is Script {
     IEntryPoint constant EP = IEntryPoint(0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108);
+    IERC20 constant USDC = IERC20(0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238);
 
     /// @dev ERC-7579 batch mode: callType=0x01, rest zeros
     bytes32 constant BATCH_MODE = bytes32(uint256(0x01) << 248);
 
     uint256 deployerPk;
     address deployer;
+    uint256 sponsorPk;
+    address sponsor;
     uint256 bundlerPk;
     address bundler;
     uint256 alicePk;
@@ -36,6 +42,8 @@ contract E2EPaymaster is Script {
     function run() external {
         deployerPk = vm.envUint("DEPLOYER_PRIVATE_KEY");
         deployer = vm.addr(deployerPk);
+        sponsorPk = vm.envUint("SPONSOR_PRIVATE_KEY");
+        sponsor = vm.addr(sponsorPk);
         bundlerPk = vm.envUint("BUNDLER_PRIVATE_KEY");
         bundler = vm.addr(bundlerPk);
 
@@ -61,6 +69,7 @@ contract E2EPaymaster is Script {
         console.log("  ERC-4337 Paymaster-Sponsored E2E");
         console.log("================================================");
         console.log("  Deployer:   ", deployer);
+        console.log("  Sponsor:    ", sponsor);
         console.log("  Bundler:    ", bundler);
         console.log("  Alice:      ", alice);
         console.log("  EntryPoint: ", address(EP));
@@ -102,8 +111,9 @@ contract E2EPaymaster is Script {
 
     function _step3_fundPaymaster() internal {
         console.log("");
-        console.log("[3] Deployer funds paymaster (deposit + stake to EP)...");
+        console.log("[3] Fund paymaster + transfer USDC to Alice...");
 
+        // Deployer funds paymaster (deposit + stake)
         vm.startBroadcast(deployerPk);
         paymaster.deposit{ value: 0.005 ether }();
         paymaster.addStake{ value: 0.001 ether }(1);
@@ -112,7 +122,15 @@ contract E2EPaymaster is Script {
         uint256 pmDeposit = paymaster.getDeposit();
         console.log("  Paymaster EP deposit:", pmDeposit, "wei");
         require(pmDeposit >= 0.005 ether, "Paymaster deposit too low");
-        console.log("  PASS: paymaster funded");
+
+        // Sponsor transfers 5 USDC to Alice (demo only — user already holds tokens in production)
+        vm.broadcast(sponsorPk);
+        USDC.transfer(alice, 5e6);
+
+        uint256 aliceUsdc = USDC.balanceOf(alice);
+        console.log("  Alice USDC:", aliceUsdc / 1e6);
+        require(aliceUsdc == 5e6, "Alice USDC should be 5");
+        console.log("  PASS: paymaster funded + Alice has USDC");
     }
 
     /// @dev v0.8 userOpHash is EIP-712 — must call EntryPoint directly.
@@ -155,8 +173,10 @@ contract E2EPaymaster is Script {
         console.log("");
         console.log("[4] Alice signs UserOp with Paymaster (off-chain, 0 gas)...");
 
-        Execution[] memory batch = new Execution[](1);
-        batch[0] = Execution(deployer, 0, ""); // zero-value call
+        // Alice sends her 5 USDC back to Deployer (3 + 2) — fully gasless via Paymaster
+        Execution[] memory batch = new Execution[](2);
+        batch[0] = Execution(address(USDC), 0, abi.encodeCall(IERC20.transfer, (deployer, 3e6)));
+        batch[1] = Execution(address(USDC), 0, abi.encodeCall(IERC20.transfer, (deployer, 2e6)));
         bytes memory executionData = abi.encode(batch);
 
         op = PackedUserOperation({
@@ -173,7 +193,7 @@ contract E2EPaymaster is Script {
 
         op.signature = _signUserOp(op);
 
-        console.log("  Action: execute(BATCH_MODE) -> zero-value call to Deployer");
+        console.log("  Action: execute(BATCH_MODE) -> USDC.transfer(deployer, 3e6) + USDC.transfer(deployer, 2e6)");
         console.log("  Paymaster:", address(paymaster));
         console.log("  Signature scheme: EIP-712 (paymaster) + raw ECDSA (userOp)");
         console.log("  PASS: signed (no tx, pure off-chain)");
@@ -216,6 +236,11 @@ contract E2EPaymaster is Script {
         require(alice.balance == 0, "Alice ETH should be 0");
         console.log("  Alice ETH: 0 (paymaster sponsored)");
 
+        // Alice USDC: 0 (all transferred back to Deployer)
+        uint256 aliceUsdc = USDC.balanceOf(alice);
+        require(aliceUsdc == 0, "Alice USDC should be 0");
+        console.log("  Alice USDC: 0 (all transferred to Deployer)");
+
         // Alice nonce: 1 (from EIP-7702 delegation auth)
         uint256 nonceAfter = vm.getNonce(alice);
         require(nonceAfter == 1, "Alice nonce should be 1 (delegation auth)");
@@ -257,7 +282,9 @@ contract E2EPaymaster is Script {
         console.log("  Executor:   ", executorAddr);
         console.log("  Paymaster:  ", address(paymaster));
         console.log("  Deployer:   ", deployer);
+        console.log("  Sponsor:    ", sponsor);
         console.log("  Bundler:    ", bundler);
+        console.log("  USDC:       ", address(USDC));
         console.log("================================================");
     }
 }

@@ -19,12 +19,14 @@
 | `ERC7821` | OZ — `execute(bytes32 mode, bytes executionData)` + ERC-7579 编码 |
 | `ERC721Holder` | OZ — 安全接收 ERC-721 Token |
 | `ERC1155Holder` | OZ — 安全接收 ERC-1155 Token |
+| `VerifyingPaymaster` | 自研 — EIP-712、Ownable2Step、Pausable、ReentrancyGuard、signer/owner 分离 |
 | EntryPoint | ERC-4337 v0.8 (`0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108`) |
 
 ## 功能特性
 
 - **ERC-7821 批量执行** — `execute(bytes32 mode, bytes executionData)` + ERC-7579 batch 编码
 - **Gas 赞助** — 兼容 ERC-4337 v0.8（`IAccount.validateUserOp`）
+- **VerifyingPaymaster** — 生产级 Paymaster，EIP-712 typed data、signer/owner 分离、Pausable、ReentrancyGuard
 - **原始 ECDSA 签名** — `SignerEIP7702` 直接验证签名（无 EIP-191 前缀）
 - **Token 接收** — 安全接收 ERC-721 和 ERC-1155 Token
 - **零状态** — 无 `initialize()`、无 owner 存储，EOA 私钥即唯一权限
@@ -117,7 +119,29 @@ forge script script/E2E4337.s.sol \
   --gas-estimate-multiplier 500
 ```
 
-#### E2E #2: 直接执行流程（`E2EDirect.s.sol`）
+#### E2E #2: Paymaster 赞助流程（`E2EPaymaster.s.sol`）
+
+四个参与者 — Alice 使用 VerifyingPaymaster 实现完全无 gas 的 USDC 转账：
+
+| 参与者 | 角色 |
+|--------|------|
+| **Deployer** | 部署 MinimalAccount + VerifyingPaymaster，为 Paymaster 注资 |
+| **Sponsor** | 为 Alice 转入 USDC（仅演示用，生产环境不需要） |
+| **Bundler** | 提交 `handleOps` type 4 交易 |
+| **Alice** | 全新 EOA（0 ETH），链下签署 delegation + UserOp，批量转 USDC |
+
+```bash
+source .env  # DEPLOYER_PRIVATE_KEY, SPONSOR_PRIVATE_KEY, BUNDLER_PRIVATE_KEY, RPC_URL
+
+forge script script/E2EPaymaster.s.sol \
+  --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
+
+# unstakeDelay 后回收 Paymaster 资金：
+PAYMASTER=0x... forge script script/PaymasterCleanup.s.sol \
+  --rpc-url $RPC_URL --broadcast
+```
+
+#### E2E #3: 直接执行流程（`E2EDirect.s.sol`）
 
 两个参与者 — Deployer 设置 delegation，Alice 直接执行：
 
@@ -130,23 +154,6 @@ forge script script/E2E4337.s.sol \
 source .env  # DEPLOYER_PRIVATE_KEY, RPC_URL
 
 forge script script/E2EDirect.s.sol \
-  --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
-```
-
-#### E2E #3: Paymaster 赞助流程（`E2EPaymaster.s.sol`）
-
-三个参与者 — Alice 使用 VerifyingPaymaster 实现完全无 gas 执行：
-
-| 参与者 | 角色 |
-|--------|------|
-| **Deployer** | 部署 MinimalAccount + MockVerifyingPaymaster，为 Paymaster 注资 |
-| **Bundler** | 提交 `handleOps` type 4 交易 |
-| **Alice** | 全新 EOA（0 ETH），链下签署 delegation + UserOp |
-
-```bash
-source .env  # DEPLOYER_PRIVATE_KEY, BUNDLER_PRIVATE_KEY, RPC_URL
-
-forge script script/E2EPaymaster.s.sol \
   --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
 ```
 
@@ -168,7 +175,7 @@ forge script script/E2EPaymaster.s.sol \
 | 变量 | 使用场景 | 说明 |
 |------|---------|------|
 | `DEPLOYER_PRIVATE_KEY` | 所有脚本 | 部署 MinimalAccount |
-| `SPONSOR_PRIVATE_KEY` | E2E4337 | 向 EntryPoint 存款 + 为 Alice 提供资金 |
+| `SPONSOR_PRIVATE_KEY` | E2E4337, E2EPaymaster | 向 EntryPoint 存款 + 为 Alice 转 USDC |
 | `BUNDLER_PRIVATE_KEY` | E2E4337, E2EPaymaster | 提交 handleOps 交易 |
 | `RPC_URL` | 所有脚本 | Sepolia RPC 端点 |
 

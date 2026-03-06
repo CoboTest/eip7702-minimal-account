@@ -19,7 +19,7 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 ///   - Alice:    fresh EOA with 0 ETH, uses paymaster for gas sponsorship
 ///
 /// @dev Alice never holds ETH — fully gasless via Paymaster sponsorship.
-///      Alice transfers USDC back to Deployer to demonstrate real token operations.
+///      Alice transfers USDC back to Sponsor to demonstrate real token operations.
 ///      Uses EIP-712 typed data for paymaster authorization signatures.
 contract E2EPaymaster is Script {
     IEntryPoint constant EP = IEntryPoint(0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108);
@@ -173,10 +173,10 @@ contract E2EPaymaster is Script {
         console.log("");
         console.log("[4] Alice signs UserOp with Paymaster (off-chain, 0 gas)...");
 
-        // Alice sends her 5 USDC back to Deployer (3 + 2) — fully gasless via Paymaster
+        // Alice sends her 5 USDC back to Sponsor (3 + 2) — fully gasless via Paymaster
         Execution[] memory batch = new Execution[](2);
-        batch[0] = Execution(address(USDC), 0, abi.encodeCall(IERC20.transfer, (deployer, 3e6)));
-        batch[1] = Execution(address(USDC), 0, abi.encodeCall(IERC20.transfer, (deployer, 2e6)));
+        batch[0] = Execution(address(USDC), 0, abi.encodeCall(IERC20.transfer, (sponsor, 3e6)));
+        batch[1] = Execution(address(USDC), 0, abi.encodeCall(IERC20.transfer, (sponsor, 2e6)));
         bytes memory executionData = abi.encode(batch);
 
         op = PackedUserOperation({
@@ -193,7 +193,7 @@ contract E2EPaymaster is Script {
 
         op.signature = _signUserOp(op);
 
-        console.log("  Action: execute(BATCH_MODE) -> USDC.transfer(deployer, 3e6) + USDC.transfer(deployer, 2e6)");
+        console.log("  Action: execute(BATCH_MODE) -> USDC.transfer(sponsor, 3e6) + USDC.transfer(sponsor, 2e6)");
         console.log("  Paymaster:", address(paymaster));
         console.log("  Signature scheme: EIP-712 (paymaster) + raw ECDSA (userOp)");
         console.log("  PASS: signed (no tx, pure off-chain)");
@@ -239,7 +239,7 @@ contract E2EPaymaster is Script {
         // Alice USDC: 0 (all transferred back to Deployer)
         uint256 aliceUsdc = USDC.balanceOf(alice);
         require(aliceUsdc == 0, "Alice USDC should be 0");
-        console.log("  Alice USDC: 0 (all transferred to Deployer)");
+        console.log("  Alice USDC: 0 (all transferred to Sponsor)");
 
         // Alice nonce: 1 (from EIP-7702 delegation auth)
         uint256 nonceAfter = vm.getNonce(alice);

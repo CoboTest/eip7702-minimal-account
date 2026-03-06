@@ -20,12 +20,12 @@
 | `ERC721Holder` | OZ — 安全接收 ERC-721 Token |
 | `ERC1155Holder` | OZ — 安全接收 ERC-1155 Token |
 | `VerifyingPaymaster` | 自研 — EIP-712、Ownable2Step、Pausable、ReentrancyGuard、signer/owner 分离 |
-| EntryPoint | ERC-4337 v0.8 (`0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108`) |
+| EntryPoint | ERC-4337 v0.7 (`0x0000000071727De22E5E9d8BAf0edAc6f37da032`) |
 
 ## 功能特性
 
 - **ERC-7821 批量执行** — `execute(bytes32 mode, bytes executionData)` + ERC-7579 batch 编码
-- **Gas 赞助** — 兼容 ERC-4337 v0.8（`IAccount.validateUserOp`）
+- **Gas 赞助** — 兼容 ERC-4337 v0.7（`IAccount.validateUserOp`）
 - **VerifyingPaymaster** — 生产级 Paymaster，EIP-712 typed data、signer/owner 分离、Pausable、ReentrancyGuard
 - **原始 ECDSA 签名** — `SignerEIP7702` 直接验证签名（无 EIP-191 前缀）
 - **Token 接收** — 安全接收 ERC-721 和 ERC-1155 Token
@@ -175,7 +175,7 @@ forge script script/E2EDirect.s.sol \
 | 变量 | 使用场景 | 说明 |
 |------|---------|------|
 | `DEPLOYER_PRIVATE_KEY` | 所有脚本 | 部署 MinimalAccount |
-| `SPONSOR_PRIVATE_KEY` | E2E4337, E2EPaymaster | 向 EntryPoint 存款 + 为 Alice 转 USDC |
+| `SPONSOR_PRIVATE_KEY` | E2E4337, E2EPaymaster | 为 Alice 提供资金（ETH 存款 / USDC 转账） |
 | `BUNDLER_PRIVATE_KEY` | E2E4337, E2EPaymaster | 提交 handleOps 交易 |
 | `RPC_URL` | 所有脚本 | Sepolia RPC 端点 |
 

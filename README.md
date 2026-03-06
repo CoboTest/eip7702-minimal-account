@@ -20,12 +20,12 @@ A minimal EIP-7702 delegate contract for EOAs built on **OpenZeppelin Contracts 
 | `ERC721Holder` | OZ — safe ERC-721 token receive |
 | `ERC1155Holder` | OZ — safe ERC-1155 token receive |
 | `VerifyingPaymaster` | Custom — EIP-712, Ownable2Step, Pausable, ReentrancyGuard, signer/owner separation |
-| EntryPoint | ERC-4337 v0.8 (`0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108`) |
+| EntryPoint | ERC-4337 v0.7 (`0x0000000071727De22E5E9d8BAf0edAc6f37da032`) |
 
 ## Features
 
 - **ERC-7821 Batch Execution** — `execute(bytes32 mode, bytes executionData)` with ERC-7579 batch encoding
-- **Gas Sponsorship** — ERC-4337 v0.8 compatible (`IAccount.validateUserOp`)
+- **Gas Sponsorship** — ERC-4337 v0.7 compatible (`IAccount.validateUserOp`)
 - **VerifyingPaymaster** — Production-grade paymaster with EIP-712 typed data, signer/owner separation, Pausable, ReentrancyGuard
 - **Raw ECDSA Signing** — `SignerEIP7702` validates signatures directly (no EIP-191 prefix)
 - **Token Holders** — Safely receive ERC-721 and ERC-1155 tokens
@@ -175,7 +175,7 @@ Detailed E2E test reports with per-step signature analysis:
 | Variable | Used By | Description |
 |----------|---------|-------------|
 | `DEPLOYER_PRIVATE_KEY` | All | Deploys MinimalAccount |
-| `SPONSOR_PRIVATE_KEY` | E2E4337, E2EPaymaster | Deposits to EntryPoint + transfers USDC to Alice |
+| `SPONSOR_PRIVATE_KEY` | E2E4337, E2EPaymaster | Funds Alice (ETH deposit / USDC transfer) |
 | `BUNDLER_PRIVATE_KEY` | E2E4337, E2EPaymaster | Submits handleOps tx |
 | `RPC_URL` | All | Sepolia RPC endpoint |
 

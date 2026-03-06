@@ -131,7 +131,7 @@ Four actors — Alice uses a VerifyingPaymaster for fully gasless USDC transfers
 | **Alice** | Fresh EOA (0 ETH), signs delegation + UserOp off-chain, batch transfers USDC |
 
 ```bash
-source .env  # DEPLOYER_PRIVATE_KEY, BUNDLER_PRIVATE_KEY, RPC_URL
+source .env  # DEPLOYER_PRIVATE_KEY, SPONSOR_PRIVATE_KEY, BUNDLER_PRIVATE_KEY, RPC_URL
 
 forge script script/E2EPaymaster.s.sol \
   --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500

@@ -133,28 +133,62 @@ contract E2E4337 is Script {
         console.log("  PASS: funded");
     }
 
-    /// @dev v0.8 userOpHash is EIP-712 — must call EntryPoint directly.
-    ///      Cannot replicate locally (depends on EP's domain separator).
+    // ── EIP-712 constants for local userOpHash computation ──
+
+    /// @dev EIP-712 domain: name="ERC4337", version="1", verifyingContract=EP
+    bytes32 constant DOMAIN_TYPEHASH = keccak256(
+        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+    );
+    bytes32 constant DOMAIN_NAME_HASH = keccak256("ERC4337");
+    bytes32 constant DOMAIN_VERSION_HASH = keccak256("1");
+
+    /// @dev From EP v0.8 UserOperationLib.sol
+    bytes32 constant PACKED_USEROP_TYPEHASH = keccak256(
+        "PackedUserOperation(address sender,uint256 nonce,bytes initCode,bytes callData,bytes32 accountGasLimits,uint256 preVerificationGas,bytes32 gasFees,bytes paymasterAndData)"
+    );
+
+    /// @dev Compute v0.8 userOpHash locally — pure EIP-712, no staticcall needed.
+    ///      For EIP-7702 accounts: hashInitCode = keccak256(delegateAddress) instead of keccak256(initCode).
     function _getUserOpHash(PackedUserOperation memory op) internal view returns (bytes32) {
-        // Pack into calldata-compatible format for the EP call
-        PackedUserOperation[] memory ops = new PackedUserOperation[](1);
-        ops[0] = op;
-        // Use staticcall to EP.getUserOpHash()
-        (bool ok, bytes memory ret) = address(EP).staticcall(
-            abi.encodeWithSignature("getUserOpHash((address,uint256,bytes,bytes,bytes32,uint256,bytes32,bytes,bytes))", op)
-        );
-        require(ok, "getUserOpHash failed");
-        return abi.decode(ret, (bytes32));
+        // 1. Compute domain separator (could be cached, constant per chain)
+        bytes32 domainSeparator = keccak256(abi.encode(
+            DOMAIN_TYPEHASH,
+            DOMAIN_NAME_HASH,
+            DOMAIN_VERSION_HASH,
+            block.chainid,
+            address(EP)
+        ));
+
+        // 2. Compute initCode hash with EIP-7702 override
+        bytes32 hashInitCode;
+        if (op.initCode.length >= 20 && op.initCode[0] == 0x77 && op.initCode[1] == 0x02) {
+            // EIP-7702 marker detected — use delegation address instead of raw initCode
+            hashInitCode = keccak256(abi.encodePacked(executorAddr));
+        } else {
+            hashInitCode = keccak256(op.initCode);
+        }
+
+        // 3. Compute struct hash
+        bytes32 structHash = keccak256(abi.encode(
+            PACKED_USEROP_TYPEHASH,
+            op.sender,
+            op.nonce,
+            hashInitCode,
+            keccak256(op.callData),
+            op.accountGasLimits,
+            op.preVerificationGas,
+            op.gasFees,
+            keccak256(op.paymasterAndData)
+        ));
+
+        // 4. EIP-712: keccak256(0x1901 || domainSeparator || structHash)
+        return keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, structHash));
     }
 
     function _step5_signUserOp() internal returns (PackedUserOperation memory op) {
         console.log("");
-        console.log("[5] Alice signs delegation + UserOp (off-chain, 0 gas)...");
-
-        // Attach delegation first so EP.getUserOpHash() can read Alice's delegation address
-        Vm.SignedDelegation memory signedDelegation = vm.signDelegation(executorAddr, alicePk);
-        vm.attachDelegation(signedDelegation);
-        console.log("  Alice signed delegation (off-chain) -> target:", executorAddr);
+        console.log("[5] Alice signs UserOp (off-chain, 0 gas)...");
+        console.log("  userOpHash computed locally (pure EIP-712, no staticcall)");
 
         // Alice sends all USDC back to Sponsor via ERC-7821 batch
         uint256 part1 = 3e6; // 3 USDC
@@ -190,6 +224,19 @@ contract E2E4337 is Script {
 
         // OZ SignerEIP7702 uses raw signature (no personal_sign prefix)
         bytes32 opHash = _getUserOpHash(op);
+
+        // Cross-verify: local computation must match EP's on-chain result
+        // (need delegation attached for EP staticcall)
+        Vm.SignedDelegation memory tempDelegation = vm.signDelegation(executorAddr, alicePk);
+        vm.attachDelegation(tempDelegation);
+        (bool ok, bytes memory ret) = address(EP).staticcall(
+            abi.encodeWithSignature("getUserOpHash((address,uint256,bytes,bytes,bytes32,uint256,bytes32,bytes,bytes))", op)
+        );
+        require(ok, "EP.getUserOpHash staticcall failed");
+        bytes32 epHash = abi.decode(ret, (bytes32));
+        require(opHash == epHash, "LOCAL vs EP hash mismatch!");
+        console.log("  VERIFIED: local hash matches EP.getUserOpHash()");
+
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(alicePk, opHash);
         op.signature = abi.encodePacked(r, s, v);
 
@@ -203,10 +250,13 @@ contract E2E4337 is Script {
 
     function _step6_handleOps(PackedUserOperation memory op) internal {
         console.log("");
-        console.log("[6] Bundler submits handleOps (type 4 tx, delegation already attached)...");
+        console.log("[6] Bundler submits handleOps + delegation (type 4 tx)...");
 
-        // Delegation was already signed and attached in step 5
-        // Bundler broadcasts handleOps — delegation goes in authorizationList
+        // Alice signs delegation (off-chain) — Bundler includes in authorizationList
+        Vm.SignedDelegation memory signedDelegation = vm.signDelegation(executorAddr, alicePk);
+        vm.attachDelegation(signedDelegation);
+        console.log("  Alice signed delegation (off-chain) -> target:", executorAddr);
+
         PackedUserOperation[] memory ops = new PackedUserOperation[](1);
         ops[0] = op;
 

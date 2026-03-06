@@ -121,16 +121,17 @@ forge script script/E2E4337.s.sol \
 
 #### E2E #2: Paymaster-Sponsored Flow (`E2EPaymaster.s.sol`)
 
-Three actors — Alice uses a VerifyingPaymaster for fully gasless execution:
+Four actors — Alice uses a VerifyingPaymaster for fully gasless USDC transfers:
 
 | Actor | Role |
 |-------|------|
 | **Deployer** | Deploys MinimalAccount + VerifyingPaymaster, funds paymaster |
+| **Sponsor** | Transfers USDC to Alice (demo-only, not needed in production) |
 | **Bundler** | Submits `handleOps` type 4 tx |
-| **Alice** | Fresh EOA (0 ETH), signs delegation + UserOp off-chain |
+| **Alice** | Fresh EOA (0 ETH), signs delegation + UserOp off-chain, batch transfers USDC |
 
 ```bash
-source .env  # DEPLOYER_PRIVATE_KEY, BUNDLER_PRIVATE_KEY, RPC_URL
+source .env  # DEPLOYER_PRIVATE_KEY, SPONSOR_PRIVATE_KEY, BUNDLER_PRIVATE_KEY, RPC_URL
 
 forge script script/E2EPaymaster.s.sol \
   --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500

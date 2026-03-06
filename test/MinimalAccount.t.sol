@@ -4,8 +4,11 @@ pragma solidity ^0.8.28;
 import "forge-std/Test.sol";
 import { MinimalAccount } from "../src/MinimalAccount.sol";
 import { Account as OZAccount } from "@openzeppelin/contracts/account/Account.sol";
-import { PackedUserOperation } from "@openzeppelin/contracts/interfaces/draft-IERC4337.sol";
+import { IAccount, PackedUserOperation } from "@openzeppelin/contracts/interfaces/draft-IERC4337.sol";
+import { IERC7821 } from "@openzeppelin/contracts/interfaces/draft-IERC7821.sol";
 import { Execution } from "@openzeppelin/contracts/interfaces/draft-IERC7579.sol";
+import { IERC721Receiver } from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import { IERC1155Receiver } from "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 
 /// @dev Mock target contract for testing batch calls.
 contract MockTarget {
@@ -402,6 +405,96 @@ contract MinimalAccountTest is Test {
         assertTrue(MinimalAccount(payable(eoaAddress)).supportsExecutionMode(BATCH_MODE));
         // Random mode should not be supported
         assertFalse(MinimalAccount(payable(eoaAddress)).supportsExecutionMode(bytes32(0)));
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //                      FUZZ TESTS
+    // ═══════════════════════════════════════════════════════════════════
+
+    function test_fuzz_validateUserOp_random_key_fails(uint256 randomPk) public {
+        // Bound to valid secp256k1 range, skip if it matches the EOA key
+        randomPk = bound(randomPk, 1, type(uint128).max);
+        vm.assume(randomPk != eoaPrivateKey);
+
+        bytes32 userOpHash = keccak256("fuzz-hash");
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(randomPk, userOpHash);
+        bytes memory signature = abi.encodePacked(r, s, v);
+
+        PackedUserOperation memory userOp = _dummyUserOp(signature);
+
+        vm.prank(address(impl.entryPoint()));
+        uint256 result = MinimalAccount(payable(eoaAddress)).validateUserOp(
+            userOp, userOpHash, 0
+        );
+        assertEq(result, 1, "Random key should return SIG_VALIDATION_FAILED");
+    }
+
+    function test_fuzz_validateUserOp_valid_key_any_hash(bytes32 hash) public {
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, hash);
+        bytes memory signature = abi.encodePacked(r, s, v);
+
+        PackedUserOperation memory userOp = _dummyUserOp(signature);
+
+        vm.prank(address(impl.entryPoint()));
+        uint256 result = MinimalAccount(payable(eoaAddress)).validateUserOp(
+            userOp, hash, 0
+        );
+        assertEq(result, 0, "Valid key with any hash should return 0");
+    }
+
+    function test_fuzz_execute_unauthorized_caller(address caller) public {
+        vm.assume(caller != eoaAddress && caller != address(impl.entryPoint()));
+
+        Execution[] memory batch = new Execution[](1);
+        batch[0] = Execution(address(target), 0, abi.encodeCall(MockTarget.setValue, (999)));
+
+        vm.prank(caller);
+        vm.expectRevert(abi.encodeWithSelector(OZAccount.AccountUnauthorized.selector, caller));
+        MinimalAccount(payable(eoaAddress)).execute(BATCH_MODE, _encodeBatch(batch));
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //                      ERC-165 INTERFACE IDS
+    // ═══════════════════════════════════════════════════════════════════
+
+    function test_supportsInterface_IAccount() public view {
+        assertTrue(
+            MinimalAccount(payable(eoaAddress)).supportsInterface(type(IAccount).interfaceId),
+            "Should support IAccount"
+        );
+    }
+
+    function test_supportsInterface_IERC7821() public view {
+        assertTrue(
+            MinimalAccount(payable(eoaAddress)).supportsInterface(type(IERC7821).interfaceId),
+            "Should support IERC7821"
+        );
+    }
+
+    function test_supportsInterface_IERC721Receiver() public view {
+        assertTrue(
+            MinimalAccount(payable(eoaAddress)).supportsInterface(type(IERC721Receiver).interfaceId),
+            "Should support IERC721Receiver"
+        );
+    }
+
+    function test_supportsInterface_IERC1155Receiver() public view {
+        assertTrue(
+            MinimalAccount(payable(eoaAddress)).supportsInterface(type(IERC1155Receiver).interfaceId),
+            "Should support IERC1155Receiver"
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //                      RECEIVE ETH ON DELEGATED EOA
+    // ═══════════════════════════════════════════════════════════════════
+
+    function test_receive_eth_on_delegated_eoa() public {
+        uint256 balanceBefore = eoaAddress.balance;
+        vm.deal(address(this), 1 ether);
+        (bool ok, ) = payable(eoaAddress).call{ value: 0.5 ether }("");
+        assertTrue(ok, "ETH transfer to delegated EOA should succeed");
+        assertEq(eoaAddress.balance, balanceBefore + 0.5 ether, "Delegated EOA balance should increase");
     }
 
     // ═══════════════════════════════════════════════════════════════════

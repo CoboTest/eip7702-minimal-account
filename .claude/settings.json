@@ -1,1 +1,9 @@
-{"enabledTools":[],"enableAllProjectMcpServers":false,"allowedTools":[],"trustAll":true}
+{
+  "permissions": {
+    "allow": ["Read", "Write", "Edit", "Bash", "WebFetch"],
+    "deny": []
+  },
+  "enableAllProjectMcpServers": false,
+  "allowedTools": [],
+  "trustAll": true
+}

@@ -6,7 +6,9 @@ import { SignerEIP7702 } from "@openzeppelin/contracts/utils/cryptography/signer
 import { ERC7821 } from "@openzeppelin/contracts/account/extensions/draft-ERC7821.sol";
 import { ERC721Holder } from "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import { ERC1155Holder } from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
-import { IEntryPoint } from "@openzeppelin/contracts/interfaces/draft-IERC4337.sol";
+import { IAccount, IEntryPoint } from "@openzeppelin/contracts/interfaces/draft-IERC4337.sol";
+import { IERC7821 } from "@openzeppelin/contracts/interfaces/draft-IERC7821.sol";
+import { IERC721Receiver } from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import { ERC4337Utils } from "@openzeppelin/contracts/account/utils/draft-ERC4337Utils.sol";
 
 /// @title MinimalAccount
@@ -20,6 +22,14 @@ contract MinimalAccount is Account, SignerEIP7702, ERC7821, ERC721Holder, ERC115
     /// @dev Override to use ERC-4337 v0.7 EntryPoint.
     function entryPoint() public view virtual override returns (IEntryPoint) {
         return ERC4337Utils.ENTRYPOINT_V07;
+    }
+
+    /// @dev Register IAccount, IERC7821, and IERC721Receiver interface IDs.
+    function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {
+        return interfaceId == type(IAccount).interfaceId
+            || interfaceId == type(IERC7821).interfaceId
+            || interfaceId == type(IERC721Receiver).interfaceId
+            || super.supportsInterface(interfaceId);
     }
 
     /// @dev Allow EntryPoint to call execute() in addition to self (default).

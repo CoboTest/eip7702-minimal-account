@@ -1,23 +1,34 @@
 # EIP-7702 Minimal Account
 
-A minimal EIP-7702 delegate contract for EOAs. Adds batch execution and ERC-4337 gas sponsorship with **zero initialization** — no owner storage, no `initialize()`, no frontrunning attack surface.
+A minimal EIP-7702 delegate contract for EOAs built on **OpenZeppelin Contracts v5.6.1**. Adds ERC-7821 batch execution and ERC-4337 gas sponsorship with **zero initialization** — no owner storage, no `initialize()`, no frontrunning attack surface.
+
+## Stack
+
+| Component | Source |
+|-----------|--------|
+| `Account` | OZ — ERC-4337 `validateUserOp` + prefund logic |
+| `SignerEIP7702` | OZ — raw ECDSA signature validation against `address(this)` |
+| `ERC7821` | OZ — `execute(bytes32 mode, bytes executionData)` with ERC-7579 encoding |
+| `ERC721Holder` | OZ — safe ERC-721 token receive |
+| `ERC1155Holder` | OZ — safe ERC-1155 token receive |
+| EntryPoint | ERC-4337 v0.7 (`0x0000000071727De22E5E9d8BAf0edAc6f37da032`) |
 
 ## Features
 
-- **Batch Execution** — Execute multiple calls in a single transaction
-- **Single Execution** — Convenience function for single calls
+- **ERC-7821 Batch Execution** — `execute(bytes32 mode, bytes executionData)` with ERC-7579 batch encoding
 - **Gas Sponsorship** — ERC-4337 v0.7 compatible (`IAccount.validateUserOp`)
+- **Raw ECDSA Signing** — `SignerEIP7702` validates signatures directly (no EIP-191 prefix)
+- **Token Holders** — Safely receive ERC-721 and ERC-1155 tokens
 - **Zero State** — No `initialize()`, no owner storage. EOA private key = sole authority
-- **Self-Call Protection** — Blocks calls targeting the EOA itself (prevents privilege escalation)
-- **ERC-165** — Interface detection support
+- **ERC-165** — Interface detection for IAccount, IERC7821, IERC721Receiver, IERC1155Receiver
 
 ## Design Philosophy
 
 Traditional Smart Accounts store an `owner` in contract storage, requiring an `initialize()` call that's vulnerable to frontrunning attacks. This contract takes a different approach:
 
-- The EOA's private key is the **only** authority (`ecrecover` against `address(this)`)
+- The EOA's private key is the **only** authority (raw ECDSA via `SignerEIP7702`)
 - No storage means no initialization, which means **zero attack surface**
-- Compatible with ERC-7821 Minimal Batch Executor interface
+- ERC-7821 interface for batch execution with ERC-7579 encoding
 
 ## Architecture
 
@@ -33,23 +44,25 @@ Traditional Smart Accounts store an `owner` in contract storage, requiring an `i
 └─────────────────────────────────────────┘
          │                    │
     Direct call          ERC-4337 UserOp
-    (msg.sender == self)  (via EntryPoint)
+    (msg.sender == self   (via EntryPoint)
+     or EntryPoint)
          │                    │
          ▼                    ▼
-   executeBatch()      validateUserOp()
-   execute()           → ecrecover == address(this)
+   execute(mode, data)  validateUserOp()
+   ERC-7821 interface   → raw ECDSA == address(this)
 ```
 
 ## Usage
 
-### Direct Batch Execution
+### ERC-7821 Batch Execution
 
 ```solidity
-MinimalAccount.Call[] memory calls = new MinimalAccount.Call[](2);
-calls[0] = MinimalAccount.Call(tokenA, 0, abi.encodeCall(IERC20.approve, (router, amount)));
-calls[1] = MinimalAccount.Call(router, 0, abi.encodeCall(IRouter.swap, (tokenA, tokenB, amount)));
+Execution[] memory batch = new Execution[](2);
+batch[0] = Execution(tokenA, 0, abi.encodeCall(IERC20.approve, (router, amount)));
+batch[1] = Execution(router, 0, abi.encodeCall(IRouter.swap, (tokenA, tokenB, amount)));
 
-MinimalAccount(payable(myEOA)).executeBatch(calls);
+bytes32 BATCH_MODE = bytes32(uint256(0x01) << 248);
+MinimalAccount(payable(myEOA)).execute(BATCH_MODE, abi.encode(batch));
 ```
 
 ### Gas-Sponsored Execution (ERC-4337)
@@ -57,9 +70,9 @@ MinimalAccount(payable(myEOA)).executeBatch(calls);
 ```solidity
 PackedUserOperation memory userOp = PackedUserOperation({
     sender: myEOA,
-    callData: abi.encodeCall(MinimalAccount.executeBatch, (calls)),
+    callData: abi.encodeCall(IERC7821.execute, (BATCH_MODE, abi.encode(batch))),
     // ... other fields
-    signature: eoaSignature
+    signature: rawEcdsaSignature  // no EIP-191 prefix
 });
 ```
 
@@ -72,19 +85,17 @@ forge build
 forge test -vvv
 ```
 
-26 tests covering: access control, delegation, batch execution, UserOp validation (EIP-191, malleable sig, prefund), ERC-165, edge cases.
-
 ### E2E Tests (Sepolia)
 
-Two E2E scripts demonstrate different execution paths. Both use Forge Script with on-chain broadcast.
+Three E2E scripts demonstrate different execution paths. All use Forge Script with on-chain broadcast.
 
-#### E2E #1: ERC-4337 Sponsored Gasless Flow
+#### E2E #1: ERC-4337 Sponsored Gasless Flow (`E2E4337.s.sol`)
 
 Four actors — Alice signs off-chain only, never pays gas:
 
 | Actor | Role |
 |-------|------|
-| **Deployer** | Deploys fresh MinimalAccount |
+| **Deployer** | Deploys MinimalAccount |
 | **Sponsor** | Deposits to EntryPoint for Alice + funds transfer values |
 | **Bundler** | Submits `handleOps` type 4 tx |
 | **Alice** | Fresh EOA (0 ETH), signs delegation + UserOp off-chain |
@@ -98,24 +109,14 @@ forge script script/E2E4337.s.sol \
   --gas-estimate-multiplier 500
 ```
 
-**Flow:**
-1. Deployer deploys MinimalAccount
-2. Verify Alice starts empty (0 ETH, no code)
-3. Sponsor deposits to EntryPoint for Alice
-4. Sponsor funds Alice with transfer values
-5. Alice signs UserOp off-chain (0 gas)
-6. **Alice signs EIP-7702 delegation off-chain** → `(v, r, s)` signature authorizing MinimalAccount
-7. Bundler submits `handleOps` + delegation in single type 4 tx
-8. Verify: delegation active, EP nonce incremented, Alice balance = 0
-
-#### E2E #2: Direct Execution Flow (no ERC-4337)
+#### E2E #2: Direct Execution Flow (`E2EDirect.s.sol`)
 
 Two actors — Deployer sets up delegation, Alice executes directly:
 
 | Actor | Role |
 |-------|------|
 | **Deployer** | Deploys MinimalAccount, funds Alice, activates delegation (type 4 tx) |
-| **Alice** | Fresh EOA, calls `execute()` + `executeBatch()` directly (pays own gas) |
+| **Alice** | Fresh EOA, calls `execute()` directly (pays own gas) |
 
 ```bash
 source .env  # DEPLOYER_PRIVATE_KEY, RPC_URL
@@ -124,72 +125,47 @@ forge script script/E2EDirect.s.sol \
   --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
 ```
 
-**Flow:**
-1. Deployer deploys MinimalAccount
-2. Deployer funds Alice with 0.01 ETH
-3. **Alice signs EIP-7702 delegation off-chain** → Deployer carries it in type 4 tx
-4. Alice calls `execute()` — single transfer to Deployer
-5. Alice calls `executeBatch()` — 2× transfer to Deployer
-6. Verify: delegation persistent, all transfers received
+#### E2E #3: Paymaster-Sponsored Flow (`E2EPaymaster.s.sol`)
 
-> **Note:** Uses `vm.setNonce` to account for EIP-7702 auth nonce increment that forge simulation doesn't model.
+Three actors — Alice uses a VerifyingPaymaster for fully gasless execution:
 
-#### EIP-7702 Delegation Signing
+| Actor | Role |
+|-------|------|
+| **Deployer** | Deploys MinimalAccount + MockVerifyingPaymaster, funds paymaster |
+| **Bundler** | Submits `handleOps` type 4 tx |
+| **Alice** | Fresh EOA (0 ETH), signs delegation + UserOp off-chain |
 
-Both E2E scripts demonstrate the delegation signing process:
+```bash
+source .env  # DEPLOYER_PRIVATE_KEY, BUNDLER_PRIVATE_KEY, RPC_URL
 
+forge script script/E2EPaymaster.s.sol \
+  --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
 ```
-Alice signs: signDelegation(implementationAddress, alicePrivateKey)
-  → SignedDelegation { v, r, s }
-  → Embedded in type 4 tx authorization list
-  → EVM processes authorization BEFORE execution
-  → Delegation is active when contract calls run
-```
-
-**Important:** The delegation must be carried by a **third party** (Bundler or Deployer), not Alice herself. When Alice sends her own type 4 tx, the auth nonce and tx nonce both start at 0, causing a nonce conflict that invalidates the delegation.
 
 ### Notes
 
 - **Gas estimation**: Forge underestimates gas for type 4 (EIP-7702) txs → use `--gas-estimate-multiplier 500`
 - **Random Alice**: Each run generates a fresh Alice keypair via `vm.randomUint()`
-- Test reports are saved to `test-reports/`
+- **Signature format**: `SignerEIP7702` uses raw ECDSA (no EIP-191 prefix). Standard ERC-4337 SDKs that use `personal_sign` will NOT work — sign the `userOpHash` directly.
 
 ## Environment Variables
 
 | Variable | Used By | Description |
 |----------|---------|-------------|
-| `DEPLOYER_PRIVATE_KEY` | Both | Deploys MinimalAccount |
+| `DEPLOYER_PRIVATE_KEY` | All | Deploys MinimalAccount |
 | `SPONSOR_PRIVATE_KEY` | E2E4337 | Deposits to EntryPoint + funds Alice |
-| `BUNDLER_PRIVATE_KEY` | E2E4337 | Submits handleOps tx |
-| `RPC_URL` | Both | Sepolia RPC endpoint |
+| `BUNDLER_PRIVATE_KEY` | E2E4337, E2EPaymaster | Submits handleOps tx |
+| `RPC_URL` | All | Sepolia RPC endpoint |
 
 > Alice's key is generated via `vm.randomUint()` — fresh random keypair each run, no env var needed.
-
-## Signature Format (EIP-191)
-
-> **Important for integrators:** This contract uses `personal_sign` (EIP-191), not raw `eth_sign`.
-
-Standard ERC-4337 SDKs sign the `userOpHash` directly. This contract wraps it with `\x19Ethereum Signed Message:\n32` before `ecrecover`, so the signing side must use `personal_sign`:
-
-```javascript
-// ✅ Correct — personal_sign (EIP-191)
-const signature = await signer.signMessage(ethers.getBytes(userOpHash));
-
-// ❌ Wrong — raw sign
-const signature = await signer.signMessage(userOpHash);
-```
-
-**Why:** Raw signing of opaque 32-byte hashes allows blind-signing attacks. With `personal_sign`, wallet UIs display a distinct confirmation dialog, making it harder for malicious dApps to trick users into signing dangerous UserOps.
 
 ## Security
 
 - **No frontrunning risk** — Nothing to initialize, nothing to steal
-- **Signature validation** — EIP-191 prefix + rejects malleable signatures (EIP-2)
-- **Access control** — Only the EOA itself or EntryPoint can execute
-- **Self-call blocked** — Prevents re-entrant privilege escalation via batch
+- **Signature validation** — Raw ECDSA via `SignerEIP7702` (rejects malleable signatures per EIP-2)
+- **Access control** — Only the EOA itself or EntryPoint can call `execute()`
 - **No delegatecall** — All calls are regular `call`, preventing storage corruption
 - **validateUserOp** — Restricted to EntryPoint only (per ERC-4337 spec)
-- **Prefund gating** — Only pays EntryPoint prefund when signature is valid
 
 ## License
 

@@ -1,5 +1,13 @@
 # EIP-7702 Minimal Account
 
+[![Test](https://github.com/CoboTest/eip7702-minimal-account/actions/workflows/test.yml/badge.svg)](https://github.com/CoboTest/eip7702-minimal-account/actions/workflows/test.yml)
+[![Solidity](https://img.shields.io/badge/Solidity-0.8.28-blue)](https://soliditylang.org/)
+[![OpenZeppelin](https://img.shields.io/badge/OpenZeppelin-v5.6.1-purple)](https://www.openzeppelin.com/contracts)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Foundry](https://img.shields.io/badge/Built%20with-Foundry-orange)](https://getfoundry.sh/)
+
+[🇨🇳 中文版](README_zh.md)
+
 A minimal EIP-7702 delegate contract for EOAs built on **OpenZeppelin Contracts v5.6.1**. Adds ERC-7821 batch execution and ERC-4337 gas sponsorship with **zero initialization** — no owner storage, no `initialize()`, no frontrunning attack surface.
 
 ## Stack
@@ -141,6 +149,13 @@ source .env  # DEPLOYER_PRIVATE_KEY, BUNDLER_PRIVATE_KEY, RPC_URL
 forge script script/E2EPaymaster.s.sol \
   --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
 ```
+
+### Test Reports
+
+Detailed E2E test reports with per-step signature analysis:
+
+- [English Report](test-reports/e2e-20260306-oz-en.md)
+- [中文报告](test-reports/e2e-20260306-oz-zh.md)
 
 ### Notes
 

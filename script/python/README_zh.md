@@ -8,8 +8,7 @@ EIP-7702 Minimal Batch Executor 的纯 Python E2E 测试套件。运行时无需
 
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/)（包管理器）
-- 已编译的 Solidity 产物（在项目根目录运行 `forge build`）
-- 项目根目录下的 `.env` 配置文件
+- `.env` 配置文件（见[环境变量](#环境变量)）
 
 ## 快速开始
 
@@ -27,7 +26,7 @@ uv run e2e_pimlico.py --ep-version v0.8
 
 ## 环境变量
 
-在项目根目录（`eip7702-minimal-account/.env`）创建 `.env` 文件：
+在**项目根目录**（与 `foundry.toml` 同级）创建 `.env` 文件。参考 [`.env.example`](../../.env.example) 模板：
 
 ```env
 RPC_URL=https://eth-sepolia.g.alchemy.com/v2/<your-key>
@@ -120,7 +119,7 @@ paymaster = PimlicoPaymaster(url, entry_point)
 | EIP-7702 标记 | 无 | `factory = "0x7702"` |
 | `hashInitCode` | `keccak256(initCode)` | `keccak256(delegateAddress)`（EIP-7702） |
 
-> **重要：** 编译产物（`out/`）必须与 EP 版本匹配。运行前需在正确的分支上构建：
+> **注意：** 脚本从 `out/` 目录读取编译产物。如果产物缺失，运行 `forge build`。产物必须与 EP 版本匹配——在正确的分支上构建：
 > - `main` 分支 → EP v0.7
 > - `feature/entrypoint-v08` 分支 → EP v0.8
 

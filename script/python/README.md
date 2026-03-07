@@ -8,8 +8,7 @@ Pure Python E2E test suite for the EIP-7702 Minimal Batch Executor. No CLI tools
 
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/) (package manager)
-- Compiled Solidity artifacts (`forge build` in project root)
-- `.env` file in project root with required keys
+- `.env` file with required keys (see [Environment Variables](#environment-variables))
 
 ## Quick Start
 
@@ -27,7 +26,7 @@ uv run e2e_pimlico.py --ep-version v0.8
 
 ## Environment Variables
 
-Create a `.env` file in the project root (`eip7702-minimal-account/.env`):
+Create a `.env` file in the **project root directory** (same level as `foundry.toml`). See [`.env.example`](../../.env.example) for a template:
 
 ```env
 RPC_URL=https://eth-sepolia.g.alchemy.com/v2/<your-key>
@@ -120,7 +119,7 @@ The script supports both EP v0.7 and v0.8 via `--ep-version`:
 | EIP-7702 marker | N/A | `factory = "0x7702"` |
 | `hashInitCode` | `keccak256(initCode)` | `keccak256(delegateAddress)` for EIP-7702 |
 
-> **Important:** The compiled artifacts (`out/`) must match the EP version. Build on the correct branch before running:
+> **Note:** The script reads compiled artifacts from the `out/` directory. Run `forge build` if artifacts are missing. The artifacts must match the EP version — build on the correct branch:
 > - `main` branch → EP v0.7
 > - `feature/entrypoint-v08` branch → EP v0.8
 

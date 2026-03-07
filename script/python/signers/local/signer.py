@@ -1,41 +1,11 @@
-"""
-Signer abstraction for EIP-7702 E2E tests.
+"""Local private key signer (in-memory)."""
 
-The Signer interface is a pure signing primitive — it only signs a 32-byte hash.
-All hash computation (delegation, UserOp, paymaster) happens in upper layers.
-
-Usage:
-    signer = LocalSigner.random()           # fresh keypair
-    signer = LocalSigner(private_key_hex)   # from existing key
-
-    v, r, s = signer.sign_hash(hash_bytes)  # raw ECDSA, no prefix
-"""
-
-from abc import ABC, abstractmethod
 from typing import Tuple
 
 from eth_account import Account
 from eth_keys import keys
 
-
-class Signer(ABC):
-    """Abstract signer — signs a 32-byte hash, returns (v, r, s)."""
-
-    @property
-    @abstractmethod
-    def address(self) -> str:
-        """Checksummed Ethereum address."""
-        ...
-
-    @abstractmethod
-    def sign_hash(self, msg_hash: bytes) -> Tuple[int, int, int]:
-        """
-        Sign a 32-byte hash with raw ECDSA (no EIP-191 prefix).
-
-        Returns:
-            (v, r, s) where v is 27 or 28, r and s are integers.
-        """
-        ...
+from signers.base import Signer
 
 
 class LocalSigner(Signer):
@@ -65,7 +35,11 @@ class LocalSigner(Signer):
         """Raw ECDSA sign (no personal_sign prefix)."""
         assert len(msg_hash) == 32, f"Expected 32 bytes, got {len(msg_hash)}"
         sig = self._pk_obj.sign_msg_hash(msg_hash)
-        return sig.v + 27, int.from_bytes(sig.r.to_bytes(32, "big"), "big"), int.from_bytes(sig.s.to_bytes(32, "big"), "big")
+        return (
+            sig.v + 27,
+            int.from_bytes(sig.r.to_bytes(32, "big"), "big"),
+            int.from_bytes(sig.s.to_bytes(32, "big"), "big"),
+        )
 
     @classmethod
     def random(cls) -> "LocalSigner":

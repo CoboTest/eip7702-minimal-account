@@ -70,7 +70,7 @@ script/python/
 
 ### 签名者抽象
 
-`Signer` 接口是纯签名原语——只负责签署 32 字节哈希。所有哈希计算（EIP-7702 delegation、UserOp）在 `hash.py` 中完成。
+`Signer` 接口提供两个签名原语：`sign_hash()` 用于链下 32 字节哈希（delegation、UserOp），`sign_transaction()` 用于链上以太坊交易。所有哈希计算在 `hash.py` 中完成。
 
 ```python
 from signers.local import LocalSigner

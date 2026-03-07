@@ -39,6 +39,11 @@ class LocalSigner(Signer):
             int.from_bytes(sig.s.to_bytes(32, "big"), "big"),
         )
 
+    def sign_transaction(self, tx: dict) -> bytes:
+        """Sign an Ethereum transaction, return raw bytes."""
+        signed = Account.sign_transaction(tx, self._private_key)
+        return signed.raw_transaction
+
     @classmethod
     def random(cls) -> "LocalSigner":
         """Generate a fresh random signer."""

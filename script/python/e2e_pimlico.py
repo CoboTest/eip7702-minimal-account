@@ -51,17 +51,18 @@ from hash import (
 )
 from artifacts import load_artifact
 from providers.pimlico import PimlicoBundler, PimlicoPaymaster
+from signers import Signer
 from signers.local import LocalSigner
 
 logger = logging.getLogger(__name__)
 
 
 async def sign_and_send_tx(
-    w3: AsyncWeb3, signer: LocalSigner, tx: dict, *, timeout: int = 60
+    w3: AsyncWeb3, signer: Signer, tx: dict, *, timeout: int = 60
 ) -> bytes:
     """Sign a transaction with a Signer and send it. Returns tx hash."""
-    signed = w3.eth.account.sign_transaction(tx, signer.private_key)
-    tx_hash = await w3.eth.send_raw_transaction(signed.raw_transaction)
+    raw_tx = signer.sign_transaction(tx)
+    tx_hash = await w3.eth.send_raw_transaction(raw_tx)
     await w3.eth.wait_for_transaction_receipt(tx_hash, timeout=timeout)
     return tx_hash
 

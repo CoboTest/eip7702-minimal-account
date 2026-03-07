@@ -70,7 +70,7 @@ script/python/
 
 ### Signer Abstraction
 
-The `Signer` interface is a pure signing primitive — it only signs a raw 32-byte hash. All hash computation (EIP-7702 delegation, UserOp) lives in `hash.py`.
+The `Signer` interface provides two signing primitives: `sign_hash()` for off-chain 32-byte hashes (delegation, UserOp) and `sign_transaction()` for on-chain Ethereum transactions. All hash computation lives in `hash.py`.
 
 ```python
 from signers.local import LocalSigner

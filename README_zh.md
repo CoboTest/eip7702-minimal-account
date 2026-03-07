@@ -14,12 +14,8 @@
 
 > 所有测试已在 Sepolia 验证。62 单元测试 + 4 E2E 脚本全部通过。
 
-| 报告 | 说明 |
-|------|------|
-| 📊 [ERC-4337 Comparison (EN)](test-reports/e2e-4337-en.md) | Three ERC-4337 scenarios compared: Self-Bundled vs Self-Paymaster vs Pimlico |
-| 📊 [ERC-4337 对比报告 (中文)](test-reports/e2e-4337-zh.md) | 三种 ERC-4337 场景横向对比 |
-| 📄 [Direct Execution (EN)](test-reports/e2e-direct-en.md) | Non-ERC-4337 direct execution flow |
-| 📄 [直接执行报告 (中文)](test-reports/e2e-direct-zh.md) | 非 ERC-4337 直接执行流程 |
+- 📊 [ERC-4337 — 三场景横向对比](test-reports/e2e-4337-zh.md) — Self-Bundled vs Self-Paymaster vs Pimlico
+- 📄 [直接执行流程](test-reports/e2e-direct-zh.md) — 非 ERC-4337 直接执行
 
 ## 技术栈
 

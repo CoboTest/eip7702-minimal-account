@@ -14,12 +14,8 @@ A minimal EIP-7702 delegate contract for EOAs built on **OpenZeppelin Contracts 
 
 > All tests verified on Sepolia. 62 unit tests + 4 E2E scripts passing.
 
-| Report | Description |
-|--------|-------------|
-| 📊 [ERC-4337 Comparison (EN)](test-reports/e2e-4337-en.md) | Three ERC-4337 scenarios compared: Self-Bundled vs Self-Paymaster vs Pimlico |
-| 📊 [ERC-4337 对比报告 (中文)](test-reports/e2e-4337-zh.md) | 三种 ERC-4337 场景横向对比 |
-| 📄 [Direct Execution (EN)](test-reports/e2e-direct-en.md) | Non-ERC-4337 direct execution flow |
-| 📄 [直接执行报告 (中文)](test-reports/e2e-direct-zh.md) | 非 ERC-4337 直接执行流程 |
+- 📊 [ERC-4337 — Three Scenarios Compared](test-reports/e2e-4337-en.md) — Self-Bundled vs Self-Paymaster vs Pimlico
+- 📄 [Direct Execution](test-reports/e2e-direct-en.md) — Non-ERC-4337 direct execution flow
 
 ## Stack
 

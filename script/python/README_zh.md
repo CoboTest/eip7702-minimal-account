@@ -19,6 +19,26 @@ uv run e2e_pimlico.py
 
 `uv run` 首次运行时自动创建 `.venv` 并安装依赖。
 
+## 开发环境
+
+```bash
+# 安装开发依赖（ruff, pre-commit）
+cd script/python
+uv pip install -e ".[dev]"
+
+# 安装 pre-commit hooks（在项目根目录执行）
+cd ../..
+pre-commit install
+
+# 手动运行检查
+pre-commit run --all-files
+
+# 或直接运行 ruff
+cd script/python
+ruff check .
+ruff format .
+```
+
 ## 环境变量
 
 在**项目根目录**（与 `foundry.toml` 同级）创建 `.env` 文件。参考 [`.env.example`](../../.env.example) 模板：

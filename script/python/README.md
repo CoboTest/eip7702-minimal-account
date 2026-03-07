@@ -19,6 +19,26 @@ uv run e2e_pimlico.py
 
 `uv run` automatically creates `.venv` and installs dependencies on first run.
 
+## Development Setup
+
+```bash
+# Install dev dependencies (ruff, pre-commit)
+cd script/python
+uv pip install -e ".[dev]"
+
+# Install pre-commit hooks (run from project root)
+cd ../..
+pre-commit install
+
+# Run checks manually
+pre-commit run --all-files
+
+# Or run ruff directly
+cd script/python
+ruff check .
+ruff format .
+```
+
 ## Environment Variables
 
 Create a `.env` file in the **project root directory** (same level as `foundry.toml`). See [`.env.example`](../../.env.example) for a template:

@@ -125,7 +125,7 @@ async def main() -> None:
 
         deploy_tx = Transaction(
             from_address=deployer.address,
-            data=artifact["bytecode"],
+            data=artifact.bytecode,
             nonce=await w3.eth.get_transaction_count(deployer.address),
             max_fee_per_gas=(await w3.eth.gas_price) * 2,
             max_priority_fee_per_gas=await w3.eth.max_priority_fee,

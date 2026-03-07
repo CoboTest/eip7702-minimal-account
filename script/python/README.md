@@ -111,12 +111,14 @@ All I/O operations (RPC calls, bundler API) use `async/await` with `aiohttp` and
 ## E2E Flow (6 Steps)
 
 ```
-[1] Deploy MinimalAccount (Deployer)
-[2] Sponsor transfers 1 USDC to Alice (Sponsor)
-[3] Build UserOp + EIP-7702 delegation + request Pimlico sponsorship
-[4] Alice signs UserOp off-chain (0 gas, 0 ETH)
-[5] Submit UserOp via Pimlico bundler (with eip7702Auth)
-[6] Wait for receipt + verify assertions
+[1]  Deploy MinimalAccount (Deployer)
+[2]  Sponsor transfers 1 USDC to Alice (Sponsor)
+[3a] Alice signs EIP-7702 delegation (off-chain)
+[3b] Build UserOp + request Pimlico sponsorship
+[4]  Alice signs UserOp (off-chain, 0 gas)
+[5]  Submit UserOp via Pimlico bundler (with eip7702Auth)
+[6a] Wait for receipt from bundler
+[6b] Verify on-chain state
 ```
 
 **Three actors:**
@@ -153,22 +155,40 @@ sequenceDiagram
     A->>RPC: [6b] verify: Alice USDC=0, ETH=0, code=23 bytes
 ```
 
-### Step 3 — Delegation + Build UserOp + Sponsorship
+### [3a] Alice Signs EIP-7702 Delegation
 
-1. **Alice signs EIP-7702 delegation** (off-chain) — `keccak256(0x05 || rlp(chainId, implAddress, nonce))`, produces `(yParity, r, s)` authorization tuple. Independent of UserOp content.
-2. **Build callData** — Encode ERC-7821 `execute(BATCH_MODE, encodedBatch)` with two USDC transfers (0.6 + 0.4) back to Sponsor
-3. **Assemble UserOp** — Unpacked format: sender, nonce, callData, gas fields (zeros for now), dummy signature, plus `eip7702Auth` parameter
-4. **Request Pimlico sponsorship** — Call `pm_sponsorUserOperation`; Pimlico simulates and returns: paymaster address, `paymasterData` (signature), gas limits (verification/call/preVerification/paymaster)
-5. **Merge sponsored fields** into UserOp — Pimlico's gas limits and paymaster data replace the zero placeholders
+Alice signs the delegation authorization off-chain. This is independent of UserOp content — only depends on `(chainId, implAddress, txNonce)`.
 
-### Step 4 — Alice Signs UserOp
+- **Hash:** `keccak256(0x05 || rlp(chainId, implAddress, nonce))`
+- **Sign:** raw ECDSA → `(yParity, r, s)` authorization tuple
+- **Result:** `eip7702Auth` JSON object for bundler API
+
+### [3b] Build UserOp + Request Pimlico Sponsorship
+
+1. **Build callData** — Encode ERC-7821 `execute(BATCH_MODE, encodedBatch)` with two USDC transfers (0.6 + 0.4) back to Sponsor
+2. **Assemble UserOp** — Unpacked format: sender, nonce, callData, gas fields (zeros for now), dummy signature, plus `eip7702Auth`
+3. **Call `pm_sponsorUserOperation`** — Pimlico simulates and returns: paymaster address, `paymasterData` (signature), gas limits (verification/call/preVerification/paymaster)
+4. **Merge sponsored fields** into UserOp — Pimlico's gas limits and paymaster data replace the zero placeholders
+
+### [4] Alice Signs UserOp
 
 1. **Pack gas fields** — `accountGasLimits` = verificationGas(128bit) || callGas(128bit), `gasFees` = maxPriority(128bit) || maxFee(128bit), `paymasterAndData` = address(20) + pmVerGas(16) + pmPostGas(16) + pmData
 2. **Compute userOpHash** (v0.7 packed keccak) — `packHash = keccak256(abi.encode(sender, nonce, keccak(initCode), keccak(callData), accountGasLimits, preVerGas, gasFees, keccak(paymasterAndData)))`, then `userOpHash = keccak256(abi.encode(packHash, entryPoint, chainId))`
 3. **Alice signs** the 32-byte `userOpHash` with raw ECDSA (no EIP-191 prefix) → 65-byte signature `r(32) + s(32) + v(1)`
 
-### Step 5 — Submit via Pimlico Bundler
+### [5] Submit via Pimlico Bundler
 
 1. **Attach signature** to UserOp, replacing the dummy
 2. **Call `eth_sendUserOperation`** with the complete UserOp + `eip7702Auth` — Pimlico's bundler wraps it in a type 4 (EIP-7702) transaction carrying Alice's delegation in `authorizationList`
 3. **Atomic execution** — EVM processes authorization list first (sets `Alice.code = 0xef0100 || implAddress`), then executes `handleOps` through EntryPoint → Alice's delegated MinimalAccount logic → USDC batch transfers
+
+### [6a] Wait for Receipt
+
+- **Poll `eth_getUserOperationReceipt(userOpHash)`** from Pimlico Bundler every 3s (up to 120s timeout)
+- **Returns:** transaction hash, block number, success status
+
+### [6b] Verify On-Chain State
+
+- Alice USDC balance = 0 (all transferred back to Sponsor)
+- Alice ETH balance = 0 (never had any)
+- Alice code = 23 bytes (`0xef0100 || implAddress` — EIP-7702 delegation active)

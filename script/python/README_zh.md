@@ -111,12 +111,14 @@ paymaster = PimlicoPaymaster(url, entry_point)
 ## E2E 流程（6 步）
 
 ```
-[1] 部署 MinimalAccount（Deployer）
-[2] Sponsor 向 Alice 转 1 USDC（Sponsor）
-[3] 构建 UserOp + EIP-7702 delegation + 请求 Pimlico 赞助
-[4] Alice 链下签署 UserOp（0 gas、0 ETH）
-[5] 通过 Pimlico bundler 提交 UserOp（附带 eip7702Auth）
-[6] 等待回执 + 验证断言
+[1]  部署 MinimalAccount（Deployer）
+[2]  Sponsor 向 Alice 转 1 USDC（Sponsor）
+[3a] Alice 签署 EIP-7702 delegation（链下）
+[3b] 构建 UserOp + 请求 Pimlico 赞助
+[4]  Alice 签署 UserOp（链下，0 gas）
+[5]  通过 Pimlico bundler 提交 UserOp（附带 eip7702Auth）
+[6a] 从 bundler 获取回执
+[6b] 验证链上状态
 ```
 
 **三个角色：**
@@ -153,22 +155,40 @@ sequenceDiagram
     A->>RPC: [6b] 验证: Alice USDC=0, ETH=0, code=23 bytes
 ```
 
-### 步骤 3 — Delegation + 构建 UserOp + 赞助
+### [3a] Alice 签署 EIP-7702 Delegation
 
-1. **Alice 签署 EIP-7702 delegation**（链下）— `keccak256(0x05 || rlp(chainId, implAddress, nonce))`，产生 `(yParity, r, s)` 授权元组。与 UserOp 内容无关。
-2. **构建 callData** — 编码 ERC-7821 `execute(BATCH_MODE, encodedBatch)`，包含两笔 USDC 转账（0.6 + 0.4）转回 Sponsor
-3. **组装 UserOp** — unpacked 格式：sender、nonce、callData、gas 字段（暂为零）、dummy 签名，加上 `eip7702Auth` 参数
-4. **请求 Pimlico 赞助** — 调用 `pm_sponsorUserOperation`；Pimlico 模拟后返回：paymaster 地址、`paymasterData`（签名）、gas 限制（verification/call/preVerification/paymaster）
-5. **合并赞助字段**到 UserOp — Pimlico 的 gas 限制和 paymaster 数据替换零值占位符
+Alice 链下签署委托授权。与 UserOp 内容无关，仅依赖 `(chainId, implAddress, txNonce)`。
 
-### 步骤 4 — Alice 签署 UserOp
+- **哈希：** `keccak256(0x05 || rlp(chainId, implAddress, nonce))`
+- **签名：** 原始 ECDSA → `(yParity, r, s)` 授权元组
+- **产出：** `eip7702Auth` JSON 对象，用于 bundler API
+
+### [3b] 构建 UserOp + 请求 Pimlico 赞助
+
+1. **构建 callData** — 编码 ERC-7821 `execute(BATCH_MODE, encodedBatch)`，包含两笔 USDC 转账（0.6 + 0.4）转回 Sponsor
+2. **组装 UserOp** — unpacked 格式：sender、nonce、callData、gas 字段（暂为零）、dummy 签名，加上 `eip7702Auth`
+3. **调用 `pm_sponsorUserOperation`** — Pimlico 模拟后返回：paymaster 地址、`paymasterData`（签名）、gas 限制（verification/call/preVerification/paymaster）
+4. **合并赞助字段**到 UserOp — Pimlico 的 gas 限制和 paymaster 数据替换零值占位符
+
+### [4] Alice 签署 UserOp
 
 1. **打包 gas 字段** — `accountGasLimits` = verificationGas(128bit) || callGas(128bit)，`gasFees` = maxPriority(128bit) || maxFee(128bit)，`paymasterAndData` = address(20) + pmVerGas(16) + pmPostGas(16) + pmData
 2. **计算 userOpHash**（v0.7 packed keccak）— `packHash = keccak256(abi.encode(sender, nonce, keccak(initCode), keccak(callData), accountGasLimits, preVerGas, gasFees, keccak(paymasterAndData)))`，然后 `userOpHash = keccak256(abi.encode(packHash, entryPoint, chainId))`
 3. **Alice 签名** 32 字节 `userOpHash`，使用原始 ECDSA（无 EIP-191 前缀）→ 65 字节签名 `r(32) + s(32) + v(1)`
 
-### 步骤 5 — 通过 Pimlico Bundler 提交
+### [5] 通过 Pimlico Bundler 提交
 
 1. **附加签名**到 UserOp，替换 dummy 签名
 2. **调用 `eth_sendUserOperation`**，携带完整 UserOp + `eip7702Auth` — Pimlico bundler 将其包装为 type 4（EIP-7702）交易，在 `authorizationList` 中携带 Alice 的 delegation
 3. **原子执行** — EVM 先处理 authorization list（设置 `Alice.code = 0xef0100 || implAddress`），再执行 `handleOps`：EntryPoint → Alice 委托的 MinimalAccount 逻辑 → USDC 批量转账
+
+### [6a] 等待回执
+
+- **轮询 `eth_getUserOperationReceipt(userOpHash)`**，每 3 秒一次（最长 120 秒超时）
+- **返回：** 交易哈希、区块号、成功状态
+
+### [6b] 验证链上状态
+
+- Alice USDC 余额 = 0（全部转回 Sponsor）
+- Alice ETH 余额 = 0（从未持有）
+- Alice code = 23 字节（`0xef0100 || implAddress` — EIP-7702 委托生效）

@@ -21,3 +21,4 @@ lcov.info
 .env.swp
 .venv/
 __pycache__/
+node_modules/

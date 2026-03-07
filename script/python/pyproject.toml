@@ -1,0 +1,11 @@
+[project]
+name = "eip7702-e2e"
+version = "0.1.0"
+description = "EIP-7702 Minimal Batch Executor — Python E2E tests"
+requires-python = ">=3.12"
+dependencies = [
+    "web3>=7.0.0",
+    "eth-account>=0.13.0",
+    "aiohttp>=3.9.0",
+    "python-dotenv>=1.0.0",
+]

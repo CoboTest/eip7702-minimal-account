@@ -1,7 +1,5 @@
 """Pimlico hosted paymaster (api.pimlico.io)."""
 
-import requests
-
 from providers.base import JsonRpcMixin
 from providers.paymaster import Paymaster
 from providers.types import SponsorResult
@@ -13,11 +11,10 @@ class PimlicoPaymaster(JsonRpcMixin, Paymaster):
     def __init__(self, url: str, entry_point: str):
         self._url = url
         self._entry_point = entry_point
-        self._session = requests.Session()
-        self._session.headers["Content-Type"] = "application/json"
+        self._session = None
 
-    def sponsor(self, user_op: dict) -> SponsorResult:
-        result = self._rpc("pm_sponsorUserOperation", [user_op, self._entry_point])
+    async def sponsor(self, user_op: dict) -> SponsorResult:
+        result = await self._rpc("pm_sponsorUserOperation", [user_op, self._entry_point])
         return SponsorResult(
             paymaster=result["paymaster"],
             paymaster_data=bytes.fromhex(result["paymasterData"][2:]),

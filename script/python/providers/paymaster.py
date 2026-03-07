@@ -9,7 +9,7 @@ class Paymaster(ABC):
     """Abstract paymaster — sponsors UserOps for gasless execution."""
 
     @abstractmethod
-    def sponsor(self, user_op: dict) -> SponsorResult:
+    async def sponsor(self, user_op: dict) -> SponsorResult:
         """
         Request sponsorship for a UserOp.
 
@@ -23,3 +23,7 @@ class Paymaster(ABC):
             SponsorResult with paymaster address, data, and gas limits.
         """
         ...
+
+    async def close(self) -> None:
+        """Close underlying resources (override in implementations)."""
+        pass

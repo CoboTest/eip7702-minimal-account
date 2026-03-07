@@ -8,10 +8,12 @@ Uses EntryPoint v0.7.
 Flow:
   [1] Deploy MinimalAccount
   [2] Sponsor transfers USDC to Alice
-  [3] Alice signs delegation + build UserOp + request Pimlico sponsorship
+  [3a] Alice signs EIP-7702 delegation (off-chain)
+  [3b] Build UserOp + request Pimlico sponsorship
   [4] Alice signs UserOp (off-chain, 0 gas)
-  [5] Submit UserOp via Pimlico bundler
-  [6] Wait for receipt + verify
+  [5] Submit UserOp via Pimlico bundler (with eip7702Auth)
+  [6a] Wait for receipt from bundler
+  [6b] Verify on-chain state
 
 Three actors:
   - Deployer: deploys MinimalAccount
@@ -179,17 +181,21 @@ async def main() -> None:
         logger.info("")
 
         # =====================================================================
-        # [3] Build UserOp + eip7702Auth + Pimlico sponsorship
+        # [3a] Alice signs EIP-7702 delegation
+        # [3b] Build UserOp + request Pimlico sponsorship
         # =====================================================================
-        logger.info("[3] Build UserOp + request Pimlico sponsorship...")
+        logger.info("[3a] Alice signs EIP-7702 delegation (off-chain)...")
 
-        # Alice signs EIP-7702 delegation (off-chain, independent of UserOp content)
+        # Alice signs EIP-7702 delegation (independent of UserOp content)
         alice_tx_nonce = await w3.eth.get_transaction_count(alice.address)
         delegation_hash = compute_delegation_hash(chain_id, executor_address, alice_tx_nonce)
         v, r, s = alice.sign_hash(delegation_hash)
         auth_json = build_delegation_auth(chain_id, executor_address, alice_tx_nonce, v, r, s)
         logger.info("  eip7702Auth: delegation to %s (signed off-chain by Alice)", executor_address)
         logger.info("  Auth nonce: %d", alice_tx_nonce)
+        logger.info("")
+
+        logger.info("[3b] Build UserOp + request Pimlico sponsorship...")
 
         # Alice EP nonce
         alice_ep_nonce = await ep.functions.getNonce(Web3.to_checksum_address(alice.address), 0).call()
@@ -310,9 +316,9 @@ async def main() -> None:
         logger.info("")
 
         # =====================================================================
-        # [6] Wait for receipt + verify
+        # [6a] Wait for receipt + [6b] verify
         # =====================================================================
-        logger.info("[6] Waiting for UserOp receipt...")
+        logger.info("[6a] Waiting for UserOp receipt...")
 
         waited = 0
         receipt = None
@@ -329,7 +335,8 @@ async def main() -> None:
         logger.info("  Block: %s", hex(receipt.block_number))
         logger.info("  Success: %s", receipt.success)
 
-        # Verify
+        # [6b] Verify on-chain state
+        logger.info("[6b] Verify on-chain state...")
         alice_usdc_after = await usdc.functions.balanceOf(Web3.to_checksum_address(alice.address)).call()
         alice_eth_after = await w3.eth.get_balance(alice.address)
         alice_code = await w3.eth.get_code(alice.address)

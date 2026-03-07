@@ -138,19 +138,19 @@ sequenceDiagram
     participant PM as Pimlico Paymaster
     participant B as Pimlico Bundler
 
-    A->>A: sign EIP-7702 delegation
-    A->>PM: pm_sponsorUserOperation(userOp + eip7702Auth)
+    A->>A: [3a] sign EIP-7702 delegation
+    A->>PM: [3b] pm_sponsorUserOperation(userOp + eip7702Auth)
     PM-->>A: paymaster + paymasterData + gas limits
 
-    A->>A: sign userOpHash (raw ECDSA)
+    A->>A: [4] sign userOpHash (raw ECDSA)
 
-    A->>B: eth_sendUserOperation(userOp + eip7702Auth)
+    A->>B: [5] eth_sendUserOperation(userOp + eip7702Auth)
     B->>RPC: type 4 tx (delegation + handleOps)
     RPC-->>B: tx receipt
 
-    A->>B: eth_getUserOperationReceipt(userOpHash)
+    A->>B: [6a] eth_getUserOperationReceipt(userOpHash)
     B-->>A: tx hash + block + success
-    A->>RPC: verify: Alice USDC=0, ETH=0, code=23 bytes
+    A->>RPC: [6b] verify: Alice USDC=0, ETH=0, code=23 bytes
 ```
 
 ### Step 3 — Delegation + Build UserOp + Sponsorship

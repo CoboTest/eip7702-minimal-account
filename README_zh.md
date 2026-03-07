@@ -103,13 +103,13 @@ forge test -vvv
 
 #### E2E #1: ERC-4337 赞助无 Gas 流程（`E2E4337.s.sol`）
 
-四个参与者 — Alice 仅链下签名，从不支付 gas：
+四个参与者 — Alice 仅链下签名，从不支付 gas。演示 1 USDC 批量转账（0.6 + 0.4）Sponsor → Alice → Sponsor 往返：
 
 | 参与者 | 角色 |
 |--------|------|
 | **Deployer** | 部署 MinimalAccount |
-| **Sponsor** | 向 EntryPoint 为 Alice 存款 + 提供转账资金 |
-| **Bundler** | 提交 `handleOps` type 4 交易 |
+| **Sponsor** | 向 EntryPoint 为 Alice 存款 + 转入 1 USDC |
+| **Bundler** | 提交带 EIP-7702 `authorizationList` 的 `handleOps` type 4 交易 |
 | **Alice** | 全新 EOA（0 ETH），链下签署 delegation + UserOp |
 
 ```bash
@@ -123,14 +123,14 @@ forge script script/E2E4337.s.sol \
 
 #### E2E #2: Paymaster 赞助流程（`E2EPaymaster.s.sol`）
 
-四个参与者 — Alice 使用 VerifyingPaymaster 实现完全无 gas 的 USDC 转账：
+四个参与者 — Alice 使用 VerifyingPaymaster 实现完全无 gas 的 1 USDC 批量转账（0.6 + 0.4）往返：
 
 | 参与者 | 角色 |
 |--------|------|
-| **Deployer** | 部署 MinimalAccount + VerifyingPaymaster，为 Paymaster 注资 |
-| **Sponsor** | 为 Alice 转入 USDC（仅演示用，生产环境不需要） |
-| **Bundler** | 提交 `handleOps` type 4 交易 |
-| **Alice** | 全新 EOA（0 ETH），链下签署 delegation + UserOp，批量转 USDC |
+| **Deployer** | 部署 MinimalAccount + VerifyingPaymaster，为 Paymaster 注资（deposit + stake） |
+| **Sponsor** | 为 Alice 转入 1 USDC（仅演示用，生产环境不需要） |
+| **Bundler** | 提交带 EIP-7702 `authorizationList` 的 `handleOps` type 4 交易 |
+| **Alice** | 全新 EOA（0 ETH），链下签署 delegation + pmAuth + UserOp，批量转 USDC 回 Sponsor |
 
 ```bash
 source .env  # DEPLOYER_PRIVATE_KEY, SPONSOR_PRIVATE_KEY, BUNDLER_PRIVATE_KEY, RPC_URL
@@ -145,12 +145,12 @@ PAYMASTER=0x... forge script script/PaymasterCleanup.s.sol \
 
 #### E2E #3: Pimlico Bundler + Sponsored Paymaster (`E2EPimlico.sh`)
 
-三个参与者 — Alice 仅链下签名（delegation + UserOp），Pimlico 承担 gas：
+三个参与者 — Alice 仅链下签名（delegation + UserOp），Pimlico 承担 gas。1 USDC 批量转账往返：
 
 | 参与者 | 角色 |
 |--------|------|
 | **Deployer** | 部署 MinimalAccount |
-| **Sponsor** | 转 USDC 给 Alice |
+| **Sponsor** | 转 1 USDC 给 Alice |
 | **Alice** | 全新 EOA（0 ETH），链下签署 EIP-7702 delegation + UserOp |
 
 > **注意：** Pimlico 同时充当 bundler 和 paymaster — 不需要单独的 Bundler 角色。
@@ -183,8 +183,13 @@ forge script script/E2EDirect.s.sol \
 
 包含每步签名分析的详细 E2E 测试报告：
 
-- [English Report](test-reports/e2e-20260306-oz-en.md)
-- [中文报告](test-reports/e2e-20260306-oz-zh.md)
+**ERC-4337 — 三场景横向对比：**
+- [English Report](test-reports/e2e-4337-en.md)
+- [中文报告](test-reports/e2e-4337-zh.md)
+
+**直接执行：**
+- [English Report](test-reports/e2e-direct-en.md)
+- [中文报告](test-reports/e2e-direct-zh.md)
 
 ### 注意事项
 

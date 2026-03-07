@@ -103,13 +103,13 @@ Four E2E scripts demonstrate different execution paths:
 
 #### E2E #1: ERC-4337 Sponsored Gasless Flow (`E2E4337.s.sol`)
 
-Four actors — Alice signs off-chain only, never pays gas:
+Four actors — Alice signs off-chain only, never pays gas. Demonstrates 1 USDC batch transfer (0.6 + 0.4) round-trip from Sponsor → Alice → Sponsor:
 
 | Actor | Role |
 |-------|------|
 | **Deployer** | Deploys MinimalAccount |
-| **Sponsor** | Deposits to EntryPoint for Alice + funds transfer values |
-| **Bundler** | Submits `handleOps` type 4 tx |
+| **Sponsor** | Deposits to EntryPoint for Alice + transfers 1 USDC |
+| **Bundler** | Submits `handleOps` type 4 tx with EIP-7702 `authorizationList` |
 | **Alice** | Fresh EOA (0 ETH), signs delegation + UserOp off-chain |
 
 ```bash
@@ -123,14 +123,14 @@ forge script script/E2E4337.s.sol \
 
 #### E2E #2: Paymaster-Sponsored Flow (`E2EPaymaster.s.sol`)
 
-Four actors — Alice uses a VerifyingPaymaster for fully gasless USDC transfers:
+Four actors — Alice uses a VerifyingPaymaster for fully gasless 1 USDC batch transfer (0.6 + 0.4) round-trip:
 
 | Actor | Role |
 |-------|------|
-| **Deployer** | Deploys MinimalAccount + VerifyingPaymaster, funds paymaster |
-| **Sponsor** | Transfers USDC to Alice (demo-only, not needed in production) |
-| **Bundler** | Submits `handleOps` type 4 tx |
-| **Alice** | Fresh EOA (0 ETH), signs delegation + UserOp off-chain, batch transfers USDC |
+| **Deployer** | Deploys MinimalAccount + VerifyingPaymaster, funds paymaster (deposit + stake) |
+| **Sponsor** | Transfers 1 USDC to Alice (demo-only, not needed in production) |
+| **Bundler** | Submits `handleOps` type 4 tx with EIP-7702 `authorizationList` |
+| **Alice** | Fresh EOA (0 ETH), signs delegation + pmAuth + UserOp off-chain, batch transfers USDC back to Sponsor |
 
 ```bash
 source .env  # DEPLOYER_PRIVATE_KEY, SPONSOR_PRIVATE_KEY, BUNDLER_PRIVATE_KEY, RPC_URL
@@ -145,12 +145,12 @@ PAYMASTER=0x... forge script script/PaymasterCleanup.s.sol \
 
 #### E2E #3: Pimlico Bundler + Sponsored Paymaster (`E2EPimlico.sh`)
 
-Three actors — Alice signs off-chain only (delegation + UserOp), Pimlico handles gas:
+Three actors — Alice signs off-chain only (delegation + UserOp), Pimlico handles gas. 1 USDC batch transfer round-trip:
 
 | Actor | Role |
 |-------|------|
 | **Deployer** | Deploys MinimalAccount |
-| **Sponsor** | Transfers USDC to Alice |
+| **Sponsor** | Transfers 1 USDC to Alice |
 | **Alice** | Fresh EOA (0 ETH), signs EIP-7702 delegation + UserOp off-chain |
 
 > **Note:** Pimlico serves as both bundler and paymaster — no separate Bundler actor needed.
@@ -183,8 +183,13 @@ forge script script/E2EDirect.s.sol \
 
 Detailed E2E test reports with per-step signature analysis:
 
-- [English Report](test-reports/e2e-20260306-oz-en.md)
-- [中文报告](test-reports/e2e-20260306-oz-zh.md)
+**ERC-4337 — Three Scenarios Compared:**
+- [English Report](test-reports/e2e-4337-en.md)
+- [中文报告](test-reports/e2e-4337-zh.md)
+
+**Direct Execution:**
+- [English Report](test-reports/e2e-direct-en.md)
+- [中文报告](test-reports/e2e-direct-zh.md)
 
 ### Notes
 

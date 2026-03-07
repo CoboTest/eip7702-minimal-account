@@ -1,7 +1,8 @@
 """Transaction types and helpers for EIP-7702 E2E tests."""
 
-from dataclasses import dataclass, fields
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
+
+from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from web3 import AsyncWeb3
@@ -9,8 +10,7 @@ if TYPE_CHECKING:
     from signers import Signer
 
 
-@dataclass
-class Transaction:
+class Transaction(BaseModel):
     """Ethereum transaction parameters (EIP-1559 type 2)."""
 
     from_address: str  # 'from' is reserved in Python
@@ -32,26 +32,25 @@ class Transaction:
         "chain_id": "chainId",
     }
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to web3-compatible transaction dict.
 
         Omits None values and zero gas (so estimate_gas works).
         """
-        result = {}
-        for f in fields(self):
-            if f.name.startswith("_"):
+        result: dict[str, Any] = {}
+        for name, value in self:
+            if name.startswith("_"):
                 continue
-            key = self._FIELD_MAP.get(f.name, f.name)
-            value = getattr(self, f.name)
+            key = self._FIELD_MAP.get(name, name)
             if value is None:
                 continue
-            if f.name == "gas" and value == 0:
+            if name == "gas" and value == 0:
                 continue  # let RPC estimate
             result[key] = value
         return result
 
     @classmethod
-    def from_dict(cls, d: dict) -> "Transaction":
+    def from_dict(cls, d: dict[str, Any]) -> "Transaction":
         """Build from a web3 transaction dict (e.g. from build_transaction)."""
         reverse_map = {
             "from": "from_address",
@@ -59,8 +58,8 @@ class Transaction:
             "maxPriorityFeePerGas": "max_priority_fee_per_gas",
             "chainId": "chain_id",
         }
-        kwargs = {}
-        valid_fields = {f.name for f in fields(cls) if not f.name.startswith("_")}
+        kwargs: dict[str, Any] = {}
+        valid_fields = set(cls.model_fields.keys())
         for k, v in d.items():
             field_name = reverse_map.get(k, k)
             if field_name in valid_fields:

@@ -8,16 +8,16 @@ Usage:
 import json
 import logging
 import sys
-from dataclasses import dataclass
 from pathlib import Path
+
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
 _ARTIFACTS_DIR = Path(__file__).resolve().parent
 
 
-@dataclass
-class ContractArtifact:
+class ContractArtifact(BaseModel):
     """Pre-compiled contract artifact (bytecode for deployment)."""
 
     name: str

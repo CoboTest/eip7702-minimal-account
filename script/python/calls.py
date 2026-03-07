@@ -13,17 +13,17 @@ Usage:
     call_data = erc7821_batch(calls)
 """
 
-from dataclasses import dataclass
-
 from eth_abi import encode
+from pydantic import BaseModel
 from web3 import Web3
 
 from config import BATCH_MODE
 
 
-@dataclass
-class Call:
+class Call(BaseModel):
     """A single call in an ERC-7821 batch: (target, value, data)."""
+
+    model_config = {"arbitrary_types_allowed": True}
 
     target: str
     value: int

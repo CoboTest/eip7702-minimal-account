@@ -1,19 +1,21 @@
 """Data types for provider interfaces."""
 
-from dataclasses import dataclass
+from typing import Any
+
+from pydantic import BaseModel
 
 from hash import DelegationAuth
 
 
-@dataclass
-class GasPrice:
+class GasPrice(BaseModel):
     max_fee_per_gas: int
     max_priority_fee_per_gas: int
 
 
-@dataclass
-class SponsorResult:
+class SponsorResult(BaseModel):
     """Result from paymaster sponsorship."""
+
+    model_config = {"arbitrary_types_allowed": True}
 
     paymaster: str
     paymaster_data: bytes
@@ -24,9 +26,10 @@ class SponsorResult:
     pre_verification_gas: int
 
 
-@dataclass
-class UserOperation:
+class UserOperation(BaseModel):
     """ERC-4337 UserOperation (v0.7 unpacked format)."""
+
+    model_config = {"arbitrary_types_allowed": True}
 
     sender: str
     nonce: int
@@ -47,9 +50,9 @@ class UserOperation:
     # EIP-7702 delegation (optional)
     eip7702_auth: DelegationAuth | None = None
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to JSON-RPC compatible dict (hex values, camelCase keys)."""
-        d: dict = {
+        d: dict[str, Any] = {
             "sender": self.sender,
             "nonce": hex(self.nonce),
             "callData": "0x" + self.call_data.hex(),
@@ -69,7 +72,7 @@ class UserOperation:
             d["eip7702Auth"] = self.eip7702_auth
         return d
 
-    def apply_sponsorship(self, result: "SponsorResult") -> None:
+    def apply_sponsorship(self, result: SponsorResult) -> None:
         """Merge sponsorship result into this UserOp."""
         self.paymaster = result.paymaster
         self.paymaster_data = result.paymaster_data
@@ -80,9 +83,10 @@ class UserOperation:
         self.pre_verification_gas = result.pre_verification_gas
 
 
-@dataclass
-class UserOpReceipt:
+class UserOpReceipt(BaseModel):
+    """Receipt from a bundler after UserOp inclusion."""
+
     tx_hash: str
     block_number: int
     success: bool
-    raw: dict
+    raw: dict[str, Any]

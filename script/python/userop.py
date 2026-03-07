@@ -52,8 +52,11 @@ async def build_userop(
     """
     # Gas prices
     gas_price = await bundler.get_gas_price()
-    logger.info("  Gas: maxFee=%s maxPriority=%s",
-                hex(gas_price.max_fee_per_gas), hex(gas_price.max_priority_fee_per_gas))
+    logger.info(
+        "  Gas: maxFee=%s maxPriority=%s",
+        hex(gas_price.max_fee_per_gas),
+        hex(gas_price.max_priority_fee_per_gas),
+    )
 
     # Assemble UserOp
     user_op = UserOperation(
@@ -71,10 +74,17 @@ async def build_userop(
     spon = await paymaster.sponsor(user_op)
 
     logger.info("  Pimlico paymaster: %s", spon.paymaster)
-    logger.info("  verGas=%s callGas=%s preVerGas=%s",
-                hex(spon.verification_gas_limit), hex(spon.call_gas_limit), hex(spon.pre_verification_gas))
-    logger.info("  pmVerGas=%s pmPostGas=%s",
-                hex(spon.paymaster_verification_gas_limit), hex(spon.paymaster_post_op_gas_limit))
+    logger.info(
+        "  verGas=%s callGas=%s preVerGas=%s",
+        hex(spon.verification_gas_limit),
+        hex(spon.call_gas_limit),
+        hex(spon.pre_verification_gas),
+    )
+    logger.info(
+        "  pmVerGas=%s pmPostGas=%s",
+        hex(spon.paymaster_verification_gas_limit),
+        hex(spon.paymaster_post_op_gas_limit),
+    )
 
     # Apply sponsorship
     user_op.apply_sponsorship(spon)

@@ -1,7 +1,6 @@
 """Shared data types for EIP-7702 E2E tests."""
 
 from dataclasses import dataclass, fields
-from typing import Optional
 
 
 @dataclass
@@ -14,7 +13,7 @@ class Transaction:
     max_priority_fee_per_gas: int
     chain_id: int
     data: str = "0x"
-    to: Optional[str] = None
+    to: str | None = None
     value: int = 0
     gas: int = 0
     type: int = 2
@@ -23,12 +22,16 @@ class Transaction:
     _FIELD_MAP: dict[str, str] = None  # type: ignore[assignment]
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "_FIELD_MAP", {
-            "from_address": "from",
-            "max_fee_per_gas": "maxFeePerGas",
-            "max_priority_fee_per_gas": "maxPriorityFeePerGas",
-            "chain_id": "chainId",
-        })
+        object.__setattr__(
+            self,
+            "_FIELD_MAP",
+            {
+                "from_address": "from",
+                "max_fee_per_gas": "maxFeePerGas",
+                "max_priority_fee_per_gas": "maxPriorityFeePerGas",
+                "chain_id": "chainId",
+            },
+        )
 
     def to_dict(self) -> dict:
         """Convert to web3-compatible transaction dict.

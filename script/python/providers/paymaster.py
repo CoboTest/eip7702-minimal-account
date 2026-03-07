@@ -24,6 +24,5 @@ class Paymaster(ABC):
         """
         ...
 
-    async def close(self) -> None:
+    async def close(self) -> None:  # noqa: B027
         """Close underlying resources (override in implementations)."""
-        pass

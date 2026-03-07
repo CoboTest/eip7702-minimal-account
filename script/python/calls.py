@@ -81,10 +81,7 @@ def erc7821_batch(calls: list[Call]) -> bytes:
     Returns:
         Full callData bytes for execute(BATCH_MODE, encodedBatch).
     """
-    batch_tuples = [
-        (Web3.to_checksum_address(c.target), c.value, c.data)
-        for c in calls
-    ]
+    batch_tuples = [(Web3.to_checksum_address(c.target), c.value, c.data) for c in calls]
     batch_encoded = encode(["(address,uint256,bytes)[]"], [batch_tuples])
     selector = Web3.keccak(text="execute(bytes32,bytes)")[:4]
     return selector + encode(["bytes32", "bytes"], [BATCH_MODE, batch_encoded])

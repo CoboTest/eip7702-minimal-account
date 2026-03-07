@@ -1,7 +1,7 @@
 """Pimlico hosted paymaster (api.pimlico.io)."""
 
-from providers.pimlico.base import JsonRpcMixin
 from providers.paymaster import Paymaster
+from providers.pimlico.base import JsonRpcMixin
 from providers.types import SponsorResult, UserOperation
 
 

@@ -31,7 +31,7 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from web3 import AsyncWeb3, AsyncHTTPProvider, Web3
+from web3 import AsyncHTTPProvider, AsyncWeb3, Web3
 
 from artifacts import load_artifact
 from calls import erc20_transfer, erc7821_batch
@@ -96,7 +96,8 @@ async def main() -> None:
     paymaster = PimlicoPaymaster(pimlico_url, ep_address)
 
     # ── Contracts ──
-    from artifacts import USDC_ABI, EP_ABI
+    from artifacts import EP_ABI, USDC_ABI
+
     usdc = w3.eth.contract(address=Web3.to_checksum_address(USDC_SEPOLIA), abi=USDC_ABI)
     ep = w3.eth.contract(address=Web3.to_checksum_address(ep_address), abi=EP_ABI)
 
@@ -153,14 +154,16 @@ async def main() -> None:
 
         transfer_dict = await usdc.functions.transfer(
             Web3.to_checksum_address(alice.address), USDC_AMOUNT
-        ).build_transaction({
-            "from": sponsor.address,
-            "nonce": await w3.eth.get_transaction_count(sponsor.address),
-            "gas": 100_000,
-            "maxFeePerGas": (await w3.eth.gas_price) * 2,
-            "maxPriorityFeePerGas": await w3.eth.max_priority_fee,
-            "chainId": chain_id,
-        })
+        ).build_transaction(
+            {
+                "from": sponsor.address,
+                "nonce": await w3.eth.get_transaction_count(sponsor.address),
+                "gas": 100_000,
+                "maxFeePerGas": (await w3.eth.gas_price) * 2,
+                "maxPriorityFeePerGas": await w3.eth.max_priority_fee,
+                "chainId": chain_id,
+            }
+        )
         transfer_hash = await sign_and_send_tx(w3, sponsor, Transaction.from_dict(transfer_dict))
 
         alice_usdc = await usdc.functions.balanceOf(Web3.to_checksum_address(alice.address)).call()
@@ -191,14 +194,18 @@ async def main() -> None:
         logger.info("[3b] Build UserOp + request Pimlico sponsorship...")
 
         # Alice EP nonce
-        alice_ep_nonce = await ep.functions.getNonce(Web3.to_checksum_address(alice.address), 0).call()
+        alice_ep_nonce = await ep.functions.getNonce(
+            Web3.to_checksum_address(alice.address), 0
+        ).call()
         logger.info("  Alice EP nonce: %d", alice_ep_nonce)
 
         # Build callData: ERC-7821 batch of two USDC transfers back to Sponsor
-        call_data = erc7821_batch([
-            erc20_transfer(USDC_SEPOLIA, sponsor.address, USDC_PART1),
-            erc20_transfer(USDC_SEPOLIA, sponsor.address, USDC_PART2),
-        ])
+        call_data = erc7821_batch(
+            [
+                erc20_transfer(USDC_SEPOLIA, sponsor.address, USDC_PART1),
+                erc20_transfer(USDC_SEPOLIA, sponsor.address, USDC_PART2),
+            ]
+        )
         logger.info("  callData: %d bytes", len(call_data))
 
         # Build + sponsor UserOp
@@ -236,7 +243,9 @@ async def main() -> None:
 
         # [6b] Verify on-chain state
         logger.info("[6b] Verify on-chain state...")
-        alice_usdc_after = await usdc.functions.balanceOf(Web3.to_checksum_address(alice.address)).call()
+        alice_usdc_after = await usdc.functions.balanceOf(
+            Web3.to_checksum_address(alice.address)
+        ).call()
         alice_eth_after = await w3.eth.get_balance(alice.address)
         alice_code = await w3.eth.get_code(alice.address)
         code_len = len(alice_code)

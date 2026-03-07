@@ -15,19 +15,20 @@ class JsonRpcMixin:
 
     async def _ensure_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession(
-                headers={"Content-Type": "application/json"}
-            )
+            self._session = aiohttp.ClientSession(headers={"Content-Type": "application/json"})
         return self._session
 
     async def _rpc(self, method: str, params: list) -> Any:
         session = await self._ensure_session()
-        async with session.post(self._url, json={
-            "jsonrpc": "2.0",
-            "method": method,
-            "params": params,
-            "id": 1,
-        }) as resp:
+        async with session.post(
+            self._url,
+            json={
+                "jsonrpc": "2.0",
+                "method": method,
+                "params": params,
+                "id": 1,
+            },
+        ) as resp:
             resp.raise_for_status()
             data = await resp.json()
         if "error" in data:

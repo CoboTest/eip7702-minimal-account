@@ -1,7 +1,6 @@
 """Data types for provider interfaces."""
 
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
 from hash import DelegationAuth
 
@@ -40,13 +39,13 @@ class UserOperation:
     pre_verification_gas: int = 0
 
     # Paymaster fields (populated after sponsorship)
-    paymaster: Optional[str] = None
+    paymaster: str | None = None
     paymaster_data: bytes = b""
     paymaster_verification_gas_limit: int = 0
     paymaster_post_op_gas_limit: int = 0
 
     # EIP-7702 delegation (optional)
-    eip7702_auth: Optional[DelegationAuth] = None
+    eip7702_auth: DelegationAuth | None = None
 
     def to_dict(self) -> dict:
         """Serialize to JSON-RPC compatible dict (hex values, camelCase keys)."""

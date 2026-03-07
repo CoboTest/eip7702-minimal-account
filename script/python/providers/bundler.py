@@ -37,7 +37,9 @@ class Bundler(ABC):
         """
         ...
 
-    async def wait_for_receipt(self, user_op_hash: str, timeout: int = 120, poll_interval: int = 3) -> UserOpReceipt:
+    async def wait_for_receipt(
+        self, user_op_hash: str, timeout: int = 120, poll_interval: int = 3
+    ) -> UserOpReceipt:
         """
         Poll for UserOp receipt until available or timeout.
 
@@ -54,6 +56,5 @@ class Bundler(ABC):
             logger.debug("Waiting for receipt... (%ds)", waited)
         raise TimeoutError(f"UserOp receipt not available after {timeout}s")
 
-    async def close(self) -> None:
+    async def close(self) -> None:  # noqa: B027
         """Close underlying resources (override in implementations)."""
-        pass

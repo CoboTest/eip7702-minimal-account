@@ -1,5 +1,7 @@
 # Python E2E Tests
 
+[🇨🇳 中文版](README_zh.md)
+
 Pure Python E2E test suite for the EIP-7702 Minimal Batch Executor. No CLI tools required (no `cast`, no `forge` at runtime).
 
 ## Prerequisites
@@ -55,11 +57,12 @@ script/python/
 │       └── signer.py        # LocalSigner — in-memory private key
 │
 ├── providers/               # Bundler & Paymaster abstraction
+│   ├── errors.py            # ProviderError
 │   ├── types.py             # GasPrice, UserOpReceipt, SponsorResult
-│   ├── base.py              # ProviderError, JsonRpcMixin
 │   ├── bundler.py           # Bundler ABC
 │   ├── paymaster.py         # Paymaster ABC
 │   └── pimlico/             # Pimlico implementation
+│       ├── base.py          # JsonRpcMixin (async JSON-RPC)
 │       ├── bundler.py       # PimlicoBundler
 │       └── paymaster.py     # PimlicoPaymaster
 │

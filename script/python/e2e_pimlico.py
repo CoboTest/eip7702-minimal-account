@@ -69,7 +69,7 @@ def load_bytecode(project_root: Path, contract_name: str) -> str:
     return artifact["bytecode"]["object"]
 
 
-async def main():
+async def main() -> None:
     parser = argparse.ArgumentParser(description="E2E #3: Pimlico Bundler + Sponsored Paymaster")
     parser.add_argument(
         "--ep-version",
@@ -343,7 +343,17 @@ async def main():
         # =====================================================================
         print("[6] Waiting for UserOp receipt...")
 
-        receipt = await bundler.wait_for_receipt(submitted_hash)
+        # Poll with progress output
+        waited = 0
+        receipt = None
+        while waited < 120:
+            receipt = await bundler.get_user_operation_receipt(submitted_hash)
+            if receipt is not None:
+                break
+            await asyncio.sleep(3)
+            waited += 3
+            print(f"  Waiting... ({waited}s)")
+        assert receipt is not None, f"UserOp receipt not available after {waited}s"
 
         print(f"  Tx: {receipt.tx_hash}")
         print(f"  Block: {hex(receipt.block_number)}")

@@ -1,9 +1,12 @@
 """Abstract bundler interface for ERC-4337 UserOp submission."""
 
 import asyncio
+import logging
 from abc import ABC, abstractmethod
 
 from providers.types import GasPrice, UserOpReceipt
+
+logger = logging.getLogger(__name__)
 
 
 class Bundler(ABC):
@@ -48,7 +51,7 @@ class Bundler(ABC):
                 return receipt
             await asyncio.sleep(poll_interval)
             waited += poll_interval
-            print(f"  Waiting... ({waited}s)")
+            logger.debug("Waiting for receipt... (%ds)", waited)
         raise TimeoutError(f"UserOp receipt not available after {timeout}s")
 
     async def close(self) -> None:

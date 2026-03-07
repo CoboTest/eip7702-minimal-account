@@ -214,7 +214,7 @@ contract E2EPaymaster is Script {
 
         console.log("  Action: execute(BATCH_MODE) -> USDC.transfer(sponsor, 0.6 USDC) + USDC.transfer(sponsor, 0.4 USDC)");
         console.log("  Paymaster:", address(paymaster));
-        console.log("  Signature scheme: EIP-712 (paymaster) + raw ECDSA (userOp)");
+        console.log("  Signature scheme: EIP-712 (paymaster) + EIP-191 (userOp)");
         console.log("  PASS: signed (no tx, pure off-chain)");
     }
 

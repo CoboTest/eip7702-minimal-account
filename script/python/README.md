@@ -99,7 +99,7 @@ The `Signer` interface provides two signing primitives: `sign_hash()` for off-ch
 from signers.local import LocalSigner
 
 signer = LocalSigner.random()          # fresh keypair
-v, r, s = signer.sign_hash(hash_bytes) # raw ECDSA, no EIP-191 prefix
+v, r, s = signer.sign_hash(hash_bytes) # EIP-191 (personal_sign)
 ```
 
 This design enables future signer implementations without changing any hash logic:
@@ -166,7 +166,7 @@ sequenceDiagram
     A->>PM: [3b] pm_sponsorUserOperation(userOp + eip7702Auth)
     PM-->>A: paymaster + paymasterData + gas limits
 
-    A->>A: [4] sign userOpHash (raw ECDSA)
+    A->>A: [4] sign userOpHash (EIP-191)
 
     A->>B: [5] eth_sendUserOperation(userOp + eip7702Auth)
     B->>RPC: type 4 tx (delegation + handleOps)
@@ -196,7 +196,7 @@ Alice signs the delegation authorization off-chain. This is independent of UserO
 
 1. **Pack gas fields** — `accountGasLimits` = `verificationGas`(128bit) || `callGas`(128bit), `gasFees` = `maxPriorityFee`(128bit) || `maxFee`(128bit), `paymasterAndData` = `address`(20) + `pmVerGas`(16) + `pmPostGas`(16) + `pmData`
 2. **Compute `userOpHash`** (v0.7 packed keccak) — `packHash = keccak256(abi.encode(sender, nonce, keccak(initCode), keccak(callData), accountGasLimits, preVerGas, gasFees, keccak(paymasterAndData)))`, then `userOpHash = keccak256(abi.encode(packHash, entryPoint, chainId))`
-3. **Alice signs** the 32-byte `userOpHash` with raw ECDSA (no EIP-191 prefix) → 65-byte signature `r(32) + s(32) + v(1)`
+3. **Alice signs** the 32-byte `userOpHash` with EIP-191 prefix (`toEthSignedMessageHash`) → 65-byte signature `r(32) + s(32) + v(1)`
 
 ### [5] Submit via Pimlico Bundler
 

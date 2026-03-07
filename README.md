@@ -24,7 +24,7 @@ A minimal EIP-7702 delegate contract for EOAs built on **OpenZeppelin Contracts 
 | Component            | Source                                                                             |
 | -------------------- | ---------------------------------------------------------------------------------- |
 | `Account`            | OZ — ERC-4337 `validateUserOp` + prefund logic                                     |
-| `SignerEIP7702`      | OZ — raw ECDSA signature validation against `address(this)`                        |
+| `SignerEIP7702`      | OZ — ECDSA signature validation against `address(this)` (with EIP-191 prefix)      |
 | `ERC7821`            | OZ — `execute(bytes32 mode, bytes executionData)` with ERC-7579 encoding           |
 | `ERC721Holder`       | OZ — safe ERC-721 token receive                                                    |
 | `ERC1155Holder`      | OZ — safe ERC-1155 token receive                                                   |
@@ -36,7 +36,7 @@ A minimal EIP-7702 delegate contract for EOAs built on **OpenZeppelin Contracts 
 - **ERC-7821 Batch Execution** — `execute(bytes32 mode, bytes executionData)` with ERC-7579 batch encoding
 - **Gas Sponsorship** — ERC-4337 v0.7 compatible (`IAccount.validateUserOp`)
 - **VerifyingPaymaster** — Production-grade paymaster with EIP-712 typed data, signer/owner separation, Pausable, ReentrancyGuard
-- **Raw ECDSA Signing** — `SignerEIP7702` validates signatures directly (no EIP-191 prefix)
+- **EIP-191 Signing** — `_signableUserOpHash()` wraps `userOpHash` with EIP-191 prefix, following eth-infinitism convention
 - **Token Holders** — Safely receive ERC-721 and ERC-1155 tokens
 - **Zero State** — No `initialize()`, no owner storage. EOA private key = sole authority
 - **ERC-165** — Interface detection for IAccount, IERC7821, IERC721Receiver, IERC1155Receiver
@@ -45,7 +45,7 @@ A minimal EIP-7702 delegate contract for EOAs built on **OpenZeppelin Contracts 
 
 Traditional Smart Accounts store an `owner` in contract storage, requiring an `initialize()` call that's vulnerable to frontrunning attacks. This contract takes a different approach:
 
-- The EOA's private key is the **only** authority (raw ECDSA via `SignerEIP7702`)
+- The EOA's private key is the **only** authority (EIP-191 + ECDSA via `SignerEIP7702`)
 - No storage means no initialization, which means **zero attack surface**
 - ERC-7821 interface for batch execution with ERC-7579 encoding
 
@@ -68,7 +68,7 @@ Traditional Smart Accounts store an `owner` in contract storage, requiring an `i
          │                    │
          ▼                    ▼
    execute(mode, data)  validateUserOp()
-   ERC-7821 interface   → raw ECDSA == address(this)
+   ERC-7821 interface   → EIP-191 + ECDSA == address(this)
 ```
 
 ## Usage
@@ -91,7 +91,7 @@ PackedUserOperation memory userOp = PackedUserOperation({
     sender: myEOA,
     callData: abi.encodeCall(IERC7821.execute, (BATCH_MODE, abi.encode(batch))),
     // ... other fields
-    signature: rawEcdsaSignature  // no EIP-191 prefix
+    signature: eip191Signature  // personal_sign(userOpHash)
 });
 ```
 
@@ -190,7 +190,7 @@ forge script script/E2EDirect.s.sol \
 
 - **Gas estimation**: Forge underestimates gas for type 4 (EIP-7702) txs → use `--gas-estimate-multiplier 500`
 - **Random Alice**: Each run generates a fresh Alice keypair via `vm.randomUint()`
-- **Signature format**: `SignerEIP7702` uses raw ECDSA (no EIP-191 prefix). Standard ERC-4337 SDKs that use `personal_sign` will NOT work — sign the `userOpHash` directly.
+- **Signature format**: `_signableUserOpHash()` adds EIP-191 prefix. Standard ERC-4337 SDKs using `personal_sign` are compatible.
 - **E2EPimlico**: Uses `cast` + `curl` + `jq` instead of Forge Script (Pimlico API requires mid-flow HTTP calls)
 
 ## Environment Variables
@@ -208,7 +208,7 @@ forge script script/E2EDirect.s.sol \
 ## Security
 
 - **No frontrunning risk** — Nothing to initialize, nothing to steal
-- **Signature validation** — Raw ECDSA via `SignerEIP7702` (rejects malleable signatures per EIP-2)
+- **Signature validation** — EIP-191 + ECDSA via `SignerEIP7702` (rejects malleable signatures per EIP-2)
 - **Access control** — Only the EOA itself or EntryPoint can call `execute()`
 - **No delegatecall** — All calls are regular `call`, preventing storage corruption
 - **validateUserOp** — Restricted to EntryPoint only (per ERC-4337 spec)

@@ -16,7 +16,7 @@ import { MessageHashUtils } from "@openzeppelin/contracts/utils/cryptography/Mes
 /// @notice EIP-7702 delegate contract for EOAs using OpenZeppelin's Account stack.
 ///         Provides ERC-7821 batch execution and ERC-4337 gas sponsorship.
 /// @dev    Uses Account + SignerEIP7702 + ERC7821.
-///         SignerEIP7702 validates raw ECDSA signatures against address(this).
+///         SignerEIP7702 validates ECDSA signatures against address(this).
 ///         ERC7821 provides execute(bytes32 mode, bytes executionData) with ERC-7579 encoding.
 ///         Overrides entryPoint() to use v0.7, _signableUserOpHash to add EIP-191 prefix,
 ///         and _erc7821AuthorizedExecutor to allow EntryPoint.

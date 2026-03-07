@@ -99,7 +99,7 @@ script/python/
 from signers.local import LocalSigner
 
 signer = LocalSigner.random()          # 生成新密钥对
-v, r, s = signer.sign_hash(hash_bytes) # 原始 ECDSA，无 EIP-191 前缀
+v, r, s = signer.sign_hash(hash_bytes) # EIP-191 (personal_sign)
 ```
 
 这种设计使新增签名者实现无需修改任何哈希逻辑：
@@ -166,7 +166,7 @@ sequenceDiagram
     A->>PM: [3b] pm_sponsorUserOperation(userOp + eip7702Auth)
     PM-->>A: paymaster + paymasterData + gas limits
 
-    A->>A: [4] 签署 userOpHash（原始 ECDSA）
+    A->>A: [4] 签署 userOpHash（EIP-191）
 
     A->>B: [5] eth_sendUserOperation(userOp + eip7702Auth)
     B->>RPC: type 4 tx（delegation + handleOps）
@@ -196,7 +196,7 @@ Alice 链下签署委托授权。与 UserOp 内容无关，仅依赖（`chainId`
 
 1. **打包 gas 字段** — `accountGasLimits` = `verificationGas`(128bit) || `callGas`(128bit)，`gasFees` = `maxPriorityFee`(128bit) || `maxFee`(128bit)，`paymasterAndData` = `address`(20) + `pmVerGas`(16) + `pmPostGas`(16) + `pmData`
 2. **计算 `userOpHash`**（v0.7 packed keccak）— `packHash = keccak256(abi.encode(sender, nonce, keccak(initCode), keccak(callData), accountGasLimits, preVerGas, gasFees, keccak(paymasterAndData)))`，然后 `userOpHash = keccak256(abi.encode(packHash, entryPoint, chainId))`
-3. **Alice 签名** 32 字节 `userOpHash`，使用原始 ECDSA（无 EIP-191 前缀）→ 65 字节签名 `r(32) + s(32) + v(1)`
+3. **Alice 签名** 32 字节 `userOpHash`，使用 EIP-191 前缀（`toEthSignedMessageHash`）→ 65 字节签名 `r(32) + s(32) + v(1)`
 
 ### [5] 通过 Pimlico Bundler 提交
 

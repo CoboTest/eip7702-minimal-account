@@ -24,7 +24,7 @@
 | 组件                 | 来源                                                                       |
 | -------------------- | -------------------------------------------------------------------------- |
 | `Account`            | OZ — ERC-4337 `validateUserOp` + 预付款逻辑                                |
-| `SignerEIP7702`      | OZ — 基于 `address(this)` 的原始 ECDSA 签名验证                            |
+| `SignerEIP7702`      | OZ — 基于 `address(this)` 的 ECDSA 签名验证（含 EIP-191 前缀）             |
 | `ERC7821`            | OZ — `execute(bytes32 mode, bytes executionData)` + ERC-7579 编码          |
 | `ERC721Holder`       | OZ — 安全接收 ERC-721 Token                                                |
 | `ERC1155Holder`      | OZ — 安全接收 ERC-1155 Token                                               |
@@ -36,7 +36,7 @@
 - **ERC-7821 批量执行** — `execute(bytes32 mode, bytes executionData)` + ERC-7579 batch 编码
 - **Gas 赞助** — 兼容 ERC-4337 v0.7（`IAccount.validateUserOp`）
 - **VerifyingPaymaster** — 生产级 Paymaster，EIP-712 typed data、signer/owner 分离、Pausable、ReentrancyGuard
-- **原始 ECDSA 签名** — `SignerEIP7702` 直接验证签名（无 EIP-191 前缀）
+- **EIP-191 签名** — `_signableUserOpHash()` 使用 EIP-191 前缀包装 `userOpHash`，遵循 eth-infinitism 惯例
 - **Token 接收** — 安全接收 ERC-721 和 ERC-1155 Token
 - **零状态** — 无 `initialize()`、无 owner 存储，EOA 私钥即唯一权限
 - **ERC-165** — 接口检测支持 IAccount、IERC7821、IERC721Receiver、IERC1155Receiver
@@ -45,7 +45,7 @@
 
 传统智能账户将 `owner` 存储在合约 storage 中，需要 `initialize()` 调用，容易被抢跑攻击。本合约采用不同方案：
 
-- EOA 的私钥是**唯一权限**（通过 `SignerEIP7702` 进行原始 ECDSA 验证）
+- EOA 的私钥是**唯一权限**（通过 `SignerEIP7702` 进行 EIP-191 + ECDSA 验证）
 - 无 storage 意味着无需初始化，即**零攻击面**
 - 使用 ERC-7821 标准接口进行批量执行，采用 ERC-7579 编码
 
@@ -68,7 +68,7 @@
          │                    │
          ▼                    ▼
    execute(mode, data)  validateUserOp()
-   ERC-7821 接口         → 原始 ECDSA == address(this)
+   ERC-7821 接口         → EIP-191 + ECDSA == address(this)
 ```
 
 ## 使用方式
@@ -91,7 +91,7 @@ PackedUserOperation memory userOp = PackedUserOperation({
     sender: myEOA,
     callData: abi.encodeCall(IERC7821.execute, (BATCH_MODE, abi.encode(batch))),
     // ... 其他字段
-    signature: rawEcdsaSignature  // 无 EIP-191 前缀
+    signature: eip191Signature  // personal_sign(userOpHash)
 });
 ```
 
@@ -190,7 +190,7 @@ forge script script/E2EDirect.s.sol \
 
 - **Gas 估算**: Forge 对 type 4（EIP-7702）交易 gas 估算偏低 → 使用 `--gas-estimate-multiplier 500`
 - **随机 Alice**: 每次运行通过 `vm.randomUint()` 生成全新 Alice 密钥对
-- **签名格式**: `SignerEIP7702` 使用原始 ECDSA（无 EIP-191 前缀）。使用 `personal_sign` 的标准 ERC-4337 SDK 将不兼容 — 需直接签署 `userOpHash`。
+- **签名格式**: `_signableUserOpHash()` 添加 EIP-191 前缀。标准 ERC-4337 SDK 使用 `personal_sign` 可兼容。
 - **E2EPimlico**: 使用 `cast` + `curl` + `jq` 代替 Forge Script（Pimlico API 需要流程中的 HTTP 调用）
 
 ## 环境变量
@@ -208,7 +208,7 @@ forge script script/E2EDirect.s.sol \
 ## 安全性
 
 - **无抢跑风险** — 无需初始化，无可窃取资产
-- **签名验证** — 通过 `SignerEIP7702` 进行原始 ECDSA 验证（按 EIP-2 拒绝可塑性签名）
+- **签名验证** — EIP-191 + ECDSA 通过 `SignerEIP7702`（按 EIP-2 拒绝可塑性签名）
 - **访问控制** — 仅 EOA 自身或 EntryPoint 可调用 `execute()`
 - **无 delegatecall** — 所有调用均为普通 `call`，防止 storage 污染
 - **validateUserOp** — 仅限 EntryPoint 调用（符合 ERC-4337 规范）

@@ -153,7 +153,9 @@ sequenceDiagram
     B->>RPC: type 4 tx (delegation + handleOps)
     RPC-->>B: tx receipt
 
-    A->>RPC: [6] verify: Alice USDC=0, ETH=0, code=23 bytes
+    A->>B: [6] eth_getUserOperationReceipt(userOpHash)
+    B-->>A: tx hash + block + success
+    A->>RPC: verify: Alice USDC=0, ETH=0, code=23 bytes
 ```
 
 ### Step 3 — Delegation + Build UserOp + Sponsorship

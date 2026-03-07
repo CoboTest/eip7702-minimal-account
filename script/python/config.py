@@ -21,7 +21,3 @@ EIP7702_INIT_CODE_MARKER = bytes.fromhex("77020000000000000000000000000000000000
 # ── ERC-7821 ──
 BATCH_MODE = (1 << 248).to_bytes(32, "big")  # 0x01 << 248
 
-# ── Gas defaults (for initial UserOp before sponsorship fills in real values) ──
-DEFAULT_VERIFICATION_GAS_LIMIT = 200_000
-DEFAULT_CALL_GAS_LIMIT = 300_000
-DEFAULT_PRE_VERIFICATION_GAS = 100_000

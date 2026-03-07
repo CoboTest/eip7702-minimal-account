@@ -1,7 +1,5 @@
 """Local private key signer (in-memory)."""
 
-from typing import Tuple
-
 from eth_account import Account
 from eth_keys import keys
 
@@ -14,7 +12,7 @@ class LocalSigner(Signer):
     def __init__(self, private_key: str):
         """
         Args:
-            private_key: hex string with or without '0x' prefix.
+            private_key: Hex string with or without '0x' prefix.
         """
         if not private_key.startswith("0x"):
             private_key = "0x" + private_key
@@ -31,7 +29,7 @@ class LocalSigner(Signer):
         """Hex private key (with 0x prefix). Useful for debugging/recovery."""
         return self._private_key
 
-    def sign_hash(self, msg_hash: bytes) -> Tuple[int, int, int]:
+    def sign_hash(self, msg_hash: bytes) -> tuple[int, int, int]:
         """Raw ECDSA sign (no personal_sign prefix)."""
         assert len(msg_hash) == 32, f"Expected 32 bytes, got {len(msg_hash)}"
         sig = self._pk_obj.sign_msg_hash(msg_hash)

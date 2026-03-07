@@ -6,7 +6,6 @@ All hash computation (delegation, UserOp, paymaster) happens in upper layers.
 """
 
 from abc import ABC, abstractmethod
-from typing import Tuple
 
 
 class Signer(ABC):
@@ -19,7 +18,7 @@ class Signer(ABC):
         ...
 
     @abstractmethod
-    def sign_hash(self, msg_hash: bytes) -> Tuple[int, int, int]:
+    def sign_hash(self, msg_hash: bytes) -> tuple[int, int, int]:
         """
         Sign a 32-byte hash with raw ECDSA (no EIP-191 prefix).
 

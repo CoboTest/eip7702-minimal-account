@@ -99,7 +99,7 @@ forge test -vvv
 
 ### E2E Tests (Sepolia)
 
-Three E2E scripts demonstrate different execution paths. All use Forge Script with on-chain broadcast.
+Four E2E scripts demonstrate different execution paths:
 
 #### E2E #1: ERC-4337 Sponsored Gasless Flow (`E2E4337.s.sol`)
 
@@ -143,7 +143,27 @@ PAYMASTER=0x... forge script script/PaymasterCleanup.s.sol \
   --rpc-url $RPC_URL --broadcast
 ```
 
-#### E2E #3: Direct Execution Flow (`E2EDirect.s.sol`)
+#### E2E #3: Pimlico Bundler + Sponsored Paymaster (`E2EPimlico.sh`)
+
+Three actors — Alice signs off-chain only (delegation + UserOp), Pimlico handles gas:
+
+| Actor | Role |
+|-------|------|
+| **Deployer** | Deploys MinimalAccount |
+| **Sponsor** | Transfers USDC to Alice |
+| **Alice** | Fresh EOA (0 ETH), signs EIP-7702 delegation + UserOp off-chain |
+
+> **Note:** Pimlico serves as both bundler and paymaster — no separate Bundler actor needed.
+
+Alice's EIP-7702 delegation is bundled atomically via `eip7702Auth` parameter — no separate delegation transaction.
+
+```bash
+source .env  # DEPLOYER_PRIVATE_KEY, SPONSOR_PRIVATE_KEY, PIMLICO_API_KEY, RPC_URL
+
+bash script/E2EPimlico.sh
+```
+
+#### E2E #4: Direct Execution Flow (`E2EDirect.s.sol`)
 
 Two actors — Deployer sets up delegation, Alice executes directly:
 
@@ -171,14 +191,16 @@ Detailed E2E test reports with per-step signature analysis:
 - **Gas estimation**: Forge underestimates gas for type 4 (EIP-7702) txs → use `--gas-estimate-multiplier 500`
 - **Random Alice**: Each run generates a fresh Alice keypair via `vm.randomUint()`
 - **Signature format**: `SignerEIP7702` uses raw ECDSA (no EIP-191 prefix). Standard ERC-4337 SDKs that use `personal_sign` will NOT work — sign the `userOpHash` directly.
+- **E2EPimlico**: Uses `cast` + `curl` + `jq` instead of Forge Script (Pimlico API requires mid-flow HTTP calls)
 
 ## Environment Variables
 
 | Variable | Used By | Description |
 |----------|---------|-------------|
 | `DEPLOYER_PRIVATE_KEY` | All | Deploys MinimalAccount |
-| `SPONSOR_PRIVATE_KEY` | E2E4337, E2EPaymaster | Funds Alice (ETH deposit / USDC transfer) |
+| `SPONSOR_PRIVATE_KEY` | E2E4337, E2EPaymaster, E2EPimlico | Funds Alice (ETH deposit / USDC transfer) |
 | `BUNDLER_PRIVATE_KEY` | E2E4337, E2EPaymaster | Submits handleOps tx |
+| `PIMLICO_API_KEY` | E2EPimlico | Pimlico bundler + paymaster API key |
 | `RPC_URL` | All | Sepolia RPC endpoint |
 
 > Alice's key is generated via `vm.randomUint()` — fresh random keypair each run, no env var needed.

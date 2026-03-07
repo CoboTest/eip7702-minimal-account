@@ -33,7 +33,7 @@ EP="0x0000000071727De22E5E9d8BAf0edAc6f37da032"
 USDC="0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
 PIMLICO_URL="https://api.pimlico.io/v2/sepolia/rpc?apikey=${PIMLICO_API_KEY}"
 CHAIN_ID=11155111
-USDC_AMOUNT=5000000  # 5 USDC
+USDC_AMOUNT=1000000  # 1 USDC
 
 DEPLOYER=$($CAST wallet address "$DEPLOYER_PRIVATE_KEY")
 SPONSOR=$($CAST wallet address "$SPONSOR_PRIVATE_KEY")
@@ -110,7 +110,7 @@ echo ""
 # =============================================================================
 # [2] Sponsor transfers USDC to Alice
 # =============================================================================
-echo "[2] Sponsor transfers 5 USDC to Alice..."
+echo "[2] Sponsor transfers 1 USDC to Alice..."
 
 TX2=$($CAST send "$USDC" "transfer(address,uint256)(bool)" "$ALICE" "$USDC_AMOUNT" \
     --rpc-url "$RPC_URL" --private-key "$SPONSOR_PRIVATE_KEY" --json 2>/dev/null)
@@ -136,8 +136,8 @@ echo "  Alice EP nonce: $ALICE_NONCE"
 
 # Build callData: execute(BATCH_MODE, encodedBatch)
 BATCH_MODE="0x0100000000000000000000000000000000000000000000000000000000000000"
-T1=$($CAST calldata "transfer(address,uint256)" "$SPONSOR" 3000000)
-T2=$($CAST calldata "transfer(address,uint256)" "$SPONSOR" 2000000)
+T1=$($CAST calldata "transfer(address,uint256)" "$SPONSOR" 600000)
+T2=$($CAST calldata "transfer(address,uint256)" "$SPONSOR" 400000)
 BATCH=$($CAST abi-encode "f((address,uint256,bytes)[])" "[($USDC,0,$T1),($USDC,0,$T2)]")
 CALL_DATA=$($CAST calldata "execute(bytes32,bytes)" "$BATCH_MODE" "$BATCH")
 echo "  callData: $(( (${#CALL_DATA} - 2) / 2 )) bytes"

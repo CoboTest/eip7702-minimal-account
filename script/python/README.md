@@ -129,11 +129,22 @@ All I/O operations (RPC calls, bundler API) use `async/await` with `aiohttp` and
 
 **USDC round-trip:** Sponsor → Alice → Sponsor (1 USDC, split 0.6 + 0.4 batch)
 
-## Dependencies
+### Step 3 — Build UserOp + Delegation + Sponsorship
 
-| Package | Purpose |
-|---------|---------|
-| `web3` | Async Ethereum JSON-RPC (deploy, transfer, query) |
-| `eth-account` | Key management, transaction signing |
-| `aiohttp` | Async HTTP for bundler/paymaster API |
-| `python-dotenv` | Load `.env` configuration |
+1. **Build callData** — Encode ERC-7821 `execute(BATCH_MODE, encodedBatch)` with two USDC transfers (0.6 + 0.4) back to Sponsor
+2. **Alice signs EIP-7702 delegation** (off-chain) — `keccak256(0x05 || rlp(chainId, implAddress, nonce))`, produces `(yParity, r, s)` authorization tuple
+3. **Assemble UserOp** — Unpacked format: sender, nonce, callData, gas fields (zeros for now), dummy signature, plus `eip7702Auth` parameter
+4. **Request Pimlico sponsorship** — Call `pm_sponsorUserOperation`; Pimlico simulates and returns: paymaster address, `paymasterData` (signature), gas limits (verification/call/preVerification/paymaster)
+5. **Merge sponsored fields** into UserOp — Pimlico's gas limits and paymaster data replace the zero placeholders
+
+### Step 4 — Alice Signs UserOp
+
+1. **Pack gas fields** — `accountGasLimits` = verificationGas(128bit) || callGas(128bit), `gasFees` = maxPriority(128bit) || maxFee(128bit), `paymasterAndData` = address(20) + pmVerGas(16) + pmPostGas(16) + pmData
+2. **Compute userOpHash** (v0.7 packed keccak) — `packHash = keccak256(abi.encode(sender, nonce, keccak(initCode), keccak(callData), accountGasLimits, preVerGas, gasFees, keccak(paymasterAndData)))`, then `userOpHash = keccak256(abi.encode(packHash, entryPoint, chainId))`
+3. **Alice signs** the 32-byte `userOpHash` with raw ECDSA (no EIP-191 prefix) → 65-byte signature `r(32) + s(32) + v(1)`
+
+### Step 5 — Submit via Pimlico Bundler
+
+1. **Attach signature** to UserOp, replacing the dummy
+2. **Call `eth_sendUserOperation`** with the complete UserOp + `eip7702Auth` — Pimlico's bundler wraps it in a type 4 (EIP-7702) transaction carrying Alice's delegation in `authorizationList`
+3. **Atomic execution** — EVM processes authorization list first (sets `Alice.code = 0xef0100 || implAddress`), then executes `handleOps` through EntryPoint → Alice's delegated MinimalAccount logic → USDC batch transfers

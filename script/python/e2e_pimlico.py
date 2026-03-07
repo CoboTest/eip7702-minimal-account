@@ -53,7 +53,7 @@ from hash import (
     pack_gas_limits,
     pack_paymaster_and_data,
 )
-from provider.pimlico import PimlicoBundler, PimlicoPaymaster
+from providers.pimlico import PimlicoBundler, PimlicoPaymaster
 from signer import LocalSigner
 
 

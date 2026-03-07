@@ -44,7 +44,8 @@ script/python/
 ├── e2e_pimlico.py           # E2E #3 orchestrator (async)
 ├── config.py                # Chain constants (EP address, USDC)
 ├── hash.py                  # Pure hash functions (delegation, UserOp v0.7)
-├── artifacts/               # Pre-compiled contract bytecode
+├── artifacts/               # Pre-compiled contract artifacts & ABI definitions
+│   ├── __init__.py          # load_artifact(), USDC_ABI, EP_ABI
 │   └── MinimalAccount.json  # Deploy bytecode (update after forge build)
 │
 ├── signers/                 # Signer abstraction

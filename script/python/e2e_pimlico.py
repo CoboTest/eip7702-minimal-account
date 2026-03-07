@@ -24,10 +24,8 @@ Usage:
 """
 
 import asyncio
-import json
 import logging
 import os
-import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -51,22 +49,21 @@ from hash import (
     pack_gas_limits,
     pack_paymaster_and_data,
 )
+from artifacts import load_artifact
 from providers.pimlico import PimlicoBundler, PimlicoPaymaster
 from signers.local import LocalSigner
 
 logger = logging.getLogger(__name__)
 
 
-def load_bytecode(contract_name: str) -> str:
-    """Load contract bytecode from local artifacts directory."""
-    artifact_path = Path(__file__).resolve().parent / "artifacts" / f"{contract_name}.json"
-    if not artifact_path.exists():
-        logger.error("Artifact not found at %s", artifact_path)
-        logger.error("Run 'forge build' and copy artifact to script/python/artifacts/.")
-        sys.exit(1)
-    with open(artifact_path) as f:
-        artifact = json.load(f)
-    return artifact["bytecode"]
+async def sign_and_send_tx(
+    w3: AsyncWeb3, signer: LocalSigner, tx: dict, *, timeout: int = 60
+) -> bytes:
+    """Sign a transaction with a Signer and send it. Returns tx hash."""
+    signed = w3.eth.account.sign_transaction(tx, signer.private_key)
+    tx_hash = await w3.eth.send_raw_transaction(signed.raw_transaction)
+    await w3.eth.wait_for_transaction_receipt(tx_hash, timeout=timeout)
+    return tx_hash
 
 
 async def main() -> None:
@@ -75,21 +72,20 @@ async def main() -> None:
         format="%(message)s",
     )
 
-    # ── Load environment ──
-    project_root = Path(__file__).resolve().parent.parent.parent
-    load_dotenv(project_root / ".env")
+    # ── Load environment (local .env first, then project root) ──
+    script_dir = Path(__file__).resolve().parent
+    load_dotenv(script_dir / ".env")
+    load_dotenv(script_dir.parent.parent / ".env")  # project root fallback
 
     rpc_url = os.environ["RPC_URL"]
-    deployer_key = os.environ["DEPLOYER_PRIVATE_KEY"]
-    sponsor_key = os.environ["SPONSOR_PRIVATE_KEY"]
     pimlico_api_key = os.environ["PIMLICO_API_KEY"]
 
     ep_address = EP_V07
     pimlico_url = f"https://api.pimlico.io/v2/sepolia/rpc?apikey={pimlico_api_key}"
 
     # ── Setup signers ──
-    deployer = LocalSigner(deployer_key)
-    sponsor = LocalSigner(sponsor_key)
+    deployer = LocalSigner(os.environ["DEPLOYER_PRIVATE_KEY"])
+    sponsor = LocalSigner(os.environ["SPONSOR_PRIVATE_KEY"])
     alice = LocalSigner.random()
 
     # ── Async Web3 setup ──
@@ -102,18 +98,10 @@ async def main() -> None:
     bundler = PimlicoBundler(pimlico_url, ep_address)
     paymaster = PimlicoPaymaster(pimlico_url, ep_address)
 
-    # ── USDC contract ──
-    usdc_abi = [
-        {"type": "function", "name": "transfer", "inputs": [{"name": "to", "type": "address"}, {"name": "amount", "type": "uint256"}], "outputs": [{"name": "", "type": "bool"}]},
-        {"type": "function", "name": "balanceOf", "inputs": [{"name": "account", "type": "address"}], "outputs": [{"name": "", "type": "uint256"}]},
-    ]
-    usdc = w3.eth.contract(address=Web3.to_checksum_address(USDC_SEPOLIA), abi=usdc_abi)
-
-    # ── EntryPoint contract (minimal ABI) ──
-    ep_abi = [
-        {"type": "function", "name": "getNonce", "inputs": [{"name": "sender", "type": "address"}, {"name": "key", "type": "uint192"}], "outputs": [{"name": "", "type": "uint256"}]},
-    ]
-    ep = w3.eth.contract(address=Web3.to_checksum_address(ep_address), abi=ep_abi)
+    # ── Contracts ──
+    from artifacts import USDC_ABI, EP_ABI
+    usdc = w3.eth.contract(address=Web3.to_checksum_address(USDC_SEPOLIA), abi=USDC_ABI)
+    ep = w3.eth.contract(address=Web3.to_checksum_address(ep_address), abi=EP_ABI)
 
     logger.info("=" * 54)
     logger.info("  E2E #3 Pimlico — Bundler + Sponsored Paymaster")
@@ -136,11 +124,11 @@ async def main() -> None:
         # [1] Deploy MinimalAccount
         # =====================================================================
         logger.info("[1] Deploy MinimalAccount...")
-        bytecode = load_bytecode("MinimalAccount")
+        artifact = load_artifact("MinimalAccount")
 
         deploy_tx = {
             "from": deployer.address,
-            "data": bytecode,
+            "data": artifact["bytecode"],
             "nonce": await w3.eth.get_transaction_count(deployer.address),
             "maxFeePerGas": (await w3.eth.gas_price) * 2,
             "maxPriorityFeePerGas": await w3.eth.max_priority_fee,
@@ -148,9 +136,8 @@ async def main() -> None:
             "type": 2,
         }
         deploy_tx["gas"] = (await w3.eth.estimate_gas(deploy_tx)) * 2
-        signed_deploy = w3.eth.account.sign_transaction(deploy_tx, deployer_key)
-        deploy_hash = await w3.eth.send_raw_transaction(signed_deploy.raw_transaction)
-        deploy_receipt = await w3.eth.wait_for_transaction_receipt(deploy_hash, timeout=60)
+        deploy_hash = await sign_and_send_tx(w3, deployer, deploy_tx)
+        deploy_receipt = await w3.eth.get_transaction_receipt(deploy_hash)
         executor_address = deploy_receipt.contractAddress
         assert executor_address is not None, "Deploy failed — no contract address"
 
@@ -178,9 +165,7 @@ async def main() -> None:
             "maxPriorityFeePerGas": await w3.eth.max_priority_fee,
             "chainId": chain_id,
         })
-        signed_transfer = w3.eth.account.sign_transaction(transfer_tx, sponsor_key)
-        transfer_hash = await w3.eth.send_raw_transaction(signed_transfer.raw_transaction)
-        await w3.eth.wait_for_transaction_receipt(transfer_hash, timeout=60)
+        transfer_hash = await sign_and_send_tx(w3, sponsor, transfer_tx)
 
         alice_usdc = await usdc.functions.balanceOf(Web3.to_checksum_address(alice.address)).call()
         logger.info("  Tx: %s", transfer_hash.hex())

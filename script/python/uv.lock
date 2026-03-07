@@ -418,6 +418,7 @@ dependencies = [
     { name = "aiohttp" },
     { name = "eth-account" },
     { name = "python-dotenv" },
+    { name = "rlp" },
     { name = "web3" },
 ]
 
@@ -426,6 +427,7 @@ requires-dist = [
     { name = "aiohttp", specifier = ">=3.9.0" },
     { name = "eth-account", specifier = ">=0.13.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
+    { name = "rlp", specifier = ">=4.0.0" },
     { name = "web3", specifier = ">=7.0.0" },
 ]
 

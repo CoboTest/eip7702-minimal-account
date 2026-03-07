@@ -9,9 +9,22 @@ Supported:
 - UserOp hash (v0.7 packed keccak)
 """
 
+from typing import TypedDict
+
 import rlp
 from eth_abi import encode
 from web3 import Web3
+
+
+class DelegationAuth(TypedDict):
+    """EIP-7702 authorization tuple for bundler API."""
+
+    chainId: str
+    address: str
+    nonce: str
+    yParity: str
+    r: str
+    s: str
 
 
 # ── EIP-7702 Delegation ──
@@ -44,7 +57,7 @@ def compute_delegation_hash(chain_id: int, target: str, nonce: int) -> bytes:
     return Web3.keccak(_EIP7702_MAGIC + encoded)
 
 
-def build_delegation_auth(chain_id: int, target: str, nonce: int, v: int, r: int, s: int) -> dict:
+def build_delegation_auth(chain_id: int, target: str, nonce: int, v: int, r: int, s: int) -> DelegationAuth:
     """
     Build the EIP-7702 authorization tuple for Pimlico's eip7702Auth parameter.
 

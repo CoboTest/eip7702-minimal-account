@@ -25,7 +25,7 @@ contract E2E4337 is Script {
 
     /// @dev Circle USDC on Sepolia (6 decimals)
     IERC20 constant USDC = IERC20(0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238);
-    uint256 constant USDC_AMOUNT = 5e6; // 5 USDC
+    uint256 constant USDC_AMOUNT = 1e6; // 1 USDC
 
     /// @dev ERC-7579 batch mode: callType=0x01, rest zeros
     bytes32 constant BATCH_MODE = bytes32(uint256(0x01) << 248);
@@ -160,8 +160,8 @@ contract E2E4337 is Script {
         console.log("[5] Alice signs UserOp (off-chain, 0 gas)...");
 
         // Alice sends all USDC back to Sponsor via ERC-7821 batch
-        uint256 part1 = 3e6; // 3 USDC
-        uint256 part2 = 2e6; // 2 USDC
+        uint256 part1 = 600000; // 0.6 USDC
+        uint256 part2 = 400000; // 0.4 USDC
 
         Execution[] memory batch = new Execution[](2);
         batch[0] = Execution(
@@ -197,7 +197,7 @@ contract E2E4337 is Script {
         op.signature = abi.encodePacked(r, s, v);
 
         console.log("  Action: execute(BATCH_MODE) -> 2x USDC transfer to Sponsor");
-        console.log("  Transfer: 3 + 2 = 5 USDC");
+        console.log("  Transfer: 0.6 + 0.4 = 1 USDC");
         console.log("  UserOp hash:", vm.toString(opHash));
         console.log("  PASS: signed (no tx, pure off-chain)");
     }

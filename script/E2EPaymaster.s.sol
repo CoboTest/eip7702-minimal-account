@@ -24,6 +24,7 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 contract E2EPaymaster is Script {
     IEntryPoint constant EP = IEntryPoint(0x0000000071727De22E5E9d8BAf0edAc6f37da032);
     IERC20 constant USDC = IERC20(0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238);
+    uint256 constant USDC_AMOUNT = 1e6; // 1 USDC
 
     /// @dev ERC-7579 batch mode: callType=0x01, rest zeros
     bytes32 constant BATCH_MODE = bytes32(uint256(0x01) << 248);
@@ -123,13 +124,13 @@ contract E2EPaymaster is Script {
         console.log("  Paymaster EP deposit:", pmDeposit, "wei");
         require(pmDeposit >= 0.005 ether, "Paymaster deposit too low");
 
-        // Sponsor transfers 5 USDC to Alice (demo only — user already holds tokens in production)
+        // Sponsor transfers USDC to Alice (demo only — user already holds tokens in production)
         vm.broadcast(sponsorPk);
-        USDC.transfer(alice, 5e6);
+        USDC.transfer(alice, USDC_AMOUNT);
 
         uint256 aliceUsdc = USDC.balanceOf(alice);
         console.log("  Alice USDC:", aliceUsdc / 1e6);
-        require(aliceUsdc == 5e6, "Alice USDC should be 5");
+        require(aliceUsdc == USDC_AMOUNT, "Alice USDC mismatch");
         console.log("  PASS: paymaster funded + Alice has USDC");
     }
 
@@ -186,10 +187,12 @@ contract E2EPaymaster is Script {
         console.log("");
         console.log("[4] Alice signs UserOp with Paymaster (off-chain, 0 gas)...");
 
-        // Alice sends her 5 USDC back to Sponsor (3 + 2) — fully gasless via Paymaster
+        // Alice sends her USDC back to Sponsor (0.6 + 0.4) — fully gasless via Paymaster
         Execution[] memory batch = new Execution[](2);
-        batch[0] = Execution(address(USDC), 0, abi.encodeCall(IERC20.transfer, (sponsor, 3e6)));
-        batch[1] = Execution(address(USDC), 0, abi.encodeCall(IERC20.transfer, (sponsor, 2e6)));
+        uint256 part1 = 600000; // 0.6 USDC
+        uint256 part2 = 400000; // 0.4 USDC
+        batch[0] = Execution(address(USDC), 0, abi.encodeCall(IERC20.transfer, (sponsor, part1)));
+        batch[1] = Execution(address(USDC), 0, abi.encodeCall(IERC20.transfer, (sponsor, part2)));
         bytes memory executionData = abi.encode(batch);
 
         op = PackedUserOperation({
@@ -206,7 +209,7 @@ contract E2EPaymaster is Script {
 
         op.signature = _signUserOp(op);
 
-        console.log("  Action: execute(BATCH_MODE) -> USDC.transfer(sponsor, 3e6) + USDC.transfer(sponsor, 2e6)");
+        console.log("  Action: execute(BATCH_MODE) -> USDC.transfer(sponsor, 0.6 USDC) + USDC.transfer(sponsor, 0.4 USDC)");
         console.log("  Paymaster:", address(paymaster));
         console.log("  Signature scheme: EIP-712 (paymaster) + raw ECDSA (userOp)");
         console.log("  PASS: signed (no tx, pure off-chain)");

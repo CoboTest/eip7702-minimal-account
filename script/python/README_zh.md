@@ -146,9 +146,10 @@ sequenceDiagram
     RPC-->>D: 合约地址
     S->>RPC: USDC.transfer(Alice, 1 USDC)
 
-    Note over A,P: [3] 构建 UserOp + 赞助
+    Note over A,P: [3] Delegation + 构建 UserOp + 赞助
     A->>A: 签署 EIP-7702 delegation（链下）
     Note right of A: keccak256(0x05 || rlp(chainId, impl, nonce))
+    A->>A: 构建 callData（ERC-7821 batch）
     A->>P: pm_sponsorUserOperation(userOp + eip7702Auth)
     P-->>A: paymaster, paymasterData, gas 限制
 
@@ -169,10 +170,10 @@ sequenceDiagram
     P-->>A: 回执 + tx hash
 ```
 
-### 步骤 3 — 构建 UserOp + Delegation + 赞助
+### 步骤 3 — Delegation + 构建 UserOp + 赞助
 
-1. **构建 callData** — 编码 ERC-7821 `execute(BATCH_MODE, encodedBatch)`，包含两笔 USDC 转账（0.6 + 0.4）转回 Sponsor
-2. **Alice 签署 EIP-7702 delegation**（链下）— `keccak256(0x05 || rlp(chainId, implAddress, nonce))`，产生 `(yParity, r, s)` 授权元组
+1. **Alice 签署 EIP-7702 delegation**（链下）— `keccak256(0x05 || rlp(chainId, implAddress, nonce))`，产生 `(yParity, r, s)` 授权元组。与 UserOp 内容无关。
+2. **构建 callData** — 编码 ERC-7821 `execute(BATCH_MODE, encodedBatch)`，包含两笔 USDC 转账（0.6 + 0.4）转回 Sponsor
 3. **组装 UserOp** — unpacked 格式：sender、nonce、callData、gas 字段（暂为零）、dummy 签名，加上 `eip7702Auth` 参数
 4. **请求 Pimlico 赞助** — 调用 `pm_sponsorUserOperation`；Pimlico 模拟后返回：paymaster 地址、`paymasterData`（签名）、gas 限制（verification/call/preVerification/paymaster）
 5. **合并赞助字段**到 UserOp — Pimlico 的 gas 限制和 paymaster 数据替换零值占位符

@@ -146,9 +146,10 @@ sequenceDiagram
     RPC-->>D: contract address
     S->>RPC: USDC.transfer(Alice, 1 USDC)
 
-    Note over A,P: [3] Build UserOp + Sponsorship
+    Note over A,P: [3] Delegation + Build UserOp + Sponsorship
     A->>A: sign EIP-7702 delegation (off-chain)
     Note right of A: keccak256(0x05 || rlp(chainId, impl, nonce))
+    A->>A: build callData (ERC-7821 batch)
     A->>P: pm_sponsorUserOperation(userOp + eip7702Auth)
     P-->>A: paymaster, paymasterData, gas limits
 
@@ -169,10 +170,10 @@ sequenceDiagram
     P-->>A: receipt + tx hash
 ```
 
-### Step 3 — Build UserOp + Delegation + Sponsorship
+### Step 3 — Delegation + Build UserOp + Sponsorship
 
-1. **Build callData** — Encode ERC-7821 `execute(BATCH_MODE, encodedBatch)` with two USDC transfers (0.6 + 0.4) back to Sponsor
-2. **Alice signs EIP-7702 delegation** (off-chain) — `keccak256(0x05 || rlp(chainId, implAddress, nonce))`, produces `(yParity, r, s)` authorization tuple
+1. **Alice signs EIP-7702 delegation** (off-chain) — `keccak256(0x05 || rlp(chainId, implAddress, nonce))`, produces `(yParity, r, s)` authorization tuple. Independent of UserOp content.
+2. **Build callData** — Encode ERC-7821 `execute(BATCH_MODE, encodedBatch)` with two USDC transfers (0.6 + 0.4) back to Sponsor
 3. **Assemble UserOp** — Unpacked format: sender, nonce, callData, gas fields (zeros for now), dummy signature, plus `eip7702Auth` parameter
 4. **Request Pimlico sponsorship** — Call `pm_sponsorUserOperation`; Pimlico simulates and returns: paymaster address, `paymasterData` (signature), gas limits (verification/call/preVerification/paymaster)
 5. **Merge sponsored fields** into UserOp — Pimlico's gas limits and paymaster data replace the zero placeholders

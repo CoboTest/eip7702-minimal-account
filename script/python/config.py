@@ -1,5 +1,8 @@
 """Constants and configuration for EIP-7702 E2E tests."""
 
+# ── Timing ──
+BLOCK_PROPAGATION_DELAY = 5  # seconds to wait for block confirmation
+
 # ── EntryPoint address (v0.7) ──
 EP_V07 = "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
 

@@ -33,9 +33,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 from web3 import AsyncHTTPProvider, AsyncWeb3, Web3
 
-from artifacts import load_artifact
+from artifacts import EP_ABI, USDC_ABI, load_artifact
 from calls import erc20_transfer, erc7821_batch
 from config import (
+    BLOCK_PROPAGATION_DELAY,
     CHAIN_ID_SEPOLIA,
     EP_V07,
     USDC_AMOUNT,
@@ -45,22 +46,11 @@ from config import (
 )
 from hash import build_delegation_auth, compute_delegation_hash
 from providers.pimlico import PimlicoBundler, PimlicoPaymaster
-from signers import Signer
 from signers.local import LocalSigner
-from tx import Transaction
+from tx import Transaction, sign_and_send_tx
 from userop import build_userop, sign_userop, submit_and_wait
 
 logger = logging.getLogger(__name__)
-
-
-async def sign_and_send_tx(
-    w3: AsyncWeb3, signer: Signer, tx: Transaction, *, timeout: int = 60
-) -> bytes:
-    """Sign a transaction with a Signer and send it. Returns tx hash."""
-    raw_tx = signer.sign_transaction(tx)
-    tx_hash = await w3.eth.send_raw_transaction(raw_tx)
-    await w3.eth.wait_for_transaction_receipt(tx_hash, timeout=timeout)
-    return tx_hash
 
 
 async def main() -> None:
@@ -96,8 +86,6 @@ async def main() -> None:
     paymaster = PimlicoPaymaster(pimlico_url, ep_address)
 
     # ── Contracts ──
-    from artifacts import EP_ABI, USDC_ABI
-
     usdc = w3.eth.contract(address=Web3.to_checksum_address(USDC_SEPOLIA), abi=USDC_ABI)
     ep = w3.eth.contract(address=Web3.to_checksum_address(ep_address), abi=EP_ABI)
 
@@ -143,8 +131,8 @@ async def main() -> None:
         logger.info("  PASS: deployed")
 
         # Wait for block propagation (Pimlico simulates against confirmed state)
-        logger.info("  Waiting 6s for block propagation...")
-        await asyncio.sleep(6)
+        logger.info("  Waiting for block propagation...")
+        await asyncio.sleep(BLOCK_PROPAGATION_DELAY)
         logger.info("")
 
         # =====================================================================
@@ -172,8 +160,8 @@ async def main() -> None:
         logger.info("  PASS: funded")
 
         # Wait for block propagation
-        logger.info("  Waiting 6s for block propagation...")
-        await asyncio.sleep(6)
+        logger.info("  Waiting for block propagation...")
+        await asyncio.sleep(BLOCK_PROPAGATION_DELAY)
         logger.info("")
 
         # =====================================================================

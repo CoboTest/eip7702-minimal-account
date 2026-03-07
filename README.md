@@ -21,15 +21,15 @@ A minimal EIP-7702 delegate contract for EOAs built on **OpenZeppelin Contracts 
 
 ## Stack
 
-| Component | Source |
-|-----------|--------|
-| `Account` | OZ — ERC-4337 `validateUserOp` + prefund logic |
-| `SignerEIP7702` | OZ — raw ECDSA signature validation against `address(this)` |
-| `ERC7821` | OZ — `execute(bytes32 mode, bytes executionData)` with ERC-7579 encoding |
-| `ERC721Holder` | OZ — safe ERC-721 token receive |
-| `ERC1155Holder` | OZ — safe ERC-1155 token receive |
+| Component            | Source                                                                             |
+| -------------------- | ---------------------------------------------------------------------------------- |
+| `Account`            | OZ — ERC-4337 `validateUserOp` + prefund logic                                     |
+| `SignerEIP7702`      | OZ — raw ECDSA signature validation against `address(this)`                        |
+| `ERC7821`            | OZ — `execute(bytes32 mode, bytes executionData)` with ERC-7579 encoding           |
+| `ERC721Holder`       | OZ — safe ERC-721 token receive                                                    |
+| `ERC1155Holder`      | OZ — safe ERC-1155 token receive                                                   |
 | `VerifyingPaymaster` | Custom — EIP-712, Ownable2Step, Pausable, ReentrancyGuard, signer/owner separation |
-| EntryPoint | ERC-4337 v0.8 (`0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108`) |
+| EntryPoint           | ERC-4337 v0.8 (`0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108`)                       |
 
 ## Features
 
@@ -112,12 +112,12 @@ Four E2E scripts demonstrate different execution paths:
 
 Four actors — Alice signs off-chain only, never pays gas. Demonstrates 1 USDC batch transfer (0.6 + 0.4) round-trip from Sponsor → Alice → Sponsor:
 
-| Actor | Role |
-|-------|------|
-| **Deployer** | Deploys MinimalAccount |
-| **Sponsor** | Deposits to EntryPoint for Alice + transfers 1 USDC |
-| **Bundler** | Submits `handleOps` type 4 tx with EIP-7702 `authorizationList` |
-| **Alice** | Fresh EOA (0 ETH), signs delegation + UserOp off-chain |
+| Actor        | Role                                                            |
+| ------------ | --------------------------------------------------------------- |
+| **Deployer** | Deploys MinimalAccount                                          |
+| **Sponsor**  | Deposits to EntryPoint for Alice + transfers 1 USDC             |
+| **Bundler**  | Submits `handleOps` type 4 tx with EIP-7702 `authorizationList` |
+| **Alice**    | Fresh EOA (0 ETH), signs delegation + UserOp off-chain          |
 
 ```bash
 source .env  # DEPLOYER_PRIVATE_KEY, SPONSOR_PRIVATE_KEY, BUNDLER_PRIVATE_KEY, RPC_URL
@@ -132,12 +132,12 @@ forge script script/E2E4337.s.sol \
 
 Four actors — Alice uses a VerifyingPaymaster for fully gasless 1 USDC batch transfer (0.6 + 0.4) round-trip:
 
-| Actor | Role |
-|-------|------|
-| **Deployer** | Deploys MinimalAccount + VerifyingPaymaster, funds paymaster (deposit + stake) |
-| **Sponsor** | Transfers 1 USDC to Alice (demo-only, not needed in production) |
-| **Bundler** | Submits `handleOps` type 4 tx with EIP-7702 `authorizationList` |
-| **Alice** | Fresh EOA (0 ETH), signs delegation + pmAuth + UserOp off-chain, batch transfers USDC back to Sponsor |
+| Actor        | Role                                                                                                  |
+| ------------ | ----------------------------------------------------------------------------------------------------- |
+| **Deployer** | Deploys MinimalAccount + VerifyingPaymaster, funds paymaster (deposit + stake)                        |
+| **Sponsor**  | Transfers 1 USDC to Alice (demo-only, not needed in production)                                       |
+| **Bundler**  | Submits `handleOps` type 4 tx with EIP-7702 `authorizationList`                                       |
+| **Alice**    | Fresh EOA (0 ETH), signs delegation + pmAuth + UserOp off-chain, batch transfers USDC back to Sponsor |
 
 ```bash
 source .env  # DEPLOYER_PRIVATE_KEY, SPONSOR_PRIVATE_KEY, BUNDLER_PRIVATE_KEY, RPC_URL
@@ -154,11 +154,11 @@ PAYMASTER=0x... forge script script/PaymasterCleanup.s.sol \
 
 Three actors — Alice signs off-chain only (delegation + UserOp), Pimlico handles gas. 1 USDC batch transfer round-trip:
 
-| Actor | Role |
-|-------|------|
-| **Deployer** | Deploys MinimalAccount |
-| **Sponsor** | Transfers 1 USDC to Alice |
-| **Alice** | Fresh EOA (0 ETH), signs EIP-7702 delegation + UserOp off-chain |
+| Actor        | Role                                                            |
+| ------------ | --------------------------------------------------------------- |
+| **Deployer** | Deploys MinimalAccount                                          |
+| **Sponsor**  | Transfers 1 USDC to Alice                                       |
+| **Alice**    | Fresh EOA (0 ETH), signs EIP-7702 delegation + UserOp off-chain |
 
 > **Note:** Pimlico serves as both bundler and paymaster — no separate Bundler actor needed.
 
@@ -174,10 +174,10 @@ bash script/E2EPimlico.sh
 
 Two actors — Deployer sets up delegation, Alice executes directly:
 
-| Actor | Role |
-|-------|------|
+| Actor        | Role                                                                  |
+| ------------ | --------------------------------------------------------------------- |
 | **Deployer** | Deploys MinimalAccount, funds Alice, activates delegation (type 4 tx) |
-| **Alice** | Fresh EOA, calls `execute()` directly (pays own gas) |
+| **Alice**    | Fresh EOA, calls `execute()` directly (pays own gas)                  |
 
 ```bash
 source .env  # DEPLOYER_PRIVATE_KEY, RPC_URL
@@ -195,13 +195,13 @@ forge script script/E2EDirect.s.sol \
 
 ## Environment Variables
 
-| Variable | Used By | Description |
-|----------|---------|-------------|
-| `DEPLOYER_PRIVATE_KEY` | All | Deploys MinimalAccount |
-| `SPONSOR_PRIVATE_KEY` | E2E4337, E2EPaymaster, E2EPimlico | Funds Alice (ETH deposit / USDC transfer) |
-| `BUNDLER_PRIVATE_KEY` | E2E4337, E2EPaymaster | Submits handleOps tx |
-| `PIMLICO_API_KEY` | E2EPimlico | Pimlico bundler + paymaster API key |
-| `RPC_URL` | All | Sepolia RPC endpoint |
+| Variable               | Used By                           | Description                               |
+| ---------------------- | --------------------------------- | ----------------------------------------- |
+| `DEPLOYER_PRIVATE_KEY` | All                               | Deploys MinimalAccount                    |
+| `SPONSOR_PRIVATE_KEY`  | E2E4337, E2EPaymaster, E2EPimlico | Funds Alice (ETH deposit / USDC transfer) |
+| `BUNDLER_PRIVATE_KEY`  | E2E4337, E2EPaymaster             | Submits handleOps tx                      |
+| `PIMLICO_API_KEY`      | E2EPimlico                        | Pimlico bundler + paymaster API key       |
+| `RPC_URL`              | All                               | Sepolia RPC endpoint                      |
 
 > Alice's key is generated via `vm.randomUint()` — fresh random keypair each run, no env var needed.
 

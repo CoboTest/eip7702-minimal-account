@@ -21,15 +21,15 @@
 
 ## 技术栈
 
-| 组件 | 来源 |
-|------|------|
-| `Account` | OZ — ERC-4337 `validateUserOp` + 预付款逻辑 |
-| `SignerEIP7702` | OZ — 基于 `address(this)` 的原始 ECDSA 签名验证 |
-| `ERC7821` | OZ — `execute(bytes32 mode, bytes executionData)` + ERC-7579 编码 |
-| `ERC721Holder` | OZ — 安全接收 ERC-721 Token |
-| `ERC1155Holder` | OZ — 安全接收 ERC-1155 Token |
+| 组件                 | 来源                                                                       |
+| -------------------- | -------------------------------------------------------------------------- |
+| `Account`            | OZ — ERC-4337 `validateUserOp` + 预付款逻辑                                |
+| `SignerEIP7702`      | OZ — 基于 `address(this)` 的原始 ECDSA 签名验证                            |
+| `ERC7821`            | OZ — `execute(bytes32 mode, bytes executionData)` + ERC-7579 编码          |
+| `ERC721Holder`       | OZ — 安全接收 ERC-721 Token                                                |
+| `ERC1155Holder`      | OZ — 安全接收 ERC-1155 Token                                               |
 | `VerifyingPaymaster` | 自研 — EIP-712、Ownable2Step、Pausable、ReentrancyGuard、signer/owner 分离 |
-| EntryPoint | ERC-4337 v0.8 (`0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108`) |
+| EntryPoint           | ERC-4337 v0.8 (`0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108`)               |
 
 ## 功能特性
 
@@ -112,12 +112,12 @@ forge test -vvv
 
 四个参与者 — Alice 仅链下签名，从不支付 gas。演示 1 USDC 批量转账（0.6 + 0.4）Sponsor → Alice → Sponsor 往返：
 
-| 参与者 | 角色 |
-|--------|------|
-| **Deployer** | 部署 MinimalAccount |
-| **Sponsor** | 向 EntryPoint 为 Alice 存款 + 转入 1 USDC |
-| **Bundler** | 提交带 EIP-7702 `authorizationList` 的 `handleOps` type 4 交易 |
-| **Alice** | 全新 EOA（0 ETH），链下签署 delegation + UserOp |
+| 参与者       | 角色                                                           |
+| ------------ | -------------------------------------------------------------- |
+| **Deployer** | 部署 MinimalAccount                                            |
+| **Sponsor**  | 向 EntryPoint 为 Alice 存款 + 转入 1 USDC                      |
+| **Bundler**  | 提交带 EIP-7702 `authorizationList` 的 `handleOps` type 4 交易 |
+| **Alice**    | 全新 EOA（0 ETH），链下签署 delegation + UserOp                |
 
 ```bash
 source .env  # DEPLOYER_PRIVATE_KEY, SPONSOR_PRIVATE_KEY, BUNDLER_PRIVATE_KEY, RPC_URL
@@ -132,12 +132,12 @@ forge script script/E2E4337.s.sol \
 
 四个参与者 — Alice 使用 VerifyingPaymaster 实现完全无 gas 的 1 USDC 批量转账（0.6 + 0.4）往返：
 
-| 参与者 | 角色 |
-|--------|------|
-| **Deployer** | 部署 MinimalAccount + VerifyingPaymaster，为 Paymaster 注资（deposit + stake） |
-| **Sponsor** | 为 Alice 转入 1 USDC（仅演示用，生产环境不需要） |
-| **Bundler** | 提交带 EIP-7702 `authorizationList` 的 `handleOps` type 4 交易 |
-| **Alice** | 全新 EOA（0 ETH），链下签署 delegation + pmAuth + UserOp，批量转 USDC 回 Sponsor |
+| 参与者       | 角色                                                                             |
+| ------------ | -------------------------------------------------------------------------------- |
+| **Deployer** | 部署 MinimalAccount + VerifyingPaymaster，为 Paymaster 注资（deposit + stake）   |
+| **Sponsor**  | 为 Alice 转入 1 USDC（仅演示用，生产环境不需要）                                 |
+| **Bundler**  | 提交带 EIP-7702 `authorizationList` 的 `handleOps` type 4 交易                   |
+| **Alice**    | 全新 EOA（0 ETH），链下签署 delegation + pmAuth + UserOp，批量转 USDC 回 Sponsor |
 
 ```bash
 source .env  # DEPLOYER_PRIVATE_KEY, SPONSOR_PRIVATE_KEY, BUNDLER_PRIVATE_KEY, RPC_URL
@@ -154,11 +154,11 @@ PAYMASTER=0x... forge script script/PaymasterCleanup.s.sol \
 
 三个参与者 — Alice 仅链下签名（delegation + UserOp），Pimlico 承担 gas。1 USDC 批量转账往返：
 
-| 参与者 | 角色 |
-|--------|------|
-| **Deployer** | 部署 MinimalAccount |
-| **Sponsor** | 转 1 USDC 给 Alice |
-| **Alice** | 全新 EOA（0 ETH），链下签署 EIP-7702 delegation + UserOp |
+| 参与者       | 角色                                                     |
+| ------------ | -------------------------------------------------------- |
+| **Deployer** | 部署 MinimalAccount                                      |
+| **Sponsor**  | 转 1 USDC 给 Alice                                       |
+| **Alice**    | 全新 EOA（0 ETH），链下签署 EIP-7702 delegation + UserOp |
 
 > **注意：** Pimlico 同时充当 bundler 和 paymaster — 不需要单独的 Bundler 角色。
 
@@ -174,10 +174,10 @@ bash script/E2EPimlico.sh
 
 两个参与者 — Deployer 设置 delegation，Alice 直接执行：
 
-| 参与者 | 角色 |
-|--------|------|
-| **Deployer** | 部署 MinimalAccount，为 Alice 注资，激活 delegation（type 4 交易）|
-| **Alice** | 全新 EOA，直接调用 `execute()`（自付 gas）|
+| 参与者       | 角色                                                               |
+| ------------ | ------------------------------------------------------------------ |
+| **Deployer** | 部署 MinimalAccount，为 Alice 注资，激活 delegation（type 4 交易） |
+| **Alice**    | 全新 EOA，直接调用 `execute()`（自付 gas）                         |
 
 ```bash
 source .env  # DEPLOYER_PRIVATE_KEY, RPC_URL
@@ -195,13 +195,13 @@ forge script script/E2EDirect.s.sol \
 
 ## 环境变量
 
-| 变量 | 使用场景 | 说明 |
-|------|---------|------|
-| `DEPLOYER_PRIVATE_KEY` | 所有脚本 | 部署 MinimalAccount |
-| `SPONSOR_PRIVATE_KEY` | E2E4337, E2EPaymaster, E2EPimlico | 为 Alice 提供资金（ETH 存款 / USDC 转账） |
-| `BUNDLER_PRIVATE_KEY` | E2E4337, E2EPaymaster | 提交 handleOps 交易 |
-| `PIMLICO_API_KEY` | E2EPimlico | Pimlico bundler + paymaster API key |
-| `RPC_URL` | 所有脚本 | Sepolia RPC 端点 |
+| 变量                   | 使用场景                          | 说明                                      |
+| ---------------------- | --------------------------------- | ----------------------------------------- |
+| `DEPLOYER_PRIVATE_KEY` | 所有脚本                          | 部署 MinimalAccount                       |
+| `SPONSOR_PRIVATE_KEY`  | E2E4337, E2EPaymaster, E2EPimlico | 为 Alice 提供资金（ETH 存款 / USDC 转账） |
+| `BUNDLER_PRIVATE_KEY`  | E2E4337, E2EPaymaster             | 提交 handleOps 交易                       |
+| `PIMLICO_API_KEY`      | E2EPimlico                        | Pimlico bundler + paymaster API key       |
+| `RPC_URL`              | 所有脚本                          | Sepolia RPC 端点                          |
 
 > Alice 的密钥通过 `vm.randomUint()` 生成 — 每次运行全新随机密钥对，无需环境变量。
 

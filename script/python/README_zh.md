@@ -50,12 +50,12 @@ SPONSOR_PRIVATE_KEY=0x...
 PIMLICO_API_KEY=pim_...
 ```
 
-| 变量 | 说明 |
-|------|------|
-| `RPC_URL` | Ethereum Sepolia RPC 端点 |
-| `DEPLOYER_PRIVATE_KEY` | 部署 MinimalAccount 合约 |
-| `SPONSOR_PRIVATE_KEY` | 向 Alice 转 USDC |
-| `PIMLICO_API_KEY` | Pimlico bundler + paymaster API 密钥 |
+| 变量                   | 说明                                 |
+| ---------------------- | ------------------------------------ |
+| `RPC_URL`              | Ethereum Sepolia RPC 端点            |
+| `DEPLOYER_PRIVATE_KEY` | 部署 MinimalAccount 合约             |
+| `SPONSOR_PRIVATE_KEY`  | 向 Alice 转 USDC                     |
+| `PIMLICO_API_KEY`      | Pimlico bundler + paymaster API 密钥 |
 
 ## 架构
 
@@ -104,11 +104,11 @@ v, r, s = signer.sign_hash(hash_bytes) # 原始 ECDSA，无 EIP-191 前缀
 
 这种设计使新增签名者实现无需修改任何哈希逻辑：
 
-| 签名者 | 说明 | 状态 |
-|--------|------|------|
-| `LocalSigner` | 内存私钥 | ✅ 已实现 |
-| `HardwareSigner` | 硬件钱包（Ledger、Trezor） | 计划中 |
-| `KMSSigner` | 云 KMS（AWS、GCP） | 计划中 |
+| 签名者           | 说明                       | 状态      |
+| ---------------- | -------------------------- | --------- |
+| `LocalSigner`    | 内存私钥                   | ✅ 已实现 |
+| `HardwareSigner` | 硬件钱包（Ledger、Trezor） | 计划中    |
+| `KMSSigner`      | 云 KMS（AWS、GCP）         | 计划中    |
 
 ### Provider 抽象
 
@@ -145,11 +145,11 @@ paymaster = PimlicoPaymaster(url, entry_point)
 
 **三个角色：**
 
-| 角色 | 职责 | ETH | 签名内容 |
-|------|------|-----|----------|
-| Deployer | 部署 MinimalAccount | 支付 gas | 部署交易 |
-| Sponsor | 为 Alice 提供 USDC | 支付 gas | 转账交易 |
-| Alice | 通过 ERC-4337 执行批量操作 | **0 ETH** | Delegation + UserOp（链下） |
+| 角色     | 职责                       | ETH       | 签名内容                    |
+| -------- | -------------------------- | --------- | --------------------------- |
+| Deployer | 部署 MinimalAccount        | 支付 gas  | 部署交易                    |
+| Sponsor  | 为 Alice 提供 USDC         | 支付 gas  | 转账交易                    |
+| Alice    | 通过 ERC-4337 执行批量操作 | **0 ETH** | Delegation + UserOp（链下） |
 
 **USDC 往返：** Sponsor → Alice → Sponsor（1 USDC，拆分为 0.6 + 0.4 批量转账）
 

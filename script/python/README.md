@@ -50,12 +50,12 @@ SPONSOR_PRIVATE_KEY=0x...
 PIMLICO_API_KEY=pim_...
 ```
 
-| Variable | Description |
-|----------|-------------|
-| `RPC_URL` | Ethereum Sepolia RPC endpoint |
-| `DEPLOYER_PRIVATE_KEY` | Deploys MinimalAccount contract |
-| `SPONSOR_PRIVATE_KEY` | Transfers USDC to Alice |
-| `PIMLICO_API_KEY` | Pimlico bundler + paymaster API key |
+| Variable               | Description                         |
+| ---------------------- | ----------------------------------- |
+| `RPC_URL`              | Ethereum Sepolia RPC endpoint       |
+| `DEPLOYER_PRIVATE_KEY` | Deploys MinimalAccount contract     |
+| `SPONSOR_PRIVATE_KEY`  | Transfers USDC to Alice             |
+| `PIMLICO_API_KEY`      | Pimlico bundler + paymaster API key |
 
 ## Architecture
 
@@ -104,11 +104,11 @@ v, r, s = signer.sign_hash(hash_bytes) # raw ECDSA, no EIP-191 prefix
 
 This design enables future signer implementations without changing any hash logic:
 
-| Signer | Description | Status |
-|--------|-------------|--------|
-| `LocalSigner` | In-memory private key | ✅ Implemented |
-| `HardwareSigner` | Hardware wallet (Ledger, Trezor) | Planned |
-| `KMSSigner` | Cloud KMS (AWS, GCP) | Planned |
+| Signer           | Description                      | Status         |
+| ---------------- | -------------------------------- | -------------- |
+| `LocalSigner`    | In-memory private key            | ✅ Implemented |
+| `HardwareSigner` | Hardware wallet (Ledger, Trezor) | Planned        |
+| `KMSSigner`      | Cloud KMS (AWS, GCP)             | Planned        |
 
 ### Provider Abstraction
 
@@ -145,11 +145,11 @@ All I/O operations (RPC calls, bundler API) use `async/await` with `aiohttp` and
 
 **Three actors:**
 
-| Actor | Role | ETH | Signs |
-|-------|------|-----|-------|
-| Deployer | Deploys MinimalAccount | Pays gas | Deploy tx |
-| Sponsor | Funds Alice with USDC | Pays gas | Transfer tx |
-| Alice | Executes batch via ERC-4337 | **0 ETH** | Delegation + UserOp (off-chain) |
+| Actor    | Role                        | ETH       | Signs                           |
+| -------- | --------------------------- | --------- | ------------------------------- |
+| Deployer | Deploys MinimalAccount      | Pays gas  | Deploy tx                       |
+| Sponsor  | Funds Alice with USDC       | Pays gas  | Transfer tx                     |
+| Alice    | Executes batch via ERC-4337 | **0 ETH** | Delegation + UserOp (off-chain) |
 
 **USDC round-trip:** Sponsor → Alice → Sponsor (1 USDC, split 0.6 + 0.4 batch)
 

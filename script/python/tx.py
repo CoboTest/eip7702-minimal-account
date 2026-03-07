@@ -31,15 +31,21 @@ class Transaction:
         })
 
     def to_dict(self) -> dict:
-        """Convert to web3-compatible transaction dict."""
+        """Convert to web3-compatible transaction dict.
+
+        Omits None values and zero gas (so estimate_gas works).
+        """
         result = {}
         for f in fields(self):
             if f.name.startswith("_"):
                 continue
             key = self._FIELD_MAP.get(f.name, f.name)
             value = getattr(self, f.name)
-            if value is not None:
-                result[key] = value
+            if value is None:
+                continue
+            if f.name == "gas" and value == 0:
+                continue  # let RPC estimate
+            result[key] = value
         return result
 
     @classmethod

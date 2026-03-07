@@ -2,7 +2,8 @@
 
 import requests
 
-from providers.base import JsonRpcMixin, Paymaster, SponsorResult
+from providers.base import JsonRpcMixin
+from providers.paymaster import Paymaster, SponsorResult
 
 
 class PimlicoPaymaster(JsonRpcMixin, Paymaster):

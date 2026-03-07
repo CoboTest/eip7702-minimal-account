@@ -43,6 +43,7 @@ PIMLICO_API_KEY=pim_...
 script/python/
 ├── e2e_pimlico.py           # E2E #3 主入口（异步）
 ├── config.py                # 链常量（EP 地址、USDC）
+├── tx.py                    # Transaction 数据类（类型化交易参数）
 ├── hash.py                  # 纯哈希函数（delegation、UserOp v0.7）
 ├── artifacts/               # 预编译合约产物与 ABI 定义
 │   ├── __init__.py          # load_artifact(), USDC_ABI, EP_ABI

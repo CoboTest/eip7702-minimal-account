@@ -2,11 +2,13 @@
 Abstract signer interface for EIP-7702 E2E tests.
 
 The Signer signs 32-byte hashes (for off-chain UserOp/delegation)
-and optionally signs full Ethereum transactions (for on-chain ops).
+and full Ethereum transactions (for on-chain ops).
 All hash computation happens in upper layers.
 """
 
 from abc import ABC, abstractmethod
+
+from tx import Transaction
 
 
 class Signer(ABC):
@@ -29,12 +31,12 @@ class Signer(ABC):
         ...
 
     @abstractmethod
-    def sign_transaction(self, tx: dict) -> bytes:
+    def sign_transaction(self, tx: Transaction) -> bytes:
         """
         Sign an Ethereum transaction.
 
         Args:
-            tx: Transaction dict (from, to, value, data, nonce, gas, etc.).
+            tx: Transaction dataclass.
 
         Returns:
             Raw signed transaction bytes ready for eth_sendRawTransaction.

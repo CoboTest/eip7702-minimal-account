@@ -4,6 +4,7 @@ from eth_account import Account
 from eth_keys import keys
 
 from signers.base import Signer
+from tx import Transaction
 
 
 class LocalSigner(Signer):
@@ -39,9 +40,9 @@ class LocalSigner(Signer):
             int.from_bytes(sig.s.to_bytes(32, "big"), "big"),
         )
 
-    def sign_transaction(self, tx: dict) -> bytes:
+    def sign_transaction(self, tx: Transaction) -> bytes:
         """Sign an Ethereum transaction, return raw bytes."""
-        signed = Account.sign_transaction(tx, self._private_key)
+        signed = Account.sign_transaction(tx.to_dict(), self._private_key)
         return signed.raw_transaction
 
     @classmethod

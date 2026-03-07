@@ -53,12 +53,13 @@ from artifacts import load_artifact
 from providers.pimlico import PimlicoBundler, PimlicoPaymaster
 from signers import Signer
 from signers.local import LocalSigner
+from tx import Transaction
 
 logger = logging.getLogger(__name__)
 
 
 async def sign_and_send_tx(
-    w3: AsyncWeb3, signer: Signer, tx: dict, *, timeout: int = 60
+    w3: AsyncWeb3, signer: Signer, tx: Transaction, *, timeout: int = 60
 ) -> bytes:
     """Sign a transaction with a Signer and send it. Returns tx hash."""
     raw_tx = signer.sign_transaction(tx)
@@ -127,16 +128,15 @@ async def main() -> None:
         logger.info("[1] Deploy MinimalAccount...")
         artifact = load_artifact("MinimalAccount")
 
-        deploy_tx = {
-            "from": deployer.address,
-            "data": artifact["bytecode"],
-            "nonce": await w3.eth.get_transaction_count(deployer.address),
-            "maxFeePerGas": (await w3.eth.gas_price) * 2,
-            "maxPriorityFeePerGas": await w3.eth.max_priority_fee,
-            "chainId": chain_id,
-            "type": 2,
-        }
-        deploy_tx["gas"] = (await w3.eth.estimate_gas(deploy_tx)) * 2
+        deploy_tx = Transaction(
+            from_address=deployer.address,
+            data=artifact["bytecode"],
+            nonce=await w3.eth.get_transaction_count(deployer.address),
+            max_fee_per_gas=(await w3.eth.gas_price) * 2,
+            max_priority_fee_per_gas=await w3.eth.max_priority_fee,
+            chain_id=chain_id,
+        )
+        deploy_tx.gas = (await w3.eth.estimate_gas(deploy_tx.to_dict())) * 2
         deploy_hash = await sign_and_send_tx(w3, deployer, deploy_tx)
         deploy_receipt = await w3.eth.get_transaction_receipt(deploy_hash)
         executor_address = deploy_receipt.contractAddress
@@ -156,7 +156,7 @@ async def main() -> None:
         # =====================================================================
         logger.info("[2] Sponsor transfers %d USDC to Alice...", USDC_AMOUNT // 1_000_000)
 
-        transfer_tx = await usdc.functions.transfer(
+        transfer_dict = await usdc.functions.transfer(
             Web3.to_checksum_address(alice.address), USDC_AMOUNT
         ).build_transaction({
             "from": sponsor.address,
@@ -166,7 +166,7 @@ async def main() -> None:
             "maxPriorityFeePerGas": await w3.eth.max_priority_fee,
             "chainId": chain_id,
         })
-        transfer_hash = await sign_and_send_tx(w3, sponsor, transfer_tx)
+        transfer_hash = await sign_and_send_tx(w3, sponsor, Transaction.from_dict(transfer_dict))
 
         alice_usdc = await usdc.functions.balanceOf(Web3.to_checksum_address(alice.address)).call()
         logger.info("  Tx: %s", transfer_hash.hex())

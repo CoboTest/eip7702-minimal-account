@@ -1,6 +1,6 @@
 """Pimlico bundler service (api.pimlico.io)."""
 
-from providers.base import JsonRpcMixin
+from providers.pimlico.base import JsonRpcMixin
 from providers.bundler import Bundler
 from providers.types import GasPrice, UserOpReceipt
 

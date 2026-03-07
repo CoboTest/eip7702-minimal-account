@@ -13,6 +13,8 @@ Usage:
 
 import logging
 
+from web3 import Web3
+
 from hash import (
     DelegationAuth,
     compute_userop_hash,
@@ -101,7 +103,8 @@ def sign_userop(
     """
     Sign a sponsored UserOp (step 4).
 
-    Computes userOpHash (v0.7 packed keccak) and signs with raw ECDSA.
+    Computes userOpHash (v0.7 packed keccak) and signs with EIP-191 prefix.
+    Matches MinimalAccount._signableUserOpHash() (toEthSignedMessageHash).
 
     Returns:
         The 32-byte userOpHash.
@@ -130,7 +133,9 @@ def sign_userop(
 
     logger.info("  userOpHash: 0x%s", userop_hash.hex())
 
-    v, r, s = signer.sign_hash(userop_hash)
+    # EIP-191 prefix: keccak256("\x19Ethereum Signed Message:\n32" || userOpHash)
+    signable_hash = Web3.keccak(b"\x19Ethereum Signed Message:\n32" + userop_hash)
+    v, r, s = signer.sign_hash(signable_hash)
     sig_bytes = r.to_bytes(32, "big") + s.to_bytes(32, "big") + bytes([v])
     user_op.signature = sig_bytes
     logger.info("  Signature: 0x%s...%s", sig_bytes[:10].hex(), sig_bytes[-4:].hex())

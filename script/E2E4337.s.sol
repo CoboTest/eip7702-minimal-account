@@ -7,6 +7,7 @@ import { MinimalAccount } from "../src/MinimalAccount.sol";
 import { PackedUserOperation, IEntryPoint } from "@openzeppelin/contracts/interfaces/draft-IERC4337.sol";
 import { Execution } from "@openzeppelin/contracts/interfaces/draft-IERC7579.sol";
 import { IERC7821 } from "@openzeppelin/contracts/interfaces/draft-IERC7821.sol";
+import { MessageHashUtils } from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 interface IERC20 {
     function balanceOf(address) external view returns (uint256);
@@ -191,9 +192,10 @@ contract E2E4337 is Script {
             signature: ""
         });
 
-        // OZ SignerEIP7702 uses raw signature (no personal_sign prefix)
+        // EIP-191 prefix: matches MinimalAccount._signableUserOpHash()
         bytes32 opHash = _getUserOpHash(op);
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(alicePk, opHash);
+        bytes32 signableHash = MessageHashUtils.toEthSignedMessageHash(opHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(alicePk, signableHash);
         op.signature = abi.encodePacked(r, s, v);
 
         console.log("  Action: execute(BATCH_MODE) -> 2x USDC transfer to Sponsor");

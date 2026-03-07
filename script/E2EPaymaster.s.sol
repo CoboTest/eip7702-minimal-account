@@ -8,6 +8,7 @@ import { VerifyingPaymaster } from "../src/VerifyingPaymaster.sol";
 import { PackedUserOperation, IEntryPoint } from "@openzeppelin/contracts/interfaces/draft-IERC4337.sol";
 import { Execution } from "@openzeppelin/contracts/interfaces/draft-IERC7579.sol";
 import { IERC7821 } from "@openzeppelin/contracts/interfaces/draft-IERC7821.sol";
+import { MessageHashUtils } from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title E2EPaymaster — ERC-4337 Paymaster-Sponsored E2E Flow
@@ -178,7 +179,9 @@ contract E2EPaymaster is Script {
 
     function _signUserOp(PackedUserOperation memory op) internal returns (bytes memory) {
         bytes32 opHash = _getUserOpHash(op);
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(alicePk, opHash);
+        // EIP-191 prefix: matches MinimalAccount._signableUserOpHash()
+        bytes32 signableHash = MessageHashUtils.toEthSignedMessageHash(opHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(alicePk, signableHash);
         console.log("  UserOp hash:", vm.toString(opHash));
         return abi.encodePacked(r, s, v);
     }

@@ -253,8 +253,8 @@ USEROP_HASH=$($CAST keccak "$OUTER_ENC")
 
 echo "  userOpHash: $USEROP_HASH"
 
-# Sign (raw ECDSA, no personal_sign prefix)
-SIG=$($CAST wallet sign --no-hash "$USEROP_HASH" --private-key "$ALICE_KEY")
+# Sign with EIP-191 prefix: matches MinimalAccount._signableUserOpHash()
+SIG=$($CAST wallet sign "$USEROP_HASH" --private-key "$ALICE_KEY")
 echo "  Signature: ${SIG:0:20}...${SIG: -8}"
 
 USEROP=$(echo "$USEROP" | jq --arg s "$SIG" '.signature = $s')

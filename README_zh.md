@@ -97,7 +97,7 @@ forge test -vvv
 
 ### E2E 测试（Sepolia）
 
-三个 E2E 脚本展示不同的执行路径，均使用 Forge Script 进行链上广播。
+四个 E2E 脚本展示不同的执行路径：
 
 #### E2E #1: ERC-4337 赞助无 Gas 流程（`E2E4337.s.sol`）
 
@@ -141,7 +141,27 @@ PAYMASTER=0x... forge script script/PaymasterCleanup.s.sol \
   --rpc-url $RPC_URL --broadcast
 ```
 
-#### E2E #3: 直接执行流程（`E2EDirect.s.sol`）
+#### E2E #3: Pimlico Bundler + Sponsored Paymaster (`E2EPimlico.sh`)
+
+三个参与者 — Alice 仅链下签名（delegation + UserOp），Pimlico 承担 gas：
+
+| 参与者 | 角色 |
+|--------|------|
+| **Deployer** | 部署 MinimalAccount |
+| **Sponsor** | 转 USDC 给 Alice |
+| **Alice** | 全新 EOA（0 ETH），链下签署 EIP-7702 delegation + UserOp |
+
+> **注意：** Pimlico 同时充当 bundler 和 paymaster — 不需要单独的 Bundler 角色。
+
+Alice 的 EIP-7702 delegation 通过 `eip7702Auth` 参数原子化打包 — 无需单独的 delegation 交易。
+
+```bash
+source .env  # DEPLOYER_PRIVATE_KEY, SPONSOR_PRIVATE_KEY, PIMLICO_API_KEY, RPC_URL
+
+bash script/E2EPimlico.sh
+```
+
+#### E2E #4: 直接执行流程（`E2EDirect.s.sol`）
 
 两个参与者 — Deployer 设置 delegation，Alice 直接执行：
 
@@ -169,14 +189,16 @@ forge script script/E2EDirect.s.sol \
 - **Gas 估算**: Forge 对 type 4（EIP-7702）交易 gas 估算偏低 → 使用 `--gas-estimate-multiplier 500`
 - **随机 Alice**: 每次运行通过 `vm.randomUint()` 生成全新 Alice 密钥对
 - **签名格式**: `SignerEIP7702` 使用原始 ECDSA（无 EIP-191 前缀）。使用 `personal_sign` 的标准 ERC-4337 SDK 将不兼容 — 需直接签署 `userOpHash`。
+- **E2EPimlico**: 使用 `cast` + `curl` + `jq` 代替 Forge Script（Pimlico API 需要流程中的 HTTP 调用）
 
 ## 环境变量
 
 | 变量 | 使用场景 | 说明 |
 |------|---------|------|
 | `DEPLOYER_PRIVATE_KEY` | 所有脚本 | 部署 MinimalAccount |
-| `SPONSOR_PRIVATE_KEY` | E2E4337, E2EPaymaster | 为 Alice 提供资金（ETH 存款 / USDC 转账） |
+| `SPONSOR_PRIVATE_KEY` | E2E4337, E2EPaymaster, E2EPimlico | 为 Alice 提供资金（ETH 存款 / USDC 转账） |
 | `BUNDLER_PRIVATE_KEY` | E2E4337, E2EPaymaster | 提交 handleOps 交易 |
+| `PIMLICO_API_KEY` | E2EPimlico | Pimlico bundler + paymaster API key |
 | `RPC_URL` | 所有脚本 | Sepolia RPC 端点 |
 
 > Alice 的密钥通过 `vm.randomUint()` 生成 — 每次运行全新随机密钥对，无需环境变量。

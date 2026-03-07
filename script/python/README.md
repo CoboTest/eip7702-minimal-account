@@ -135,39 +135,25 @@ All I/O operations (RPC calls, bundler API) use `async/await` with `aiohttp` and
 sequenceDiagram
     participant D as Deployer
     participant S as Sponsor
-    participant A as Alice (EOA)
+    participant A as Alice
     participant RPC as Sepolia RPC
-    participant P as Pimlico API
-    participant EP as EntryPoint v0.7
-    participant MA as MinimalAccount
+    participant PM as Pimlico Paymaster
+    participant B as Pimlico Bundler
 
-    Note over D,MA: [1] Deploy & [2] Fund
-    D->>RPC: deploy MinimalAccount
-    RPC-->>D: contract address
-    S->>RPC: USDC.transfer(Alice, 1 USDC)
+    D->>RPC: [1] deploy MinimalAccount
+    S->>RPC: [2] USDC.transfer(Alice, 1 USDC)
 
-    Note over A,P: [3] Delegation + Build UserOp + Sponsorship
-    A->>A: sign EIP-7702 delegation (off-chain)
-    Note right of A: keccak256(0x05 || rlp(chainId, impl, nonce))
-    A->>A: build callData (ERC-7821 batch)
-    A->>P: pm_sponsorUserOperation(userOp + eip7702Auth)
-    P-->>A: paymaster, paymasterData, gas limits
+    A->>A: [3a] sign EIP-7702 delegation
+    A->>PM: [3b] pm_sponsorUserOperation(userOp + eip7702Auth)
+    PM-->>A: paymaster + paymasterData + gas limits
 
-    Note over A: [4] Sign UserOp
-    A->>A: compute userOpHash (v0.7 packed keccak)
-    A->>A: raw ECDSA sign → 65-byte sig
+    A->>A: [4] sign userOpHash (raw ECDSA)
 
-    Note over A,EP: [5] Submit & [6] Verify
-    A->>P: eth_sendUserOperation(userOp + eip7702Auth)
-    P->>EP: type 4 tx (authList + handleOps)
-    Note over EP: EVM: set Alice.code = 0xef0100||impl
-    EP->>MA: validateUserOp (delegatecall via Alice)
-    MA->>MA: ecrecover → verify Alice
-    EP->>MA: execute(BATCH_MODE, batch)
-    MA->>RPC: USDC.transfer(Sponsor, 0.6)
-    MA->>RPC: USDC.transfer(Sponsor, 0.4)
-    EP-->>P: UserOp receipt (success)
-    P-->>A: receipt + tx hash
+    A->>B: [5] eth_sendUserOperation(userOp + eip7702Auth)
+    B->>RPC: type 4 tx (delegation + handleOps)
+    RPC-->>B: tx receipt
+
+    A->>RPC: [6] verify: Alice USDC=0, ETH=0, code=23 bytes
 ```
 
 ### Step 3 — Delegation + Build UserOp + Sponsorship

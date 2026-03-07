@@ -53,7 +53,8 @@ from hash import (
     pack_gas_limits,
     pack_paymaster_and_data,
 )
-from pimlico import PimlicoClient
+from bundler import PimlicoBundler
+from paymaster import PimlicoPaymaster
 from signer import LocalSigner
 
 
@@ -105,8 +106,9 @@ def main():
     chain_id = w3.eth.chain_id
     assert chain_id == CHAIN_ID_SEPOLIA, f"Expected Sepolia ({CHAIN_ID_SEPOLIA}), got {chain_id}"
 
-    # ── Pimlico client ──
-    pimlico = PimlicoClient(pimlico_url, ep_address)
+    # ── Bundler + Paymaster ──
+    bundler = PimlicoBundler(pimlico_url, ep_address)
+    paymaster = PimlicoPaymaster(pimlico_url, ep_address)
 
     # ── USDC contract ──
     usdc_abi = [
@@ -233,7 +235,7 @@ def main():
     print(f"  callData: {len(call_data)} bytes")
 
     # Gas prices from Pimlico
-    gas_price = pimlico.get_gas_price()
+    gas_price = bundler.get_gas_price()
     print(f"  Gas: maxFee={hex(gas_price.max_fee_per_gas)} maxPriority={hex(gas_price.max_priority_fee_per_gas)}")
 
     # Alice signs EIP-7702 delegation (off-chain)
@@ -268,7 +270,7 @@ def main():
 
     # Request Pimlico sponsorship
     print("  Requesting pm_sponsorUserOperation...")
-    spon = pimlico.sponsor_user_operation(user_op)
+    spon = paymaster.sponsor(user_op)
 
     print(f"  Pimlico paymaster: {spon.paymaster}")
     print(f"  verGas={hex(spon.verification_gas_limit)} callGas={hex(spon.call_gas_limit)} preVerGas={hex(spon.pre_verification_gas)}")
@@ -342,7 +344,7 @@ def main():
     # =========================================================================
     print("[5] Submit UserOp via Pimlico bundler (with eip7702Auth)...")
 
-    submitted_hash = pimlico.send_user_operation(user_op)
+    submitted_hash = bundler.send_user_operation(user_op)
     print(f"  Submitted: {submitted_hash}")
     print("  PASS: submitted")
     print()
@@ -352,7 +354,7 @@ def main():
     # =========================================================================
     print("[6] Waiting for UserOp receipt...")
 
-    receipt = pimlico.wait_for_receipt(submitted_hash)
+    receipt = bundler.wait_for_receipt(submitted_hash)
 
     print(f"  Tx: {receipt.tx_hash}")
     print(f"  Block: {hex(receipt.block_number)}")

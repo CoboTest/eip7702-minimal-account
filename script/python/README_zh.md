@@ -131,7 +131,43 @@ paymaster = PimlicoPaymaster(url, entry_point)
 
 ### 时序图
 
-![E2E 时序图](docs/e2e-sequence.svg)
+```mermaid
+sequenceDiagram
+    participant D as Deployer
+    participant S as Sponsor
+    participant A as Alice (EOA)
+    participant RPC as Sepolia RPC
+    participant P as Pimlico API
+    participant EP as EntryPoint v0.7
+    participant MA as MinimalAccount
+
+    Note over D,MA: [1] 部署 & [2] 注资
+    D->>RPC: 部署 MinimalAccount
+    RPC-->>D: 合约地址
+    S->>RPC: USDC.transfer(Alice, 1 USDC)
+
+    Note over A,P: [3] 构建 UserOp + 赞助
+    A->>A: 签署 EIP-7702 delegation（链下）
+    Note right of A: keccak256(0x05 || rlp(chainId, impl, nonce))
+    A->>P: pm_sponsorUserOperation(userOp + eip7702Auth)
+    P-->>A: paymaster, paymasterData, gas 限制
+
+    Note over A: [4] 签署 UserOp
+    A->>A: 计算 userOpHash（v0.7 packed keccak）
+    A->>A: 原始 ECDSA 签名 → 65 字节
+
+    Note over A,EP: [5] 提交 & [6] 验证
+    A->>P: eth_sendUserOperation(userOp + eip7702Auth)
+    P->>EP: type 4 tx（authList + handleOps）
+    Note over EP: EVM: 设置 Alice.code = 0xef0100||impl
+    EP->>MA: validateUserOp（通过 Alice 地址 delegatecall）
+    MA->>MA: ecrecover → 验证 Alice
+    EP->>MA: execute(BATCH_MODE, batch)
+    MA->>RPC: USDC.transfer(Sponsor, 0.6)
+    MA->>RPC: USDC.transfer(Sponsor, 0.4)
+    EP-->>P: UserOp 回执（成功）
+    P-->>A: 回执 + tx hash
+```
 
 ### 步骤 3 — 构建 UserOp + Delegation + 赞助
 

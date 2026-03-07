@@ -2,7 +2,7 @@
 Pimlico bundler + paymaster implementation.
 
 Usage:
-    from provider.pimlico import PimlicoBundler, PimlicoPaymaster
+    from providers.pimlico import PimlicoBundler, PimlicoPaymaster
 
     bundler = PimlicoBundler(url, entry_point)
     paymaster = PimlicoPaymaster(url, entry_point)
@@ -10,7 +10,7 @@ Usage:
 
 import requests
 
-from provider import (
+from providers import (
     Bundler,
     GasPrice,
     JsonRpcMixin,

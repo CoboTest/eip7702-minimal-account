@@ -28,13 +28,13 @@
 | 角色     | 地址                                                                                                                            |
 | -------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | Deployer | [`0xbE9E7946aCf27c51424AE1227f056ed21bC0be44`](https://sepolia.etherscan.io/address/0xbE9E7946aCf27c51424AE1227f056ed21bC0be44) |
-| Alice    | [`0xb868CF872511fBFE7f63a73e407Bea81E3f7a24E`](https://sepolia.etherscan.io/address/0xb868CF872511fBFE7f63a73e407Bea81E3f7a24E) |
+| Alice    | [`0xF484e8d0f8927489aE126Ec2aedA0490489D0537`](https://sepolia.etherscan.io/address/0xF484e8d0f8927489aE126Ec2aedA0490489D0537) |
 
 ## 合约
 
 | 合约           | 地址                                                                                                                            |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| MinimalAccount | [`0x9BdC3a0cdc9B3cc4949cbE98cf0bFd7738A200A6`](https://sepolia.etherscan.io/address/0x9BdC3a0cdc9B3cc4949cbE98cf0bFd7738A200A6) |
+| MinimalAccount | [`0x6E0C2DF0F63BA420e57366dD0049614b68a324B7`](https://sepolia.etherscan.io/address/0x6E0C2DF0F63BA420e57366dD0049614b68a324B7) |
 
 ---
 
@@ -42,11 +42,11 @@
 
 | 步骤 | 操作                                           | Tx                                                                                                                                                                         | 区块     |
 | ---- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| 1    | 部署 MinimalAccount                            | [`0xe044e140e6b01e3aab19f3f09e0d768788924df1a50ef314b64ba9623ba76f75`](https://sepolia.etherscan.io/tx/0xe044e140e6b01e3aab19f3f09e0d768788924df1a50ef314b64ba9623ba76f75) | 0x9eaf34 |
-| 2    | Deployer 给 Alice 注资（ETH）                  | [`0x6d2f45606c2871fda2659f53e218e4c8311be4555f789d62913b4afe7ad55c53`](https://sepolia.etherscan.io/tx/0x6d2f45606c2871fda2659f53e218e4c8311be4555f789d62913b4afe7ad55c53) | 0x9eaf36 |
-| 3    | Deployer 激活委托（type 4 tx）                 | [`0x8b37346feed6e072d97660fe0824afd160f2496b098586f1e9c80dd70bd0826b`](https://sepolia.etherscan.io/tx/0x8b37346feed6e072d97660fe0824afd160f2496b098586f1e9c80dd70bd0826b) | 0x9eaf37 |
-| 4    | Alice 调用 execute() 单笔                      | [`0x9ef8e9548e0b01423de95001900cd74ab2189eb57639a2bb0b937c693cb01dc6`](https://sepolia.etherscan.io/tx/0x9ef8e9548e0b01423de95001900cd74ab2189eb57639a2bb0b937c693cb01dc6) | 0x9eaf38 |
-| 5    | Alice 调用 execute() 批量                      | [`0x535168cbbee8873bd1e5810994c0a884eca569d65133ab2d89451b9f240d1585`](https://sepolia.etherscan.io/tx/0x535168cbbee8873bd1e5810994c0a884eca569d65133ab2d89451b9f240d1585) | 0x9eaf39 |
+| 1    | 部署 MinimalAccount                            | [`0x2ea65f5e52e6ff72dffc5b4ae62225d7e7d0c52a4266c71a8eb908e6988c1d2d`](https://sepolia.etherscan.io/tx/0x2ea65f5e52e6ff72dffc5b4ae62225d7e7d0c52a4266c71a8eb908e6988c1d2d) | 0x9eb8c9 |
+| 2    | Deployer 给 Alice 注资（ETH）                  | [`0xa3310eee6b8722e865978e7bbe22d97579c778ebc6b28a02e05d902244e16fae`](https://sepolia.etherscan.io/tx/0xa3310eee6b8722e865978e7bbe22d97579c778ebc6b28a02e05d902244e16fae) | 0x9eb8ca |
+| 3    | Deployer 激活委托（type 4 tx）                 | [`0x2c878baa0bedb8c3eb1ff9d1f1b1005d10959d371e299c8d94b38891f99d57a7`](https://sepolia.etherscan.io/tx/0x2c878baa0bedb8c3eb1ff9d1f1b1005d10959d371e299c8d94b38891f99d57a7) | 0x9eb8cb |
+| 4    | Alice 调用 execute() 单笔                      | [`0xe370ee27d99d7bd3dd2c686c5253868e48a7a2535c471d5929126080dd1ccb02`](https://sepolia.etherscan.io/tx/0xe370ee27d99d7bd3dd2c686c5253868e48a7a2535c471d5929126080dd1ccb02) | 0x9eb8cc |
+| 5    | Alice 调用 execute() 批量                      | [`0x7697f829bd279d7b8627e00af85b9974614a317b9c909286cd3e0a5251bf0e28`](https://sepolia.etherscan.io/tx/0x7697f829bd279d7b8627e00af85b9974614a317b9c909286cd3e0a5251bf0e28) | 0x9eb8cd |
 | 6    | 验证：委托生效，nonce=3（1 auth + 2 executes） | —                                                                                                                                                                          | —        |
 
 ---

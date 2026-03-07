@@ -42,6 +42,8 @@ PIMLICO_API_KEY=pim_...
 ```
 script/python/
 ├── e2e_pimlico.py           # E2E #3 orchestrator (async)
+├── calls.py                 # Call encoding: erc20_transfer(), contract_call(), erc7821_batch()
+├── userop.py                # UserOp lifecycle: build_userop(), sign_userop(), submit_and_wait()
 ├── config.py                # Chain constants (EP address, USDC)
 ├── tx.py                    # Transaction dataclass (typed tx params)
 ├── hash.py                  # Pure hash functions (delegation, UserOp v0.7)

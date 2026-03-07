@@ -31,11 +31,11 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from eth_abi import encode
 from web3 import AsyncWeb3, AsyncHTTPProvider, Web3
 
+from artifacts import load_artifact
+from calls import erc20_transfer, erc7821_batch
 from config import (
-    BATCH_MODE,
     CHAIN_ID_SEPOLIA,
     EP_V07,
     USDC_AMOUNT,
@@ -43,19 +43,12 @@ from config import (
     USDC_PART2,
     USDC_SEPOLIA,
 )
-from hash import (
-    build_delegation_auth,
-    compute_delegation_hash,
-    compute_userop_hash,
-    pack_gas_fees,
-    pack_gas_limits,
-    pack_paymaster_and_data,
-)
-from artifacts import load_artifact
+from hash import build_delegation_auth, compute_delegation_hash
 from providers.pimlico import PimlicoBundler, PimlicoPaymaster
 from signers import Signer
 from signers.local import LocalSigner
 from tx import Transaction
+from userop import build_userop, sign_userop, submit_and_wait
 
 logger = logging.getLogger(__name__)
 
@@ -201,69 +194,22 @@ async def main() -> None:
         alice_ep_nonce = await ep.functions.getNonce(Web3.to_checksum_address(alice.address), 0).call()
         logger.info("  Alice EP nonce: %d", alice_ep_nonce)
 
-        # Build callData: execute(BATCH_MODE, encodedBatch)
-        t1_data = encode(["address", "uint256"], [Web3.to_checksum_address(sponsor.address), USDC_PART1])
-        t1_selector = Web3.keccak(text="transfer(address,uint256)")[:4]
-        t1_calldata = t1_selector + t1_data
-
-        t2_data = encode(["address", "uint256"], [Web3.to_checksum_address(sponsor.address), USDC_PART2])
-        t2_calldata = t1_selector + t2_data
-
-        batch = encode(
-            ["(address,uint256,bytes)[]"],
-            [
-                [
-                    (Web3.to_checksum_address(USDC_SEPOLIA), 0, t1_calldata),
-                    (Web3.to_checksum_address(USDC_SEPOLIA), 0, t2_calldata),
-                ]
-            ],
-        )
-
-        execute_selector = Web3.keccak(text="execute(bytes32,bytes)")[:4]
-        call_data = execute_selector + encode(["bytes32", "bytes"], [BATCH_MODE, batch])
+        # Build callData: ERC-7821 batch of two USDC transfers back to Sponsor
+        call_data = erc7821_batch([
+            erc20_transfer(USDC_SEPOLIA, sponsor.address, USDC_PART1),
+            erc20_transfer(USDC_SEPOLIA, sponsor.address, USDC_PART2),
+        ])
         logger.info("  callData: %d bytes", len(call_data))
 
-        # Gas prices from Pimlico
-        gas_price = await bundler.get_gas_price()
-        logger.info("  Gas: maxFee=%s maxPriority=%s", hex(gas_price.max_fee_per_gas), hex(gas_price.max_priority_fee_per_gas))
-
-        # Dummy signature for sponsorship request
-        dummy_sig = "0x" + "ff" * 32 + "aa" * 32 + "1c"
-
-        # Build UserOp (unpacked format for Pimlico API)
-        user_op: dict = {
-            "sender": alice.address,
-            "nonce": hex(alice_ep_nonce),
-            "callData": "0x" + call_data.hex(),
-            "callGasLimit": "0x0",
-            "verificationGasLimit": "0x0",
-            "preVerificationGas": "0x0",
-            "maxFeePerGas": hex(gas_price.max_fee_per_gas),
-            "maxPriorityFeePerGas": hex(gas_price.max_priority_fee_per_gas),
-            "signature": dummy_sig,
-            "eip7702Auth": auth_json,
-        }
-
-        # Request Pimlico sponsorship
-        logger.info("  Requesting pm_sponsorUserOperation...")
-        spon = await paymaster.sponsor(user_op)
-
-        logger.info("  Pimlico paymaster: %s", spon.paymaster)
-        logger.info("  verGas=%s callGas=%s preVerGas=%s",
-                     hex(spon.verification_gas_limit), hex(spon.call_gas_limit), hex(spon.pre_verification_gas))
-        logger.info("  pmVerGas=%s pmPostGas=%s",
-                     hex(spon.paymaster_verification_gas_limit), hex(spon.paymaster_post_op_gas_limit))
-
-        # Merge sponsored fields into UserOp
-        user_op.update({
-            "paymaster": spon.paymaster,
-            "paymasterData": "0x" + spon.paymaster_data.hex(),
-            "paymasterVerificationGasLimit": hex(spon.paymaster_verification_gas_limit),
-            "paymasterPostOpGasLimit": hex(spon.paymaster_post_op_gas_limit),
-            "verificationGasLimit": hex(spon.verification_gas_limit),
-            "callGasLimit": hex(spon.call_gas_limit),
-            "preVerificationGas": hex(spon.pre_verification_gas),
-        })
+        # Build + sponsor UserOp
+        user_op = await build_userop(
+            sender=alice.address,
+            nonce=alice_ep_nonce,
+            call_data=call_data,
+            auth_json=auth_json,
+            bundler=bundler,
+            paymaster=paymaster,
+        )
 
         logger.info("  PASS: sponsored")
         logger.info("")
@@ -273,35 +219,8 @@ async def main() -> None:
         # =====================================================================
         logger.info("[4] Alice signs UserOp (off-chain, 0 gas)...")
 
-        account_gas_limits = pack_gas_limits(spon.verification_gas_limit, spon.call_gas_limit)
-        gas_fees = pack_gas_fees(gas_price.max_priority_fee_per_gas, gas_price.max_fee_per_gas)
+        userop_hash = sign_userop(user_op, alice, ep_address, chain_id)
 
-        paymaster_and_data = pack_paymaster_and_data(
-            spon.paymaster,
-            spon.paymaster_verification_gas_limit,
-            spon.paymaster_post_op_gas_limit,
-            spon.paymaster_data,
-        )
-
-        userop_hash = compute_userop_hash(
-            sender=alice.address,
-            nonce=alice_ep_nonce,
-            init_code=b"",
-            call_data=call_data,
-            account_gas_limits=account_gas_limits,
-            pre_verification_gas=spon.pre_verification_gas,
-            gas_fees=gas_fees,
-            paymaster_and_data=paymaster_and_data,
-            entry_point=ep_address,
-            chain_id=chain_id,
-        )
-
-        logger.info("  userOpHash: 0x%s", userop_hash.hex())
-
-        v, r, s = alice.sign_hash(userop_hash)
-        sig_bytes = r.to_bytes(32, "big") + s.to_bytes(32, "big") + bytes([v])
-        user_op["signature"] = "0x" + sig_bytes.hex()
-        logger.info("  Signature: 0x%s...%s", sig_bytes[:10].hex(), sig_bytes[-4:].hex())
         logger.info("  PASS: signed")
         logger.info("")
 
@@ -310,30 +229,10 @@ async def main() -> None:
         # =====================================================================
         logger.info("[5] Submit UserOp via Pimlico bundler (with eip7702Auth)...")
 
-        submitted_hash = await bundler.send_user_operation(user_op)
-        logger.info("  Submitted: %s", submitted_hash)
+        receipt = await submit_and_wait(user_op, bundler)
+
         logger.info("  PASS: submitted")
         logger.info("")
-
-        # =====================================================================
-        # [6a] Wait for receipt + [6b] verify
-        # =====================================================================
-        logger.info("[6a] Waiting for UserOp receipt...")
-
-        waited = 0
-        receipt = None
-        while waited < 120:
-            receipt = await bundler.get_user_operation_receipt(submitted_hash)
-            if receipt is not None:
-                break
-            await asyncio.sleep(3)
-            waited += 3
-            logger.info("  Waiting... (%ds)", waited)
-        assert receipt is not None, f"UserOp receipt not available after {waited}s"
-
-        logger.info("  Tx: %s", receipt.tx_hash)
-        logger.info("  Block: %s", hex(receipt.block_number))
-        logger.info("  Success: %s", receipt.success)
 
         # [6b] Verify on-chain state
         logger.info("[6b] Verify on-chain state...")

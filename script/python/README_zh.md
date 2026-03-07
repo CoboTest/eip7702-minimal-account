@@ -42,6 +42,8 @@ PIMLICO_API_KEY=pim_...
 ```
 script/python/
 ├── e2e_pimlico.py           # E2E #3 主入口（异步）
+├── calls.py                 # 调用编码: erc20_transfer(), contract_call(), erc7821_batch()
+├── userop.py                # UserOp 生命周期: build_userop(), sign_userop(), submit_and_wait()
 ├── config.py                # 链常量（EP 地址、USDC）
 ├── tx.py                    # Transaction 数据类（类型化交易参数）
 ├── hash.py                  # 纯哈希函数（delegation、UserOp v0.7）

@@ -140,9 +140,14 @@ sequenceDiagram
     participant PM as Pimlico Paymaster
     participant B as Pimlico Bundler
 
+    rect rgb(240, 240, 240)
+    Note over D,B: Test Setup (one-time)
     D->>RPC: [1] deploy MinimalAccount
     S->>RPC: [2] USDC.transfer(Alice, 1 USDC)
+    end
 
+    rect rgb(232, 245, 233)
+    Note over A,B: Per-Transaction Flow
     A->>A: [3a] sign EIP-7702 delegation
     A->>PM: [3b] pm_sponsorUserOperation(userOp + eip7702Auth)
     PM-->>A: paymaster + paymasterData + gas limits
@@ -156,6 +161,7 @@ sequenceDiagram
     A->>B: [6] eth_getUserOperationReceipt(userOpHash)
     B-->>A: tx hash + block + success
     A->>RPC: verify: Alice USDC=0, ETH=0, code=23 bytes
+    end
 ```
 
 ### Step 3 — Delegation + Build UserOp + Sponsorship

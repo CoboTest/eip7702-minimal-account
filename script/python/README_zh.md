@@ -140,9 +140,14 @@ sequenceDiagram
     participant PM as Pimlico Paymaster
     participant B as Pimlico Bundler
 
+    rect rgb(240, 240, 240)
+    Note over D,B: 测试准备（一次性）
     D->>RPC: [1] 部署 MinimalAccount
     S->>RPC: [2] USDC.transfer(Alice, 1 USDC)
+    end
 
+    rect rgb(232, 245, 233)
+    Note over A,B: 每次交易流程
     A->>A: [3a] 签署 EIP-7702 delegation
     A->>PM: [3b] pm_sponsorUserOperation(userOp + eip7702Auth)
     PM-->>A: paymaster + paymasterData + gas limits
@@ -156,6 +161,7 @@ sequenceDiagram
     A->>B: [6] eth_getUserOperationReceipt(userOpHash)
     B-->>A: tx hash + block + success
     A->>RPC: 验证: Alice USDC=0, ETH=0, code=23 bytes
+    end
 ```
 
 ### 步骤 3 — Delegation + 构建 UserOp + 赞助

@@ -17,11 +17,11 @@ import { ERC4337Utils } from "@openzeppelin/contracts/account/utils/draft-ERC433
 /// @dev    Uses Account + SignerEIP7702 + ERC7821.
 ///         SignerEIP7702 validates raw ECDSA signatures against address(this).
 ///         ERC7821 provides execute(bytes32 mode, bytes executionData) with ERC-7579 encoding.
-///         Overrides entryPoint() to use v0.8 and _erc7821AuthorizedExecutor to allow EntryPoint.
+///         Overrides entryPoint() to use v0.7 and _erc7821AuthorizedExecutor to allow EntryPoint.
 contract MinimalAccount is Account, SignerEIP7702, ERC7821, ERC721Holder, ERC1155Holder {
-    /// @dev Override to use ERC-4337 v0.8 EntryPoint.
+    /// @dev Override to use ERC-4337 v0.7 EntryPoint.
     function entryPoint() public view virtual override returns (IEntryPoint) {
-        return ERC4337Utils.ENTRYPOINT_V08;
+        return ERC4337Utils.ENTRYPOINT_V07;
     }
 
     /// @dev Register IAccount, IERC7821, and IERC721Receiver interface IDs.

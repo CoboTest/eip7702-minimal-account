@@ -10,7 +10,7 @@ import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.s
 
 /// @title VerifyingPaymaster
 /// @author CoboTest
-/// @notice Production-grade ERC-4337 v0.8 Verifying Paymaster.
+/// @notice Production-grade ERC-4337 v0.7 Verifying Paymaster.
 ///         A designated `verifyingSigner` (hot wallet) authorizes gas sponsorship per-UserOp.
 ///         Owner (cold wallet) manages signer rotation, deposits, and stake.
 ///
@@ -84,7 +84,7 @@ contract VerifyingPaymaster is IPaymaster, Ownable2Step, Pausable, ReentrancyGua
     //                          CONSTRUCTOR
     // ═══════════════════════════════════════════════════════════════════
 
-    /// @param _ep EntryPoint v0.8 address
+    /// @param _ep EntryPoint v0.7 address
     /// @param _owner Owner (cold wallet) — manages signer, deposits, stake
     /// @param _signer Initial verifying signer (hot wallet) — signs UserOp authorizations
     constructor(

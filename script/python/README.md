@@ -157,38 +157,38 @@ sequenceDiagram
 
 ### [3a] Alice Signs EIP-7702 Delegation
 
-Alice signs the delegation authorization off-chain. This is independent of UserOp content — only depends on `(chainId, implAddress, txNonce)`.
+Alice signs the delegation authorization off-chain. This is independent of UserOp content — only depends on (`chainId`, `implAddress`, `txNonce`).
 
 - **Hash:** `keccak256(0x05 || rlp(chainId, implAddress, nonce))`
-- **Sign:** raw ECDSA → `(yParity, r, s)` authorization tuple
+- **Sign:** raw ECDSA → (`yParity`, `r`, `s`) authorization tuple
 - **Result:** `eip7702Auth` JSON object for bundler API
 
 ### [3b] Build UserOp + Request Pimlico Sponsorship
 
-1. **Build callData** — Encode ERC-7821 `execute(BATCH_MODE, encodedBatch)` with two USDC transfers (0.6 + 0.4) back to Sponsor
-2. **Assemble UserOp** — Unpacked format: sender, nonce, callData, gas fields (zeros for now), dummy signature, plus `eip7702Auth`
-3. **Call `pm_sponsorUserOperation`** — Pimlico simulates and returns: paymaster address, `paymasterData` (signature), gas limits (verification/call/preVerification/paymaster)
+1. **Build `callData`** — Encode ERC-7821 `execute(BATCH_MODE, encodedBatch)` with two USDC transfers (0.6 + 0.4) back to Sponsor
+2. **Assemble UserOp** — Unpacked format: `sender`, `nonce`, `callData`, gas fields (zeros for now), dummy `signature`, plus `eip7702Auth`
+3. **Call `pm_sponsorUserOperation`** — Pimlico simulates and returns: `paymaster` address, `paymasterData` (signature), gas limits (`verificationGasLimit` / `callGasLimit` / `preVerificationGas` / `paymasterVerificationGasLimit` / `paymasterPostOpGasLimit`)
 4. **Merge sponsored fields** into UserOp — Pimlico's gas limits and paymaster data replace the zero placeholders
 
 ### [4] Alice Signs UserOp
 
-1. **Pack gas fields** — `accountGasLimits` = verificationGas(128bit) || callGas(128bit), `gasFees` = maxPriority(128bit) || maxFee(128bit), `paymasterAndData` = address(20) + pmVerGas(16) + pmPostGas(16) + pmData
-2. **Compute userOpHash** (v0.7 packed keccak) — `packHash = keccak256(abi.encode(sender, nonce, keccak(initCode), keccak(callData), accountGasLimits, preVerGas, gasFees, keccak(paymasterAndData)))`, then `userOpHash = keccak256(abi.encode(packHash, entryPoint, chainId))`
+1. **Pack gas fields** — `accountGasLimits` = `verificationGas`(128bit) || `callGas`(128bit), `gasFees` = `maxPriorityFee`(128bit) || `maxFee`(128bit), `paymasterAndData` = `address`(20) + `pmVerGas`(16) + `pmPostGas`(16) + `pmData`
+2. **Compute `userOpHash`** (v0.7 packed keccak) — `packHash = keccak256(abi.encode(sender, nonce, keccak(initCode), keccak(callData), accountGasLimits, preVerGas, gasFees, keccak(paymasterAndData)))`, then `userOpHash = keccak256(abi.encode(packHash, entryPoint, chainId))`
 3. **Alice signs** the 32-byte `userOpHash` with raw ECDSA (no EIP-191 prefix) → 65-byte signature `r(32) + s(32) + v(1)`
 
 ### [5] Submit via Pimlico Bundler
 
-1. **Attach signature** to UserOp, replacing the dummy
+1. **Attach `signature`** to UserOp, replacing the dummy
 2. **Call `eth_sendUserOperation`** with the complete UserOp + `eip7702Auth` — Pimlico's bundler wraps it in a type 4 (EIP-7702) transaction carrying Alice's delegation in `authorizationList`
-3. **Atomic execution** — EVM processes authorization list first (sets `Alice.code = 0xef0100 || implAddress`), then executes `handleOps` through EntryPoint → Alice's delegated MinimalAccount logic → USDC batch transfers
+3. **Atomic execution** — EVM processes `authorizationList` first (sets `Alice.code = 0xef0100 || implAddress`), then executes `handleOps` through EntryPoint → Alice's delegated MinimalAccount logic → USDC batch transfers
 
 ### [6a] Wait for Receipt
 
 - **Poll `eth_getUserOperationReceipt(userOpHash)`** from Pimlico Bundler every 3s (up to 120s timeout)
-- **Returns:** transaction hash, block number, success status
+- **Returns:** `transactionHash`, `blockNumber`, `success`
 
 ### [6b] Verify On-Chain State
 
-- Alice USDC balance = 0 (all transferred back to Sponsor)
-- Alice ETH balance = 0 (never had any)
-- Alice code = 23 bytes (`0xef0100 || implAddress` — EIP-7702 delegation active)
+- `Alice.USDC` = 0 (all transferred back to Sponsor)
+- `Alice.ETH` = 0 (never had any)
+- `Alice.code` = 23 bytes (`0xef0100 || implAddress` — EIP-7702 delegation active)

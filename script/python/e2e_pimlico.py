@@ -54,7 +54,7 @@ from hash import (
     pack_paymaster_and_data,
 )
 from providers.pimlico import PimlicoBundler, PimlicoPaymaster
-from signer import LocalSigner
+from signers.local import LocalSigner
 
 
 def load_artifact(project_root: Path, contract_name: str) -> tuple[str, list]:

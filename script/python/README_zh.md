@@ -99,7 +99,7 @@ script/python/
 from signers.local import LocalSigner
 
 signer = LocalSigner.random()          # 生成新密钥对
-v, r, s = signer.sign_hash(hash_bytes) # EIP-191 (personal_sign)
+v, r, s = signer.sign_hash(hash_bytes) # 原始 ECDSA（若需 EIP-191，请先在上层包装 hash）
 ```
 
 这种设计使新增签名者实现无需修改任何哈希逻辑：

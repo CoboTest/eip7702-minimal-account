@@ -99,7 +99,7 @@ The `Signer` interface provides two signing primitives: `sign_hash()` for off-ch
 from signers.local import LocalSigner
 
 signer = LocalSigner.random()          # fresh keypair
-v, r, s = signer.sign_hash(hash_bytes) # EIP-191 (personal_sign)
+v, r, s = signer.sign_hash(hash_bytes) # raw ECDSA (pre-wrap hash if EIP-191 is needed)
 ```
 
 This design enables future signer implementations without changing any hash logic:

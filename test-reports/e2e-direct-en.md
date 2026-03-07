@@ -1,3 +1,5 @@
+[🇨🇳 中文版](e2e-direct-zh.md) | [📊 ERC-4337 Comparison Report](e2e-4337-en.md)
+
 # Direct Execution E2E Test Report
 
 | Item | Detail |

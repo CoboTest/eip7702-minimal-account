@@ -1,3 +1,5 @@
+[🇬🇧 English](e2e-direct-en.md) | [📊 ERC-4337 对比报告](e2e-4337-zh.md)
+
 # 直接执行 E2E 测试报告
 
 | 项目 | 详情 |

@@ -6,7 +6,7 @@ Orchestrates the full ERC-4337 UserOp flow with Pimlico bundler + paymaster.
 Usage:
     from userop import build_userop, sign_userop, submit_and_wait
 
-    user_op = await build_userop(sender, nonce, call_data, auth_json, bundler, paymaster)
+    user_op = await build_userop(sender, nonce, call_data, auth, bundler, paymaster)
     sign_userop(user_op, alice, ep_address, chain_id)
     receipt = await submit_and_wait(user_op, bundler)
 """
@@ -14,6 +14,7 @@ Usage:
 import logging
 
 from hash import (
+    DelegationAuth,
     compute_userop_hash,
     pack_gas_fees,
     pack_gas_limits,
@@ -21,53 +22,49 @@ from hash import (
 )
 from providers.bundler import Bundler
 from providers.paymaster import Paymaster
-from providers.types import GasPrice, SponsorResult, UserOpReceipt
+from providers.types import UserOperation, UserOpReceipt
 from signers import Signer
 
 logger = logging.getLogger(__name__)
 
 # Dummy signature for sponsorship requests (65 bytes, non-zero)
-_DUMMY_SIG = "0x" + "ff" * 32 + "aa" * 32 + "1c"
+_DUMMY_SIG = bytes.fromhex("ff" * 32 + "aa" * 32 + "1c")
 
 
 async def build_userop(
     sender: str,
     nonce: int,
     call_data: bytes,
-    auth_json: dict,
+    auth: DelegationAuth,
     bundler: Bundler,
     paymaster: Paymaster,
-) -> dict:
+) -> UserOperation:
     """
-    Build a sponsored UserOp (steps 3b).
+    Build a sponsored UserOp (step 3b).
 
     1. Get gas prices from bundler
-    2. Assemble UserOp with dummy signature
+    2. Assemble UserOperation with dummy signature
     3. Request paymaster sponsorship
-    4. Merge sponsored fields
+    4. Apply sponsored fields
 
     Returns:
-        Complete UserOp dict ready for signing. Also attaches
-        `_gas_price` and `_sponsor` as private metadata for sign_userop().
+        Sponsored UserOperation ready for signing.
     """
     # Gas prices
     gas_price = await bundler.get_gas_price()
     logger.info("  Gas: maxFee=%s maxPriority=%s",
                 hex(gas_price.max_fee_per_gas), hex(gas_price.max_priority_fee_per_gas))
 
-    # Assemble UserOp (unpacked format)
-    user_op: dict = {
-        "sender": sender,
-        "nonce": hex(nonce),
-        "callData": "0x" + call_data.hex(),
-        "callGasLimit": "0x0",
-        "verificationGasLimit": "0x0",
-        "preVerificationGas": "0x0",
-        "maxFeePerGas": hex(gas_price.max_fee_per_gas),
-        "maxPriorityFeePerGas": hex(gas_price.max_priority_fee_per_gas),
-        "signature": _DUMMY_SIG,
-        "eip7702Auth": auth_json,
-    }
+    # Assemble UserOp
+    user_op = UserOperation(
+        sender=sender,
+        nonce=nonce,
+        call_data=call_data,
+        max_fee_per_gas=gas_price.max_fee_per_gas,
+        max_priority_fee_per_gas=gas_price.max_priority_fee_per_gas,
+        signature=_DUMMY_SIG,
+        eip7702_auth=auth,
+    )
 
     # Request sponsorship
     logger.info("  Requesting pm_sponsorUserOperation...")
@@ -79,28 +76,14 @@ async def build_userop(
     logger.info("  pmVerGas=%s pmPostGas=%s",
                 hex(spon.paymaster_verification_gas_limit), hex(spon.paymaster_post_op_gas_limit))
 
-    # Merge sponsored fields
-    user_op.update({
-        "paymaster": spon.paymaster,
-        "paymasterData": "0x" + spon.paymaster_data.hex(),
-        "paymasterVerificationGasLimit": hex(spon.paymaster_verification_gas_limit),
-        "paymasterPostOpGasLimit": hex(spon.paymaster_post_op_gas_limit),
-        "verificationGasLimit": hex(spon.verification_gas_limit),
-        "callGasLimit": hex(spon.call_gas_limit),
-        "preVerificationGas": hex(spon.pre_verification_gas),
-    })
-
-    # Stash metadata for sign_userop()
-    user_op["_gas_price"] = gas_price
-    user_op["_sponsor"] = spon
-    user_op["_call_data_raw"] = call_data
-    user_op["_nonce_int"] = nonce
+    # Apply sponsorship
+    user_op.apply_sponsorship(spon)
 
     return user_op
 
 
 def sign_userop(
-    user_op: dict,
+    user_op: UserOperation,
     signer: Signer,
     entry_point: str,
     chain_id: int,
@@ -113,27 +96,22 @@ def sign_userop(
     Returns:
         The 32-byte userOpHash.
     """
-    spon: SponsorResult = user_op["_sponsor"]
-    gas_price: GasPrice = user_op["_gas_price"]
-    call_data: bytes = user_op["_call_data_raw"]
-    nonce: int = user_op["_nonce_int"]
-
-    account_gas_limits = pack_gas_limits(spon.verification_gas_limit, spon.call_gas_limit)
-    gas_fees = pack_gas_fees(gas_price.max_priority_fee_per_gas, gas_price.max_fee_per_gas)
+    account_gas_limits = pack_gas_limits(user_op.verification_gas_limit, user_op.call_gas_limit)
+    gas_fees = pack_gas_fees(user_op.max_priority_fee_per_gas, user_op.max_fee_per_gas)
     paymaster_and_data = pack_paymaster_and_data(
-        spon.paymaster,
-        spon.paymaster_verification_gas_limit,
-        spon.paymaster_post_op_gas_limit,
-        spon.paymaster_data,
+        user_op.paymaster,
+        user_op.paymaster_verification_gas_limit,
+        user_op.paymaster_post_op_gas_limit,
+        user_op.paymaster_data,
     )
 
     userop_hash = compute_userop_hash(
-        sender=user_op["sender"],
-        nonce=nonce,
+        sender=user_op.sender,
+        nonce=user_op.nonce,
         init_code=b"",
-        call_data=call_data,
+        call_data=user_op.call_data,
         account_gas_limits=account_gas_limits,
-        pre_verification_gas=spon.pre_verification_gas,
+        pre_verification_gas=user_op.pre_verification_gas,
         gas_fees=gas_fees,
         paymaster_and_data=paymaster_and_data,
         entry_point=entry_point,
@@ -144,18 +122,14 @@ def sign_userop(
 
     v, r, s = signer.sign_hash(userop_hash)
     sig_bytes = r.to_bytes(32, "big") + s.to_bytes(32, "big") + bytes([v])
-    user_op["signature"] = "0x" + sig_bytes.hex()
+    user_op.signature = sig_bytes
     logger.info("  Signature: 0x%s...%s", sig_bytes[:10].hex(), sig_bytes[-4:].hex())
-
-    # Clean up private metadata
-    for key in ("_gas_price", "_sponsor", "_call_data_raw", "_nonce_int"):
-        user_op.pop(key, None)
 
     return userop_hash
 
 
 async def submit_and_wait(
-    user_op: dict,
+    user_op: UserOperation,
     bundler: Bundler,
     timeout: int = 120,
 ) -> UserOpReceipt:

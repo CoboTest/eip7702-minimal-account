@@ -10,4 +10,4 @@ Usage:
 from providers.errors import ProviderError  # noqa: F401
 from providers.bundler import Bundler  # noqa: F401
 from providers.paymaster import Paymaster  # noqa: F401
-from providers.types import GasPrice, SponsorResult, UserOpReceipt  # noqa: F401
+from providers.types import GasPrice, SponsorResult, UserOperation, UserOpReceipt  # noqa: F401

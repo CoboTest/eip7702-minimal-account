@@ -2,7 +2,7 @@
 
 from providers.pimlico.base import JsonRpcMixin
 from providers.bundler import Bundler
-from providers.types import GasPrice, UserOpReceipt
+from providers.types import GasPrice, UserOperation, UserOpReceipt
 
 
 class PimlicoBundler(JsonRpcMixin, Bundler):
@@ -21,8 +21,8 @@ class PimlicoBundler(JsonRpcMixin, Bundler):
             max_priority_fee_per_gas=int(fast["maxPriorityFeePerGas"], 16),
         )
 
-    async def send_user_operation(self, user_op: dict) -> str:
-        return await self._rpc("eth_sendUserOperation", [user_op, self._entry_point])
+    async def send_user_operation(self, user_op: UserOperation) -> str:
+        return await self._rpc("eth_sendUserOperation", [user_op.to_dict(), self._entry_point])
 
     async def get_user_operation_receipt(self, user_op_hash: str) -> UserOpReceipt | None:
         result = await self._rpc("eth_getUserOperationReceipt", [user_op_hash])

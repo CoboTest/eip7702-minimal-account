@@ -183,7 +183,7 @@ async def main() -> None:
         alice_tx_nonce = await w3.eth.get_transaction_count(alice.address)
         delegation_hash = compute_delegation_hash(chain_id, executor_address, alice_tx_nonce)
         v, r, s = alice.sign_hash(delegation_hash)
-        auth_json = build_delegation_auth(chain_id, executor_address, alice_tx_nonce, v, r, s)
+        auth = build_delegation_auth(chain_id, executor_address, alice_tx_nonce, v, r, s)
         logger.info("  eip7702Auth: delegation to %s (signed off-chain by Alice)", executor_address)
         logger.info("  Auth nonce: %d", alice_tx_nonce)
         logger.info("")
@@ -206,7 +206,7 @@ async def main() -> None:
             sender=alice.address,
             nonce=alice_ep_nonce,
             call_data=call_data,
-            auth_json=auth_json,
+            auth=auth,
             bundler=bundler,
             paymaster=paymaster,
         )

@@ -2,14 +2,14 @@
 
 from abc import ABC, abstractmethod
 
-from providers.types import SponsorResult
+from providers.types import SponsorResult, UserOperation
 
 
 class Paymaster(ABC):
     """Abstract paymaster — sponsors UserOps for gasless execution."""
 
     @abstractmethod
-    async def sponsor(self, user_op: dict) -> SponsorResult:
+    async def sponsor(self, user_op: UserOperation) -> SponsorResult:
         """
         Request sponsorship for a UserOp.
 
@@ -17,7 +17,7 @@ class Paymaster(ABC):
         The paymaster will simulate and return real gas limits + paymaster data.
 
         Args:
-            user_op: UserOp dict (provider-specific format).
+            user_op: UserOperation with sender, nonce, callData, etc.
 
         Returns:
             SponsorResult with paymaster address, data, and gas limits.

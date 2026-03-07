@@ -2,7 +2,7 @@
 
 from providers.pimlico.base import JsonRpcMixin
 from providers.paymaster import Paymaster
-from providers.types import SponsorResult
+from providers.types import SponsorResult, UserOperation
 
 
 class PimlicoPaymaster(JsonRpcMixin, Paymaster):
@@ -13,8 +13,8 @@ class PimlicoPaymaster(JsonRpcMixin, Paymaster):
         self._entry_point = entry_point
         self._session = None
 
-    async def sponsor(self, user_op: dict) -> SponsorResult:
-        result = await self._rpc("pm_sponsorUserOperation", [user_op, self._entry_point])
+    async def sponsor(self, user_op: UserOperation) -> SponsorResult:
+        result = await self._rpc("pm_sponsorUserOperation", [user_op.to_dict(), self._entry_point])
         return SponsorResult(
             paymaster=result["paymaster"],
             paymaster_data=bytes.fromhex(result["paymasterData"][2:]),

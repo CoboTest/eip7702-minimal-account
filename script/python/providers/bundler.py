@@ -4,7 +4,7 @@ import asyncio
 import logging
 from abc import ABC, abstractmethod
 
-from providers.types import GasPrice, UserOpReceipt
+from providers.types import GasPrice, UserOperation, UserOpReceipt
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ class Bundler(ABC):
         ...
 
     @abstractmethod
-    async def send_user_operation(self, user_op: dict) -> str:
+    async def send_user_operation(self, user_op: UserOperation) -> str:
         """
         Submit a signed UserOp.
 

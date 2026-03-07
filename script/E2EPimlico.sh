@@ -18,7 +18,7 @@
 #
 # Delegation is handled by the bundler via eip7702Auth — no separate delegation tx.
 #
-# EntryPoint: v0.8 (0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108)
+# EntryPoint: v0.7 (0x0000000071727De22E5E9d8BAf0edAc6f37da032)
 # =============================================================================
 
 set -euo pipefail
@@ -29,7 +29,7 @@ source .env
 CAST="${CAST:-$HOME/.foundry/bin/cast}"
 FORGE="${FORGE:-$HOME/.foundry/bin/forge}"
 
-EP="0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108"
+EP="0x0000000071727De22E5E9d8BAf0edAc6f37da032"
 USDC="0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
 PIMLICO_URL="https://api.pimlico.io/v2/sepolia/rpc?apikey=${PIMLICO_API_KEY}"
 CHAIN_ID=11155111
@@ -50,10 +50,10 @@ echo "Actors:"
 echo "  Deployer: $DEPLOYER"
 echo "  Sponsor:  $SPONSOR"
 echo "  Alice:    $ALICE (fresh, 0 ETH)"
-echo "  Alice PK: $ALICE_KEY"
+echo "  Alice PK: $ALICE_PK"
 echo ""
 echo "Infra:"
-echo "  EntryPoint: $EP (v0.8)"
+echo "  EntryPoint: $EP (v0.7)"
 echo "  Bundler+Paymaster: Pimlico (api.pimlico.io/v2/sepolia)"
 echo ""
 
@@ -171,7 +171,6 @@ USEROP=$(jq -n \
     --arg sig "$DUMMY_SIG" \
     --argjson auth "$AUTH_JSON" \
     '{sender:$sender, nonce:$nonce, callData:$callData,
-      factory:"0x7702",
       callGasLimit:"0x0", verificationGasLimit:"0x0", preVerificationGas:"0x0",
       maxFeePerGas:$maxFee, maxPriorityFeePerGas:$maxPrio,
       signature:$sig, eip7702Auth:$auth}')
@@ -214,7 +213,7 @@ echo ""
 # =============================================================================
 echo "[4] Alice signs UserOp (off-chain, 0 gas)..."
 
-# ── Compute v0.8 userOpHash locally (EIP-712) ──
+# ── Compute v0.7 userOpHash locally ──
 # Pack paymasterAndData: paymaster(20) + pmVerGas(16) + pmPostGas(16) + pmData
 PM_VGAS_DEC=$(printf "%d" "$PM_VGAS")
 PM_PGAS_DEC=$(printf "%d" "$PM_PGAS")
@@ -236,40 +235,21 @@ GAS_FEES=$(python3 -c "print('0x' + hex(($MP_DEC << 128) | $MF_DEC)[2:].zfill(64
 
 PVG_DEC=$(printf "%d" "$R_PVGAS")
 
-# EIP-7702 initCode: 20-byte marker 0x7702 (left-aligned)
-INIT_CODE="0x7702000000000000000000000000000000000000"
-
-# For EIP-7702: hashInitCode = keccak256(abi.encodePacked(delegateAddress))
-# = keccak256 of the raw 20-byte delegate address (NOT abi.encode which left-pads to 32)
-# EP v0.8 reads Alice's delegation via EXTCODECOPY and hashes the delegate address
-EXECUTOR_BARE=${EXECUTOR#0x}
-INIT_HASH=$($CAST keccak "0x${EXECUTOR_BARE}")
+# userOpHash = keccak256(abi.encode(packHash, EP, chainId))
+# packHash   = keccak256(abi.encode(sender, nonce, H(initCode), H(callData),
+#                         accountGasLimits, preVerGas, gasFees, H(paymasterAndData)))
+INIT_HASH=$($CAST keccak "0x")
 CALL_HASH=$($CAST keccak "$CALL_DATA")
 PM_HASH=$($CAST keccak "$PAYMASTER_AND_DATA")
 
-# v0.8 uses EIP-712: userOpHash = hashTypedData(domainSeparator, structHash)
-# domain: name="ERC4337", version="1", chainId, verifyingContract=EP
-DOMAIN_TYPE_HASH=$($CAST keccak "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
-DOMAIN_NAME_HASH=$($CAST keccak "ERC4337")
-DOMAIN_VER_HASH=$($CAST keccak "1")
-DOMAIN_SEP_ENC=$($CAST abi-encode "f(bytes32,bytes32,bytes32,uint256,address)" \
-    "$DOMAIN_TYPE_HASH" "$DOMAIN_NAME_HASH" "$DOMAIN_VER_HASH" "$CHAIN_ID" "$EP")
-DOMAIN_SEP=$($CAST keccak "$DOMAIN_SEP_ENC")
-
-# PackedUserOperation struct hash
-PACKED_USEROP_TYPEHASH=$($CAST keccak "PackedUserOperation(address sender,uint256 nonce,bytes initCode,bytes callData,bytes32 accountGasLimits,uint256 preVerificationGas,bytes32 gasFees,bytes paymasterAndData)")
-
-STRUCT_ENC=$($CAST abi-encode \
-    "f(bytes32,address,uint256,bytes32,bytes32,bytes32,uint256,bytes32,bytes32)" \
-    "$PACKED_USEROP_TYPEHASH" \
+PACK_ENC=$($CAST abi-encode \
+    "f(address,uint256,bytes32,bytes32,bytes32,uint256,bytes32,bytes32)" \
     "$ALICE" "$ALICE_NONCE" "$INIT_HASH" "$CALL_HASH" \
     "$ACCOUNT_GAS_LIMITS" "$PVG_DEC" "$GAS_FEES" "$PM_HASH")
-STRUCT_HASH=$($CAST keccak "$STRUCT_ENC")
+PACK_HASH=$($CAST keccak "$PACK_ENC")
 
-# EIP-712 hash: keccak256("\x19\x01" || domainSeparator || structHash)
-DOMAIN_SEP_BARE=${DOMAIN_SEP#0x}
-STRUCT_HASH_BARE=${STRUCT_HASH#0x}
-USEROP_HASH=$($CAST keccak "0x1901${DOMAIN_SEP_BARE}${STRUCT_HASH_BARE}")
+OUTER_ENC=$($CAST abi-encode "f(bytes32,address,uint256)" "$PACK_HASH" "$EP" "$CHAIN_ID")
+USEROP_HASH=$($CAST keccak "$OUTER_ENC")
 
 echo "  userOpHash: $USEROP_HASH"
 

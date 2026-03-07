@@ -10,7 +10,7 @@
 
 基于 **OpenZeppelin Contracts v5.6.1** 构建的极简 EIP-7702 EOA 委托合约。提供 ERC-7821 批量执行和 ERC-4337 gas 赞助功能，**零初始化** — 无 owner 存储、无 `initialize()`、无抢跑攻击面。
 
-> **本分支使用 EntryPoint v0.8**，支持原生 EIP-7702。详见 [v0.7 vs v0.8 差异对比](docs/v07-vs-v08.md)。`main` 分支使用 EntryPoint v0.7。
+> 本分支使用 **EntryPoint v0.7**。如需 EntryPoint v0.8（原生 EIP-7702 支持），请查看 `feature/entrypoint-v08` 分支。
 
 ## 📋 E2E 测试报告
 
@@ -29,12 +29,12 @@
 | `ERC721Holder`       | OZ — 安全接收 ERC-721 Token                                                |
 | `ERC1155Holder`      | OZ — 安全接收 ERC-1155 Token                                               |
 | `VerifyingPaymaster` | 自研 — EIP-712、Ownable2Step、Pausable、ReentrancyGuard、signer/owner 分离 |
-| EntryPoint           | ERC-4337 v0.8 (`0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108`)               |
+| EntryPoint           | ERC-4337 v0.7 (`0x0000000071727De22E5E9d8BAf0edAc6f37da032`)               |
 
 ## 功能特性
 
 - **ERC-7821 批量执行** — `execute(bytes32 mode, bytes executionData)` + ERC-7579 batch 编码
-- **Gas 赞助** — 兼容 ERC-4337 v0.8（`IAccount.validateUserOp`）
+- **Gas 赞助** — 兼容 ERC-4337 v0.7（`IAccount.validateUserOp`）
 - **VerifyingPaymaster** — 生产级 Paymaster，EIP-712 typed data、signer/owner 分离、Pausable、ReentrancyGuard
 - **原始 ECDSA 签名** — `SignerEIP7702` 直接验证签名（无 EIP-191 前缀）
 - **Token 接收** — 安全接收 ERC-721 和 ERC-1155 Token

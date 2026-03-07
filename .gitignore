@@ -19,3 +19,5 @@ lcov.info
 .DS_Store
 .claude/
 .env.swp
+.venv/
+__pycache__/

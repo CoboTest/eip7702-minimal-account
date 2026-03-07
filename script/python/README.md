@@ -19,8 +19,6 @@ uv run e2e_pimlico.py
 
 `uv run` automatically creates `.venv` and installs dependencies on first run.
 
-> **Note:** The script reads compiled artifacts from the `out/` directory. Run `forge build` in the project root if artifacts are missing.
-
 ## Environment Variables
 
 Create a `.env` file in the **project root directory** (same level as `foundry.toml`). See [`.env.example`](../../.env.example) for a template:
@@ -46,6 +44,8 @@ script/python/
 ├── e2e_pimlico.py           # E2E #3 orchestrator (async)
 ├── config.py                # Chain constants (EP address, USDC)
 ├── hash.py                  # Pure hash functions (delegation, UserOp v0.7)
+├── artifacts/               # Pre-compiled contract bytecode
+│   └── MinimalAccount.json  # Deploy bytecode (update after forge build)
 │
 ├── signers/                 # Signer abstraction
 │   ├── base.py              # Signer ABC: sign_hash(bytes32) → (v, r, s)

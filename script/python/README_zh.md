@@ -19,8 +19,6 @@ uv run e2e_pimlico.py
 
 `uv run` 首次运行时自动创建 `.venv` 并安装依赖。
 
-> **注意：** 脚本从 `out/` 目录读取编译产物。如果产物缺失，在项目根目录运行 `forge build`。
-
 ## 环境变量
 
 在**项目根目录**（与 `foundry.toml` 同级）创建 `.env` 文件。参考 [`.env.example`](../../.env.example) 模板：
@@ -46,6 +44,8 @@ script/python/
 ├── e2e_pimlico.py           # E2E #3 主入口（异步）
 ├── config.py                # 链常量（EP 地址、USDC）
 ├── hash.py                  # 纯哈希函数（delegation、UserOp v0.7）
+├── artifacts/               # 预编译合约字节码
+│   └── MinimalAccount.json  # 部署字节码（forge build 后更新）
 │
 ├── signers/                 # 签名者抽象
 │   ├── base.py              # Signer ABC: sign_hash(bytes32) → (v, r, s)

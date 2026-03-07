@@ -57,16 +57,16 @@ from signers.local import LocalSigner
 logger = logging.getLogger(__name__)
 
 
-def load_bytecode(project_root: Path, contract_name: str) -> str:
-    """Load contract bytecode from forge output artifacts."""
-    artifact_path = project_root / "out" / f"{contract_name}.sol" / f"{contract_name}.json"
+def load_bytecode(contract_name: str) -> str:
+    """Load contract bytecode from local artifacts directory."""
+    artifact_path = Path(__file__).resolve().parent / "artifacts" / f"{contract_name}.json"
     if not artifact_path.exists():
         logger.error("Artifact not found at %s", artifact_path)
-        logger.error("Run 'forge build' first to compile contracts.")
+        logger.error("Run 'forge build' and copy artifact to script/python/artifacts/.")
         sys.exit(1)
     with open(artifact_path) as f:
         artifact = json.load(f)
-    return artifact["bytecode"]["object"]
+    return artifact["bytecode"]
 
 
 async def main() -> None:
@@ -136,7 +136,7 @@ async def main() -> None:
         # [1] Deploy MinimalAccount
         # =====================================================================
         logger.info("[1] Deploy MinimalAccount...")
-        bytecode = load_bytecode(project_root, "MinimalAccount")
+        bytecode = load_bytecode("MinimalAccount")
 
         deploy_tx = {
             "from": deployer.address,

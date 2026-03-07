@@ -1,20 +1,8 @@
 """Abstract paymaster interface for ERC-4337 gas sponsorship."""
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 
-
-@dataclass
-class SponsorResult:
-    """Result from paymaster sponsorship."""
-
-    paymaster: str
-    paymaster_data: bytes
-    paymaster_verification_gas_limit: int
-    paymaster_post_op_gas_limit: int
-    verification_gas_limit: int
-    call_gas_limit: int
-    pre_verification_gas: int
+from providers.types import SponsorResult
 
 
 class Paymaster(ABC):

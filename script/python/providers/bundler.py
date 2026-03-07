@@ -2,21 +2,8 @@
 
 import time
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 
-
-@dataclass
-class GasPrice:
-    max_fee_per_gas: int
-    max_priority_fee_per_gas: int
-
-
-@dataclass
-class UserOpReceipt:
-    tx_hash: str
-    block_number: int
-    success: bool
-    raw: dict
+from providers.types import GasPrice, UserOpReceipt
 
 
 class Bundler(ABC):

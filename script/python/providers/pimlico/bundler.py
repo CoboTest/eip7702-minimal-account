@@ -3,7 +3,8 @@
 import requests
 
 from providers.base import JsonRpcMixin
-from providers.bundler import Bundler, GasPrice, UserOpReceipt
+from providers.bundler import Bundler
+from providers.types import GasPrice, UserOpReceipt
 
 
 class PimlicoBundler(JsonRpcMixin, Bundler):

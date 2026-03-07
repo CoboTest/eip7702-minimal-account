@@ -13,14 +13,6 @@ class GasPrice:
 
 
 @dataclass
-class UserOpReceipt:
-    tx_hash: str
-    block_number: int
-    success: bool
-    raw: dict
-
-
-@dataclass
 class SponsorResult:
     """Result from paymaster sponsorship."""
 
@@ -87,3 +79,11 @@ class UserOperation:
         self.verification_gas_limit = result.verification_gas_limit
         self.call_gas_limit = result.call_gas_limit
         self.pre_verification_gas = result.pre_verification_gas
+
+
+@dataclass
+class UserOpReceipt:
+    tx_hash: str
+    block_number: int
+    success: bool
+    raw: dict

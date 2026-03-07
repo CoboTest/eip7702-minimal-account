@@ -2,7 +2,7 @@
 
 [🇬🇧 English](README.md)
 
-EIP-7702 Minimal Batch Executor 的纯 Python E2E 测试套件。运行时无需 CLI 工具（不依赖 `cast`、`forge`）。
+EIP-7702 Minimal Batch Executor 的纯 Python E2E 测试套件。运行时无需 CLI 工具（不依赖 `cast`、`forge`）。使用 EntryPoint v0.7。
 
 ## 前置要求
 
@@ -14,15 +14,12 @@ EIP-7702 Minimal Batch Executor 的纯 Python E2E 测试套件。运行时无需
 
 ```bash
 cd script/python
-
-# 使用 EntryPoint v0.7 运行（默认）
-uv run e2e_pimlico.py --ep-version v0.7
-
-# 使用 EntryPoint v0.8 运行
-uv run e2e_pimlico.py --ep-version v0.8
+uv run e2e_pimlico.py
 ```
 
 `uv run` 首次运行时自动创建 `.venv` 并安装依赖。
+
+> **注意：** 脚本从 `out/` 目录读取编译产物。如果产物缺失，在项目根目录运行 `forge build`。
 
 ## 环境变量
 
@@ -47,8 +44,8 @@ PIMLICO_API_KEY=pim_...
 ```
 script/python/
 ├── e2e_pimlico.py           # E2E #3 主入口（异步）
-├── config.py                # 链常量（EP 地址、USDC、gas 默认值）
-├── hash.py                  # 纯哈希函数（delegation、UserOp、paymaster）
+├── config.py                # 链常量（EP 地址、USDC）
+├── hash.py                  # 纯哈希函数（delegation、UserOp v0.7）
 │
 ├── signers/                 # 签名者抽象
 │   ├── base.py              # Signer ABC: sign_hash(bytes32) → (v, r, s)
@@ -72,7 +69,7 @@ script/python/
 
 ### 签名者抽象
 
-`Signer` 接口是纯签名原语——只负责签署 32 字节哈希。所有哈希计算（EIP-7702 delegation、UserOp、paymaster EIP-712）在 `hash.py` 中完成。
+`Signer` 接口是纯签名原语——只负责签署 32 字节哈希。所有哈希计算（EIP-7702 delegation、UserOp）在 `hash.py` 中完成。
 
 ```python
 from signers.local import LocalSigner
@@ -108,20 +105,6 @@ paymaster = PimlicoPaymaster(url, entry_point)
 ### 异步优先
 
 所有 I/O 操作（RPC 调用、bundler API）使用 `async/await`，基于 `aiohttp` 和 `AsyncWeb3`。CPU 密集操作（签名、哈希）保持同步。
-
-### EntryPoint 版本支持
-
-通过 `--ep-version` 参数支持 EP v0.7 和 v0.8：
-
-| 特性 | v0.7 | v0.8 |
-|------|------|------|
-| UserOp 哈希 | `keccak256(abi.encode(packHash, ep, chainId))` | EIP-712 类型化数据 |
-| EIP-7702 标记 | 无 | `factory = "0x7702"` |
-| `hashInitCode` | `keccak256(initCode)` | `keccak256(delegateAddress)`（EIP-7702） |
-
-> **注意：** 脚本从 `out/` 目录读取编译产物。如果产物缺失，运行 `forge build`。产物必须与 EP 版本匹配——在正确的分支上构建：
-> - `main` 分支 → EP v0.7
-> - `feature/entrypoint-v08` 分支 → EP v0.8
 
 ## E2E 流程（6 步）
 

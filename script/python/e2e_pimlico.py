@@ -3,6 +3,7 @@
 E2E #3: Pimlico Bundler + Sponsored Paymaster (Python)
 
 Pure Python implementation — no CLI tools (no cast, no forge).
+Uses EntryPoint v0.7.
 
 Flow:
   [1] Deploy MinimalAccount
@@ -19,11 +20,9 @@ Three actors:
 
 Usage:
   cd script/python
-  uv run e2e_pimlico.py --ep-version v0.7
-  uv run e2e_pimlico.py --ep-version v0.8
+  uv run e2e_pimlico.py
 """
 
-import argparse
 import asyncio
 import json
 import logging
@@ -38,9 +37,7 @@ from web3 import AsyncWeb3, AsyncHTTPProvider, Web3
 from config import (
     BATCH_MODE,
     CHAIN_ID_SEPOLIA,
-    EIP7702_INIT_CODE_MARKER,
     EP_V07,
-    EP_V08,
     USDC_AMOUNT,
     USDC_PART1,
     USDC_PART2,
@@ -78,15 +75,6 @@ async def main() -> None:
         format="%(message)s",
     )
 
-    parser = argparse.ArgumentParser(description="E2E #3: Pimlico Bundler + Sponsored Paymaster")
-    parser.add_argument(
-        "--ep-version",
-        choices=["v0.7", "v0.8"],
-        default="v0.7",
-        help="EntryPoint version (default: v0.7)",
-    )
-    args = parser.parse_args()
-
     # ── Load environment ──
     project_root = Path(__file__).resolve().parent.parent.parent
     load_dotenv(project_root / ".env")
@@ -96,8 +84,7 @@ async def main() -> None:
     sponsor_key = os.environ["SPONSOR_PRIVATE_KEY"]
     pimlico_api_key = os.environ["PIMLICO_API_KEY"]
 
-    ep_version = args.ep_version
-    ep_address = EP_V07 if ep_version == "v0.7" else EP_V08
+    ep_address = EP_V07
     pimlico_url = f"https://api.pimlico.io/v2/sepolia/rpc?apikey={pimlico_api_key}"
 
     # ── Setup signers ──
@@ -130,7 +117,7 @@ async def main() -> None:
 
     logger.info("=" * 54)
     logger.info("  E2E #3 Pimlico — Bundler + Sponsored Paymaster")
-    logger.info("  EntryPoint: %s", ep_version)
+    logger.info("  EntryPoint: v0.7")
     logger.info("=" * 54)
     logger.info("")
     logger.info("Actors:")
@@ -140,7 +127,7 @@ async def main() -> None:
     logger.info("  Alice PK: %s", alice.private_key)
     logger.info("")
     logger.info("Infra:")
-    logger.info("  EntryPoint: %s (%s)", ep_address, ep_version)
+    logger.info("  EntryPoint: %s (v0.7)", ep_address)
     logger.info("  Bundler+Paymaster: Pimlico (api.pimlico.io/v2/sepolia)")
     logger.info("")
 
@@ -265,9 +252,6 @@ async def main() -> None:
             "eip7702Auth": auth_json,
         }
 
-        if ep_version == "v0.8":
-            user_op["factory"] = "0x7702"
-
         # Request Pimlico sponsorship
         logger.info("  Requesting pm_sponsorUserOperation...")
         spon = await paymaster.sponsor(user_op)
@@ -307,18 +291,10 @@ async def main() -> None:
             spon.paymaster_data,
         )
 
-        if ep_version == "v0.8":
-            init_code = EIP7702_INIT_CODE_MARKER
-            delegate_for_hash = executor_address
-        else:
-            init_code = b""
-            delegate_for_hash = None
-
         userop_hash = compute_userop_hash(
-            ep_version=ep_version,
             sender=alice.address,
             nonce=alice_ep_nonce,
-            init_code=init_code,
+            init_code=b"",
             call_data=call_data,
             account_gas_limits=account_gas_limits,
             pre_verification_gas=spon.pre_verification_gas,
@@ -326,7 +302,6 @@ async def main() -> None:
             paymaster_and_data=paymaster_and_data,
             entry_point=ep_address,
             chain_id=chain_id,
-            delegate_address=delegate_for_hash,
         )
 
         logger.info("  userOpHash: 0x%s", userop_hash.hex())

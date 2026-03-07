@@ -2,7 +2,7 @@
 
 [🇨🇳 中文版](README_zh.md)
 
-Pure Python E2E test suite for the EIP-7702 Minimal Batch Executor. No CLI tools required (no `cast`, no `forge` at runtime).
+Pure Python E2E test suite for the EIP-7702 Minimal Batch Executor. No CLI tools required (no `cast`, no `forge` at runtime). Uses EntryPoint v0.7.
 
 ## Prerequisites
 
@@ -14,15 +14,12 @@ Pure Python E2E test suite for the EIP-7702 Minimal Batch Executor. No CLI tools
 
 ```bash
 cd script/python
-
-# Run E2E with EntryPoint v0.7 (default)
-uv run e2e_pimlico.py --ep-version v0.7
-
-# Run E2E with EntryPoint v0.8
-uv run e2e_pimlico.py --ep-version v0.8
+uv run e2e_pimlico.py
 ```
 
 `uv run` automatically creates `.venv` and installs dependencies on first run.
+
+> **Note:** The script reads compiled artifacts from the `out/` directory. Run `forge build` in the project root if artifacts are missing.
 
 ## Environment Variables
 
@@ -47,8 +44,8 @@ PIMLICO_API_KEY=pim_...
 ```
 script/python/
 ├── e2e_pimlico.py           # E2E #3 orchestrator (async)
-├── config.py                # Chain constants (EP addresses, USDC, gas defaults)
-├── hash.py                  # Pure hash functions (delegation, UserOp, paymaster)
+├── config.py                # Chain constants (EP address, USDC)
+├── hash.py                  # Pure hash functions (delegation, UserOp v0.7)
 │
 ├── signers/                 # Signer abstraction
 │   ├── base.py              # Signer ABC: sign_hash(bytes32) → (v, r, s)
@@ -72,7 +69,7 @@ script/python/
 
 ### Signer Abstraction
 
-The `Signer` interface is a pure signing primitive — it only signs a raw 32-byte hash. All hash computation (EIP-7702 delegation, UserOp, paymaster EIP-712) lives in `hash.py`.
+The `Signer` interface is a pure signing primitive — it only signs a raw 32-byte hash. All hash computation (EIP-7702 delegation, UserOp) lives in `hash.py`.
 
 ```python
 from signers.local import LocalSigner
@@ -108,20 +105,6 @@ paymaster = PimlicoPaymaster(url, entry_point)
 ### Async-First
 
 All I/O operations (RPC calls, bundler API) use `async/await` with `aiohttp` and `AsyncWeb3`. CPU-bound operations (signing, hashing) remain synchronous.
-
-### EntryPoint Version Support
-
-The script supports both EP v0.7 and v0.8 via `--ep-version`:
-
-| Feature | v0.7 | v0.8 |
-|---------|------|------|
-| UserOp hash | `keccak256(abi.encode(packHash, ep, chainId))` | EIP-712 typed data |
-| EIP-7702 marker | N/A | `factory = "0x7702"` |
-| `hashInitCode` | `keccak256(initCode)` | `keccak256(delegateAddress)` for EIP-7702 |
-
-> **Note:** The script reads compiled artifacts from the `out/` directory. Run `forge build` if artifacts are missing. The artifacts must match the EP version — build on the correct branch:
-> - `main` branch → EP v0.7
-> - `feature/entrypoint-v08` branch → EP v0.8
 
 ## E2E Flow (6 Steps)
 

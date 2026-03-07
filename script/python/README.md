@@ -133,35 +133,24 @@ All I/O operations (RPC calls, bundler API) use `async/await` with `aiohttp` and
 
 ```mermaid
 sequenceDiagram
-    participant D as Deployer
-    participant S as Sponsor
     participant A as Alice
     participant RPC as Sepolia RPC
     participant PM as Pimlico Paymaster
     participant B as Pimlico Bundler
 
-    rect rgb(240, 240, 240)
-    Note over D,B: Test Setup (one-time)
-    D->>RPC: [1] deploy MinimalAccount
-    S->>RPC: [2] USDC.transfer(Alice, 1 USDC)
-    end
-
-    rect rgb(232, 245, 233)
-    Note over A,B: Per-Transaction Flow
-    A->>A: [3a] sign EIP-7702 delegation
-    A->>PM: [3b] pm_sponsorUserOperation(userOp + eip7702Auth)
+    A->>A: sign EIP-7702 delegation
+    A->>PM: pm_sponsorUserOperation(userOp + eip7702Auth)
     PM-->>A: paymaster + paymasterData + gas limits
 
-    A->>A: [4] sign userOpHash (raw ECDSA)
+    A->>A: sign userOpHash (raw ECDSA)
 
-    A->>B: [5] eth_sendUserOperation(userOp + eip7702Auth)
+    A->>B: eth_sendUserOperation(userOp + eip7702Auth)
     B->>RPC: type 4 tx (delegation + handleOps)
     RPC-->>B: tx receipt
 
-    A->>B: [6] eth_getUserOperationReceipt(userOpHash)
+    A->>B: eth_getUserOperationReceipt(userOpHash)
     B-->>A: tx hash + block + success
     A->>RPC: verify: Alice USDC=0, ETH=0, code=23 bytes
-    end
 ```
 
 ### Step 3 — Delegation + Build UserOp + Sponsorship

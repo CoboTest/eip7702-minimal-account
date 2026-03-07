@@ -57,8 +57,8 @@ from providers.pimlico import PimlicoBundler, PimlicoPaymaster
 from signers.local import LocalSigner
 
 
-def load_artifact(project_root: Path, contract_name: str) -> tuple[str, list]:
-    """Load bytecode and ABI from forge output artifacts."""
+def load_bytecode(project_root: Path, contract_name: str) -> str:
+    """Load contract bytecode from forge output artifacts."""
     artifact_path = project_root / "out" / f"{contract_name}.sol" / f"{contract_name}.json"
     if not artifact_path.exists():
         print(f"  ERROR: Artifact not found at {artifact_path}")
@@ -66,9 +66,7 @@ def load_artifact(project_root: Path, contract_name: str) -> tuple[str, list]:
         sys.exit(1)
     with open(artifact_path) as f:
         artifact = json.load(f)
-    bytecode = artifact["bytecode"]["object"]
-    abi = artifact["abi"]
-    return bytecode, abi
+    return artifact["bytecode"]["object"]
 
 
 async def main():
@@ -143,7 +141,7 @@ async def main():
         # [1] Deploy MinimalAccount
         # =====================================================================
         print("[1] Deploy MinimalAccount...")
-        bytecode, _ = load_artifact(project_root, "MinimalAccount")
+        bytecode = load_bytecode(project_root, "MinimalAccount")
 
         deploy_tx = {
             "from": deployer.address,

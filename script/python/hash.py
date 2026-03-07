@@ -10,10 +10,9 @@ Supported:
 - UserOp hash (v0.8 EIP-712)
 """
 
+import rlp
 from eth_abi import encode
 from web3 import Web3
-
-w3 = Web3()
 
 
 # ── EIP-7702 Delegation ──
@@ -37,15 +36,13 @@ def compute_delegation_hash(chain_id: int, target: str, nonce: int) -> bytes:
     Returns:
         32-byte hash to be signed by the EOA.
     """
-    import rlp
-
     target_bytes = bytes.fromhex(target[2:] if target.startswith("0x") else target)
     encoded = rlp.encode([
         chain_id.to_bytes((chain_id.bit_length() + 7) // 8, "big") if chain_id > 0 else b"",
         target_bytes,
         nonce.to_bytes((nonce.bit_length() + 7) // 8, "big") if nonce > 0 else b"",
     ])
-    return w3.keccak(_EIP7702_MAGIC + encoded)
+    return Web3.keccak(_EIP7702_MAGIC + encoded)
 
 
 def build_delegation_auth(chain_id: int, target: str, nonce: int, v: int, r: int, s: int) -> dict:
@@ -92,20 +89,20 @@ def compute_userop_hash_v07(
                                     accountGasLimits, preVerificationGas, gasFees,
                                     keccak(paymasterAndData)))
     """
-    pack_hash = w3.keccak(encode(
+    pack_hash = Web3.keccak(encode(
         ["address", "uint256", "bytes32", "bytes32", "bytes32", "uint256", "bytes32", "bytes32"],
         [
             Web3.to_checksum_address(sender),
             nonce,
-            w3.keccak(init_code),
-            w3.keccak(call_data),
+            Web3.keccak(init_code),
+            Web3.keccak(call_data),
             account_gas_limits,
             pre_verification_gas,
             gas_fees,
-            w3.keccak(paymaster_and_data),
+            Web3.keccak(paymaster_and_data),
         ],
     ))
-    return w3.keccak(encode(
+    return Web3.keccak(encode(
         ["bytes32", "address", "uint256"],
         [pack_hash, Web3.to_checksum_address(entry_point), chain_id],
     ))
@@ -114,12 +111,12 @@ def compute_userop_hash_v07(
 # ── UserOp Hash (v0.8 EIP-712) ──
 
 # EIP-712 type hashes (pre-computed for efficiency, but computed here for clarity)
-_DOMAIN_TYPEHASH = w3.keccak(
+_DOMAIN_TYPEHASH = Web3.keccak(
     text="EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
 )
-_DOMAIN_NAME_HASH = w3.keccak(text="ERC4337")
-_DOMAIN_VERSION_HASH = w3.keccak(text="1")
-_PACKED_USEROP_TYPEHASH = w3.keccak(
+_DOMAIN_NAME_HASH = Web3.keccak(text="ERC4337")
+_DOMAIN_VERSION_HASH = Web3.keccak(text="1")
+_PACKED_USEROP_TYPEHASH = Web3.keccak(
     text="PackedUserOperation(address sender,uint256 nonce,bytes initCode,bytes callData,"
          "bytes32 accountGasLimits,uint256 preVerificationGas,bytes32 gasFees,bytes paymasterAndData)"
 )
@@ -148,7 +145,7 @@ def compute_userop_hash_v08(
                          This is the EIP-7702 native support in EP v0.8.
     """
     # Domain separator
-    domain_separator = w3.keccak(encode(
+    domain_separator = Web3.keccak(encode(
         ["bytes32", "bytes32", "bytes32", "uint256", "address"],
         [
             _DOMAIN_TYPEHASH,
@@ -164,28 +161,28 @@ def compute_userop_hash_v08(
         addr_bytes = bytes.fromhex(
             delegate_address[2:] if delegate_address.startswith("0x") else delegate_address
         )
-        hash_init_code = w3.keccak(addr_bytes)  # keccak256(abi.encodePacked(addr)) = keccak256(20 bytes)
+        hash_init_code = Web3.keccak(addr_bytes)  # keccak256(abi.encodePacked(addr)) = keccak256(20 bytes)
     else:
-        hash_init_code = w3.keccak(init_code)
+        hash_init_code = Web3.keccak(init_code)
 
     # Struct hash
-    struct_hash = w3.keccak(encode(
+    struct_hash = Web3.keccak(encode(
         ["bytes32", "address", "uint256", "bytes32", "bytes32", "bytes32", "uint256", "bytes32", "bytes32"],
         [
             _PACKED_USEROP_TYPEHASH,
             Web3.to_checksum_address(sender),
             nonce,
             hash_init_code,
-            w3.keccak(call_data),
+            Web3.keccak(call_data),
             account_gas_limits,
             pre_verification_gas,
             gas_fees,
-            w3.keccak(paymaster_and_data),
+            Web3.keccak(paymaster_and_data),
         ],
     ))
 
     # EIP-712: keccak256(0x19 0x01 || domainSeparator || structHash)
-    return w3.keccak(b"\x19\x01" + domain_separator + struct_hash)
+    return Web3.keccak(b"\x19\x01" + domain_separator + struct_hash)
 
 
 # ── Convenience: select by version ──

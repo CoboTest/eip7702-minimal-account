@@ -24,7 +24,7 @@ A minimal EIP-7702 delegate contract for EOAs built on **OpenZeppelin Contracts 
 | Component            | Source                                                                             |
 | -------------------- | ---------------------------------------------------------------------------------- |
 | `Account`            | OZ — ERC-4337 `validateUserOp` + prefund logic                                     |
-| `SignerEIP7702`      | OZ — ECDSA signature validation against `address(this)` (with EIP-191 prefix)      |
+| `SignerEIP7702`      | OZ — ECDSA signature validation against `address(this)`                               |
 | `ERC7821`            | OZ — `execute(bytes32 mode, bytes executionData)` with ERC-7579 encoding           |
 | `ERC721Holder`       | OZ — safe ERC-721 token receive                                                    |
 | `ERC1155Holder`      | OZ — safe ERC-1155 token receive                                                   |
@@ -36,7 +36,7 @@ A minimal EIP-7702 delegate contract for EOAs built on **OpenZeppelin Contracts 
 - **ERC-7821 Batch Execution** — `execute(bytes32 mode, bytes executionData)` with ERC-7579 batch encoding
 - **Gas Sponsorship** — ERC-4337 v0.7 compatible (`IAccount.validateUserOp`)
 - **VerifyingPaymaster** — Production-grade paymaster with EIP-712 typed data, signer/owner separation, Pausable, ReentrancyGuard
-- **EIP-191 Signing** — `_signableUserOpHash()` wraps `userOpHash` with EIP-191 prefix, following eth-infinitism convention
+- **EIP-191 Signing (v0.7 override)** — `MinimalAccount._signableUserOpHash()` wraps `userOpHash` with EIP-191 prefix, following eth-infinitism convention
 - **Token Holders** — Safely receive ERC-721 and ERC-1155 tokens
 - **Zero State** — No `initialize()`, no owner storage. EOA private key = sole authority
 - **ERC-165** — Interface detection for IAccount, IERC7821, IERC721Receiver, IERC1155Receiver
@@ -45,7 +45,7 @@ A minimal EIP-7702 delegate contract for EOAs built on **OpenZeppelin Contracts 
 
 Traditional Smart Accounts store an `owner` in contract storage, requiring an `initialize()` call that's vulnerable to frontrunning attacks. This contract takes a different approach:
 
-- The EOA's private key is the **only** authority (EIP-191 + ECDSA via `SignerEIP7702`)
+- The EOA's private key is the **only** authority (`SignerEIP7702` verifies ECDSA; this contract's `_signableUserOpHash()` adds the EIP-191 prefix)
 - No storage means no initialization, which means **zero attack surface**
 - ERC-7821 interface for batch execution with ERC-7579 encoding
 
@@ -208,7 +208,7 @@ forge script script/E2EDirect.s.sol \
 ## Security
 
 - **No frontrunning risk** — Nothing to initialize, nothing to steal
-- **Signature validation** — EIP-191 + ECDSA via `SignerEIP7702` (rejects malleable signatures per EIP-2)
+- **Signature validation** — ECDSA via `SignerEIP7702` (rejects malleable signatures per EIP-2), with EIP-191 wrapping applied in `_signableUserOpHash()`
 - **Access control** — Only the EOA itself or EntryPoint can call `execute()`
 - **No delegatecall** — All calls are regular `call`, preventing storage corruption
 - **validateUserOp** — Restricted to EntryPoint only (per ERC-4337 spec)

@@ -198,7 +198,8 @@ contract MinimalAccountTest is Test {
     function test_validateUserOp_valid_signature() public {
         bytes32 userOpHash = keccak256("test-userop-hash");
 
-        // OZ SignerEIP7702 uses raw signature (no personal_sign prefix)
+        // MinimalAccount._signableUserOpHash() wraps userOpHash with EIP-191,
+        // so tests must sign MessageHashUtils.toEthSignedMessageHash(userOpHash).
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, MessageHashUtils.toEthSignedMessageHash(userOpHash));
         bytes memory signature = abi.encodePacked(r, s, v);
 

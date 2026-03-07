@@ -4,7 +4,7 @@ from typing import Any
 
 import aiohttp
 
-from providers.base import ProviderError
+from providers.errors import ProviderError
 
 
 class JsonRpcMixin:

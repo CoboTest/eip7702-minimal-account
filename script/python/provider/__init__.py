@@ -1,16 +1,9 @@
 """
-Bundler abstraction for ERC-4337 UserOp submission.
+Provider abstractions for ERC-4337 bundler and paymaster services.
 
-The Bundler interface handles:
-- Gas price estimation
-- UserOp submission (eth_sendUserOperation)
-- Receipt polling (eth_getUserOperationReceipt)
-
-Implementations:
-- PimlicoBundler: Pimlico bundler service
-
-Future:
-- AlchemyBundler, StackupBundler, SelfHostedBundler, etc.
+Usage:
+    from provider import Bundler, Paymaster, GasPrice, SponsorResult, UserOpReceipt
+    from provider.pimlico import PimlicoBundler, PimlicoPaymaster
 """
 
 import time
@@ -21,10 +14,25 @@ from typing import Any
 import requests
 
 
+# ── Data types ──
+
 @dataclass
 class GasPrice:
     max_fee_per_gas: int
     max_priority_fee_per_gas: int
+
+
+@dataclass
+class SponsorResult:
+    """Result from paymaster sponsorship."""
+
+    paymaster: str
+    paymaster_data: bytes
+    paymaster_verification_gas_limit: int
+    paymaster_post_op_gas_limit: int
+    verification_gas_limit: int
+    call_gas_limit: int
+    pre_verification_gas: int
 
 
 @dataclass
@@ -35,14 +43,18 @@ class UserOpReceipt:
     raw: dict
 
 
-class BundlerError(Exception):
-    """Error from a bundler service."""
+# ── Errors ──
+
+class ProviderError(Exception):
+    """Error from a bundler/paymaster service."""
 
     def __init__(self, message: str, code: int | None = None, data: Any = None):
         super().__init__(message)
         self.code = code
         self.data = data
 
+
+# ── Abstract interfaces ──
 
 class Bundler(ABC):
     """Abstract bundler — submits UserOps and retrieves receipts."""
@@ -90,6 +102,26 @@ class Bundler(ABC):
         raise TimeoutError(f"UserOp receipt not available after {timeout}s")
 
 
+class Paymaster(ABC):
+    """Abstract paymaster — sponsors UserOps for gasless execution."""
+
+    @abstractmethod
+    def sponsor(self, user_op: dict) -> SponsorResult:
+        """
+        Request sponsorship for a UserOp.
+
+        The UserOp should have a dummy signature and zero gas limits.
+        The paymaster will simulate and return real gas limits + paymaster data.
+
+        Args:
+            user_op: UserOp dict (provider-specific format).
+
+        Returns:
+            SponsorResult with paymaster address, data, and gas limits.
+        """
+        ...
+
+
 # ── JSON-RPC helper mixin ──
 
 class JsonRpcMixin:
@@ -109,47 +141,9 @@ class JsonRpcMixin:
         data = resp.json()
         if "error" in data:
             err = data["error"]
-            raise BundlerError(
+            raise ProviderError(
                 message=err.get("message", str(err)),
                 code=err.get("code"),
                 data=err.get("data"),
             )
         return data.get("result")
-
-
-# ── Pimlico implementation ──
-
-class PimlicoBundler(JsonRpcMixin, Bundler):
-    """Pimlico bundler service (api.pimlico.io)."""
-
-    def __init__(self, url: str, entry_point: str):
-        self._url = url
-        self._entry_point = entry_point
-        self._session = requests.Session()
-        self._session.headers["Content-Type"] = "application/json"
-
-    def get_gas_price(self) -> GasPrice:
-        result = self._rpc("pimlico_getUserOperationGasPrice", [])
-        fast = result["fast"]
-        return GasPrice(
-            max_fee_per_gas=int(fast["maxFeePerGas"], 16),
-            max_priority_fee_per_gas=int(fast["maxPriorityFeePerGas"], 16),
-        )
-
-    def send_user_operation(self, user_op: dict) -> str:
-        return self._rpc("eth_sendUserOperation", [user_op, self._entry_point])
-
-    def get_user_operation_receipt(self, user_op_hash: str) -> UserOpReceipt | None:
-        result = self._rpc("eth_getUserOperationReceipt", [user_op_hash])
-        if result is None:
-            return None
-        receipt = result.get("receipt", {})
-        return UserOpReceipt(
-            tx_hash=receipt.get("transactionHash", ""),
-            block_number=int(receipt.get("blockNumber", "0x0"), 16),
-            success=result.get("success", False),
-            raw=result,
-        )
-
-    def __repr__(self) -> str:
-        return f"PimlicoBundler(ep={self._entry_point})"

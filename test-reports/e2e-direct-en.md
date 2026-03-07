@@ -59,6 +59,44 @@ This report covers the non-ERC-4337 direct execution flow. Unlike the ERC-4337 s
 | execute() tx | Alice | EIP-1559 (type 2) | execute call | MinimalAccount | 4 | 🔴 Per-operation |
 | executeBatch() tx | Alice | EIP-1559 (type 2) | execute batch call | MinimalAccount | 5 | 🔴 Per-operation |
 
+### Signature Detail: EIP-7702 Delegation
+
+**Signer:** Alice (EOA private key)
+**Signed object:** Authorization tuple
+
+**Fields:**
+
+| Field | Value | Description |
+|-------|-------|-------------|
+| chainId | 11155111 | Sepolia chain ID (0 = any chain) |
+| address | MinimalAccount address | Delegate implementation contract |
+| nonce | 0 | Alice's current nonce (prevents replay) |
+
+**Signing process:**
+1. Compute `commit = keccak256(MAGIC || rlp(chainId, address, nonce))` where MAGIC = `0x05`
+2. Alice signs `commit` with raw ECDSA → (v, r, s) / (yParity, r, s)
+3. Authorization tuple = `(chainId, address, nonce, yParity, r, s)`
+
+**Verification:** EVM validates during type 4 tx processing. If valid, sets `Alice.code = 0xef0100 || address` (23-byte delegation designator).
+
+**Security:** Once delegation is set, Alice's EOA executes via MinimalAccount logic. Can be revoked by delegating to `address(0)` or re-delegating to another contract.
+
+### Signature Detail: Direct execute() Call
+
+**Signer:** Alice (EOA private key)
+**Tx type:** EIP-1559 (type 2)
+
+**What's signed:** Standard EIP-1559 transaction calling `execute()` on Alice's own address.
+
+**Access control:** `ERC7821._execute()` checks `msg.sender`:
+- If `msg.sender == address(this)` (Alice calling herself) → allowed
+- If `msg.sender == EntryPoint` → allowed
+- Otherwise → reverted
+
+Since Alice has delegation code pointing to MinimalAccount, calling `execute()` on her own address is like calling a contract function — but `msg.sender` is Alice's address, which equals `address(this)` in the delegated context.
+
+**Key difference from ERC-4337:** Alice must hold ETH for gas. No UserOp, no paymaster, no bundler abstraction. Simpler but requires ETH balance.
+
 ---
 
 ## ERC-4337 vs Direct Comparison

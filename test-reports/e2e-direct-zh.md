@@ -59,6 +59,44 @@
 | execute() 交易 | Alice | EIP-1559 (type 2) | execute 调用 | MinimalAccount | 4 | 🔴 每操作 |
 | executeBatch() 交易 | Alice | EIP-1559 (type 2) | execute 批量调用 | MinimalAccount | 5 | 🔴 每操作 |
 
+### 签名详解：EIP-7702 委托
+
+**签名者：** Alice（EOA 私钥）
+**签名对象：** Authorization 元组
+
+**字段：**
+
+| 字段 | 值 | 说明 |
+|------|-----|------|
+| chainId | 11155111 | Sepolia 链 ID（0 = 任意链） |
+| address | MinimalAccount 地址 | 委托实现合约 |
+| nonce | 0 | Alice 当前 nonce（防止重放） |
+
+**签名过程：**
+1. 计算 `commit = keccak256(MAGIC || rlp(chainId, address, nonce))`，其中 MAGIC = `0x05`
+2. Alice 用原始 ECDSA 签名 `commit` → (v, r, s) / (yParity, r, s)
+3. Authorization 元组 = `(chainId, address, nonce, yParity, r, s)`
+
+**验证：** EVM 在处理 type 4 交易时验证。若有效，设置 `Alice.code = 0xef0100 || address`（23 字节委托指示符）。
+
+**安全性：** 委托设置后，Alice 的 EOA 通过 MinimalAccount 逻辑执行。可通过委托给 `address(0)` 或重新委托给其他合约来撤销。
+
+### 签名详解：直接 execute() 调用
+
+**签名者：** Alice（EOA 私钥）
+**交易类型：** EIP-1559 (type 2)
+
+**签名内容：** 标准 EIP-1559 交易，调用 Alice 自身地址上的 `execute()`。
+
+**访问控制：** `ERC7821._execute()` 检查 `msg.sender`：
+- 如果 `msg.sender == address(this)`（Alice 调用自己）→ 允许
+- 如果 `msg.sender == EntryPoint` → 允许
+- 否则 → 回滚
+
+由于 Alice 的委托代码指向 MinimalAccount，在她自己的地址上调用 `execute()` 就像调用合约函数 — 但 `msg.sender` 是 Alice 的地址，在委托上下文中等于 `address(this)`。
+
+**与 ERC-4337 的关键区别：** Alice 必须持有 ETH 支付 gas。没有 UserOp、没有 paymaster、没有 bundler 抽象。更简单，但需要 ETH 余额。
+
 ---
 
 ## ERC-4337 与直接执行对比

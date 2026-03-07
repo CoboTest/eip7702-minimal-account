@@ -219,7 +219,7 @@ async def main() -> None:
         # =====================================================================
         logger.info("[4] Alice signs UserOp (off-chain, 0 gas)...")
 
-        userop_hash = sign_userop(user_op, alice, ep_address, chain_id)
+        sign_userop(user_op, alice, ep_address, chain_id)
 
         logger.info("  PASS: signed")
         logger.info("")

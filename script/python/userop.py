@@ -13,8 +13,6 @@ Usage:
 
 import logging
 
-from web3 import Web3
-
 from hash import (
     DelegationAuth,
     compute_userop_hash,
@@ -40,6 +38,7 @@ async def build_userop(
     auth: DelegationAuth,
     bundler: Bundler,
     paymaster: Paymaster,
+    delegate_address: str | None = None,
 ) -> UserOperation:
     """
     Build a sponsored UserOp (step 3b).
@@ -69,6 +68,7 @@ async def build_userop(
         max_priority_fee_per_gas=gas_price.max_priority_fee_per_gas,
         signature=_DUMMY_SIG,
         eip7702_auth=auth,
+        delegate_address=delegate_address,
     )
 
     # Request sponsorship
@@ -103,12 +103,15 @@ def sign_userop(
     """
     Sign a sponsored UserOp (step 4).
 
-    Computes userOpHash (v0.7 packed keccak) and signs with EIP-191 prefix.
-    Matches MinimalAccount._signableUserOpHash() (toEthSignedMessageHash).
+    Computes userOpHash (v0.8 EIP-712) and signs with raw ECDSA.
+
+    For EIP-7702 accounts, uses delegate_address to compute hashInitCode.
 
     Returns:
         The 32-byte userOpHash.
     """
+    from config import EIP7702_INIT_CODE_MARKER
+
     account_gas_limits = pack_gas_limits(user_op.verification_gas_limit, user_op.call_gas_limit)
     gas_fees = pack_gas_fees(user_op.max_priority_fee_per_gas, user_op.max_fee_per_gas)
     paymaster_and_data = pack_paymaster_and_data(
@@ -121,7 +124,7 @@ def sign_userop(
     userop_hash = compute_userop_hash(
         sender=user_op.sender,
         nonce=user_op.nonce,
-        init_code=b"",
+        init_code=EIP7702_INIT_CODE_MARKER,
         call_data=user_op.call_data,
         account_gas_limits=account_gas_limits,
         pre_verification_gas=user_op.pre_verification_gas,
@@ -129,13 +132,12 @@ def sign_userop(
         paymaster_and_data=paymaster_and_data,
         entry_point=entry_point,
         chain_id=chain_id,
+        delegate_address=user_op.delegate_address,
     )
 
     logger.info("  userOpHash: 0x%s", userop_hash.hex())
 
-    # EIP-191 prefix: keccak256("\x19Ethereum Signed Message:\n32" || userOpHash)
-    signable_hash = Web3.keccak(b"\x19Ethereum Signed Message:\n32" + userop_hash)
-    v, r, s = signer.sign_hash(signable_hash)
+    v, r, s = signer.sign_hash(userop_hash)
     sig_bytes = r.to_bytes(32, "big") + s.to_bytes(32, "big") + bytes([v])
     user_op.signature = sig_bytes
     logger.info("  Signature: 0x%s...%s", sig_bytes[:10].hex(), sig_bytes[-4:].hex())

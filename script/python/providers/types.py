@@ -27,7 +27,7 @@ class SponsorResult(BaseModel):
 
 
 class UserOperation(BaseModel):
-    """ERC-4337 UserOperation (v0.7 unpacked format)."""
+    """ERC-4337 UserOperation (v0.8 unpacked format)."""
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -50,6 +50,9 @@ class UserOperation(BaseModel):
     # EIP-7702 delegation (optional)
     eip7702_auth: DelegationAuth | None = None
 
+    # EIP-7702 delegate address (for v0.8 userOpHash computation)
+    delegate_address: str | None = None
+
     def to_dict(self) -> dict[str, Any]:
         """Serialize to JSON-RPC compatible dict (hex values, camelCase keys)."""
         d: dict[str, Any] = {
@@ -70,6 +73,8 @@ class UserOperation(BaseModel):
             d["paymasterPostOpGasLimit"] = hex(self.paymaster_post_op_gas_limit)
         if self.eip7702_auth is not None:
             d["eip7702Auth"] = self.eip7702_auth
+        if self.delegate_address is not None:
+            d["factory"] = "0x7702"  # EIP-7702 marker (short form for Pimlico v0.8)
         return d
 
     def apply_sponsorship(self, result: SponsorResult) -> None:

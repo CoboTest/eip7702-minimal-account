@@ -2,7 +2,7 @@
 
 [🇨🇳 中文版](README_zh.md)
 
-Pure Python E2E test suite for the EIP-7702 Minimal Batch Executor. No CLI tools required (no `cast`, no `forge` at runtime). Uses EntryPoint v0.7.
+Pure Python E2E test suite for the EIP-7702 Minimal Batch Executor. No CLI tools required (no `cast`, no `forge` at runtime). Uses EntryPoint v0.8.
 
 ## Prerequisites
 
@@ -195,7 +195,7 @@ Alice signs the delegation authorization off-chain. This is independent of UserO
 ### [4] Alice Signs UserOp
 
 1. **Pack gas fields** — `accountGasLimits` = `verificationGas`(128bit) || `callGas`(128bit), `gasFees` = `maxPriorityFee`(128bit) || `maxFee`(128bit), `paymasterAndData` = `address`(20) + `pmVerGas`(16) + `pmPostGas`(16) + `pmData`
-2. **Compute `userOpHash`** (v0.7 packed keccak) — `packHash = keccak256(abi.encode(sender, nonce, keccak(initCode), keccak(callData), accountGasLimits, preVerGas, gasFees, keccak(paymasterAndData)))`, then `userOpHash = keccak256(abi.encode(packHash, entryPoint, chainId))`
+2. **Compute `userOpHash`** (v0.8 EIP-712) — `packHash = keccak256(abi.encode(sender, nonce, keccak(initCode), keccak(callData), accountGasLimits, preVerGas, gasFees, keccak(paymasterAndData)))`, then `userOpHash = keccak256(abi.encode(packHash, entryPoint, chainId))`
 3. **Alice signs** the 32-byte `userOpHash` with raw ECDSA (no EIP-191 prefix) → 65-byte signature `r(32) + s(32) + v(1)`
 
 ### [5] Submit via Pimlico Bundler

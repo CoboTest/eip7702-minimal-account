@@ -10,7 +10,7 @@
 
 A minimal EIP-7702 delegate contract for EOAs built on **OpenZeppelin Contracts v5.6.1**. Adds ERC-7821 batch execution and ERC-4337 gas sponsorship with **zero initialization** — no owner storage, no `initialize()`, no frontrunning attack surface.
 
-> This branch uses **EntryPoint v0.7**. For EntryPoint v0.8 with native EIP-7702 support, see the `feature/entrypoint-v08` branch.
+> **This branch uses EntryPoint v0.8** with native EIP-7702 support. See [v0.7 vs v0.8 comparison](docs/v07-vs-v08.md) for details. The `main` branch uses EntryPoint v0.7.
 
 ## 📋 E2E Test Reports
 
@@ -29,12 +29,12 @@ A minimal EIP-7702 delegate contract for EOAs built on **OpenZeppelin Contracts 
 | `ERC721Holder`       | OZ — safe ERC-721 token receive                                                    |
 | `ERC1155Holder`      | OZ — safe ERC-1155 token receive                                                   |
 | `VerifyingPaymaster` | Custom — EIP-712, Ownable2Step, Pausable, ReentrancyGuard, signer/owner separation |
-| EntryPoint           | ERC-4337 v0.7 (`0x0000000071727De22E5E9d8BAf0edAc6f37da032`)                       |
+| EntryPoint           | ERC-4337 v0.8 (`0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108`)                       |
 
 ## Features
 
 - **ERC-7821 Batch Execution** — `execute(bytes32 mode, bytes executionData)` with ERC-7579 batch encoding
-- **Gas Sponsorship** — ERC-4337 v0.7 compatible (`IAccount.validateUserOp`)
+- **Gas Sponsorship** — ERC-4337 v0.8 compatible (`IAccount.validateUserOp`)
 - **VerifyingPaymaster** — Production-grade paymaster with EIP-712 typed data, signer/owner separation, Pausable, ReentrancyGuard
 - **Raw ECDSA Signing** — `SignerEIP7702` validates signatures directly (no EIP-191 prefix)
 - **Token Holders** — Safely receive ERC-721 and ERC-1155 tokens

@@ -8,7 +8,6 @@ import { VerifyingPaymaster } from "../src/VerifyingPaymaster.sol";
 import { PackedUserOperation, IEntryPoint } from "@openzeppelin/contracts/interfaces/draft-IERC4337.sol";
 import { Execution } from "@openzeppelin/contracts/interfaces/draft-IERC7579.sol";
 import { IERC7821 } from "@openzeppelin/contracts/interfaces/draft-IERC7821.sol";
-import { MessageHashUtils } from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title E2EPaymaster — ERC-4337 Paymaster-Sponsored E2E Flow
@@ -23,7 +22,7 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 ///      Alice transfers USDC back to Sponsor to demonstrate real token operations.
 ///      Uses EIP-712 typed data for paymaster authorization signatures.
 contract E2EPaymaster is Script {
-    IEntryPoint constant EP = IEntryPoint(0x0000000071727De22E5E9d8BAf0edAc6f37da032);
+    IEntryPoint constant EP = IEntryPoint(0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108);
     IERC20 constant USDC = IERC20(0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238);
     uint256 constant USDC_AMOUNT = 1e6; // 1 USDC
 
@@ -135,36 +134,73 @@ contract E2EPaymaster is Script {
         console.log("  PASS: paymaster funded + Alice has USDC");
     }
 
-    /// @dev Compute userOpHash locally (same as EntryPoint.getUserOpHash)
-    function _packUserOp(PackedUserOperation memory op) internal pure returns (bytes32) {
-        return keccak256(abi.encode(
-            op.sender,
-            op.nonce,
-            keccak256(op.initCode),
-            keccak256(op.callData),
-            op.accountGasLimits,
-            op.preVerificationGas,
-            op.gasFees,
+    // ── EIP-712 constants for local userOpHash computation ──
+
+    bytes32 constant DOMAIN_TYPEHASH = keccak256(
+        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+    );
+    bytes32 constant DOMAIN_NAME_HASH = keccak256("ERC4337");
+    bytes32 constant DOMAIN_VERSION_HASH = keccak256("1");
+    bytes32 constant PACKED_USEROP_TYPEHASH = keccak256(
+        "PackedUserOperation(address sender,uint256 nonce,bytes initCode,bytes callData,bytes32 accountGasLimits,uint256 preVerificationGas,bytes32 gasFees,bytes paymasterAndData)"
+    );
+
+    /// @dev Compute v0.8 userOpHash locally — pure EIP-712, no staticcall needed.
+    function _getUserOpHash(PackedUserOperation memory op) internal view returns (bytes32) {
+        bytes32 domainSeparator = keccak256(abi.encode(
+            DOMAIN_TYPEHASH, DOMAIN_NAME_HASH, DOMAIN_VERSION_HASH, block.chainid, address(EP)
+        ));
+
+        // EIP-7702 override: use delegation address instead of raw initCode
+        bytes32 hashInitCode;
+        if (op.initCode.length >= 20 && op.initCode[0] == 0x77 && op.initCode[1] == 0x02) {
+            hashInitCode = keccak256(abi.encodePacked(executorAddr));
+        } else {
+            hashInitCode = keccak256(op.initCode);
+        }
+
+        bytes32 structHash = keccak256(abi.encode(
+            PACKED_USEROP_TYPEHASH,
+            op.sender, op.nonce, hashInitCode, keccak256(op.callData),
+            op.accountGasLimits, op.preVerificationGas, op.gasFees,
             keccak256(op.paymasterAndData)
         ));
+
+        return keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, structHash));
     }
 
-    function _getUserOpHash(PackedUserOperation memory op) internal view returns (bytes32) {
-        return keccak256(abi.encode(
-            _packUserOp(op),
-            address(EP),
-            block.chainid
+    // ── Paymaster EIP-712 constants ──
+
+    bytes32 constant PM_DOMAIN_NAME_HASH = keccak256("VerifyingPaymaster");
+    bytes32 constant PM_DOMAIN_VERSION_HASH = keccak256("1");
+    bytes32 constant PAYMASTER_DATA_TYPEHASH = keccak256(
+        "PaymasterData(address sender,uint256 nonce,uint48 validUntil,uint48 validAfter)"
+    );
+
+    /// @dev Compute paymaster authorization hash locally (EIP-712).
+    function _getPaymasterHash(address sender, uint256 nonce, uint48 validUntil, uint48 validAfter) internal view returns (bytes32) {
+        bytes32 pmDomain = keccak256(abi.encode(
+            DOMAIN_TYPEHASH, PM_DOMAIN_NAME_HASH, PM_DOMAIN_VERSION_HASH, block.chainid, address(paymaster)
         ));
+        bytes32 structHash = keccak256(abi.encode(
+            PAYMASTER_DATA_TYPEHASH, sender, nonce, validUntil, validAfter
+        ));
+        return keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), pmDomain, structHash));
     }
 
     function _buildPaymasterAndData() internal returns (bytes memory) {
         uint48 validUntil = uint48(block.timestamp + 1 hours);
         uint48 validAfter = 0;
 
-        // EIP-712 typed data hash via VerifyingPaymaster.getHash()
-        bytes32 pmHash = paymaster.getHash(alice, 0, validUntil, validAfter);
-        (uint8 pmV, bytes32 pmR, bytes32 pmS) = vm.sign(deployerPk, pmHash);
+        // Local EIP-712 computation
+        bytes32 pmHash = _getPaymasterHash(alice, 0, validUntil, validAfter);
 
+        // Cross-verify against on-chain getHash()
+        bytes32 onChainPmHash = paymaster.getHash(alice, 0, validUntil, validAfter);
+        require(pmHash == onChainPmHash, "LOCAL vs ON-CHAIN pmHash mismatch!");
+        console.log("  VERIFIED: local pmHash matches paymaster.getHash()");
+
+        (uint8 pmV, bytes32 pmR, bytes32 pmS) = vm.sign(deployerPk, pmHash);
         console.log("  PM authorization hash (EIP-712):", vm.toString(pmHash));
 
         return abi.encodePacked(
@@ -179,9 +215,19 @@ contract E2EPaymaster is Script {
 
     function _signUserOp(PackedUserOperation memory op) internal returns (bytes memory) {
         bytes32 opHash = _getUserOpHash(op);
-        // EIP-191 prefix: matches MinimalAccount._signableUserOpHash()
-        bytes32 signableHash = MessageHashUtils.toEthSignedMessageHash(opHash);
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(alicePk, signableHash);
+
+        // Cross-verify against EP.getUserOpHash() (need delegation attached)
+        Vm.SignedDelegation memory tempDelegation = vm.signDelegation(executorAddr, alicePk);
+        vm.attachDelegation(tempDelegation);
+        (bool ok, bytes memory ret) = address(EP).staticcall(
+            abi.encodeWithSignature("getUserOpHash((address,uint256,bytes,bytes,bytes32,uint256,bytes32,bytes,bytes))", op)
+        );
+        require(ok, "EP.getUserOpHash staticcall failed");
+        bytes32 epHash = abi.decode(ret, (bytes32));
+        require(opHash == epHash, "LOCAL vs EP userOpHash mismatch!");
+        console.log("  VERIFIED: local userOpHash matches EP.getUserOpHash()");
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(alicePk, opHash);
         console.log("  UserOp hash:", vm.toString(opHash));
         return abi.encodePacked(r, s, v);
     }
@@ -189,6 +235,7 @@ contract E2EPaymaster is Script {
     function _step4_signUserOp() internal returns (PackedUserOperation memory op) {
         console.log("");
         console.log("[4] Alice signs UserOp with Paymaster (off-chain, 0 gas)...");
+        console.log("  userOpHash computed locally (pure EIP-712, no staticcall)");
 
         // Alice sends her USDC back to Sponsor (0.6 + 0.4) — fully gasless via Paymaster
         Execution[] memory batch = new Execution[](2);
@@ -201,7 +248,7 @@ contract E2EPaymaster is Script {
         op = PackedUserOperation({
             sender: alice,
             nonce: 0,
-            initCode: "",
+            initCode: abi.encodePacked(bytes20(bytes2(0x7702))), // EIP-7702 marker -> EP includes delegation address in hash
             callData: abi.encodeCall(IERC7821.execute, (BATCH_MODE, executionData)),
             accountGasLimits: bytes32(uint256(uint128(200_000)) << 128 | uint128(300_000)),
             preVerificationGas: 100_000,
@@ -212,6 +259,7 @@ contract E2EPaymaster is Script {
 
         op.signature = _signUserOp(op);
 
+        console.log("  initCode: 0x7702 +", executorAddr, "(native EIP-7702 marker)");
         console.log("  Action: execute(BATCH_MODE) -> USDC.transfer(sponsor, 0.6 USDC) + USDC.transfer(sponsor, 0.4 USDC)");
         console.log("  Paymaster:", address(paymaster));
         console.log("  Signature scheme: EIP-712 (paymaster) + raw ECDSA (userOp)");
@@ -222,10 +270,10 @@ contract E2EPaymaster is Script {
         console.log("");
         console.log("[5] Bundler submits handleOps + delegation (type 4 tx)...");
 
+        // Alice signs delegation (off-chain) — Bundler includes in authorizationList
         Vm.SignedDelegation memory signedDelegation = vm.signDelegation(executorAddr, alicePk);
         vm.attachDelegation(signedDelegation);
-        console.log("  Alice signed delegation (off-chain):");
-        console.log("    target:", executorAddr);
+        console.log("  Alice signed delegation (off-chain) -> target:", executorAddr);
 
         PackedUserOperation[] memory ops = new PackedUserOperation[](1);
         ops[0] = op;

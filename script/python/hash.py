@@ -6,7 +6,7 @@ No signing happens here — that's the Signer's job.
 
 Supported:
 - EIP-7702 delegation authorization hash
-- UserOp hash (v0.7 packed keccak)
+- UserOp hash (v0.8 EIP-712)
 """
 
 from typing import TypedDict
@@ -83,7 +83,18 @@ def build_delegation_auth(
     }
 
 
-# ── UserOp Hash (v0.7) ──
+# ── UserOp Hash (v0.8 EIP-712) ──
+
+# EIP-712 type hashes
+_DOMAIN_TYPEHASH = Web3.keccak(
+    text="EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+)
+_DOMAIN_NAME_HASH = Web3.keccak(text="ERC4337")
+_DOMAIN_VERSION_HASH = Web3.keccak(text="1")
+_PACKED_USEROP_TYPEHASH = Web3.keccak(
+    text="PackedUserOperation(address sender,uint256 nonce,bytes initCode,bytes callData,"
+    "bytes32 accountGasLimits,uint256 preVerificationGas,bytes32 gasFees,bytes paymasterAndData)"
+)
 
 
 def compute_userop_hash(
@@ -97,18 +108,47 @@ def compute_userop_hash(
     paymaster_and_data: bytes,
     entry_point: str,
     chain_id: int,
+    delegate_address: str | None = None,
 ) -> bytes:
     """
-    Compute UserOp hash for EntryPoint v0.7 (packed keccak format).
+    Compute UserOp hash for EntryPoint v0.8 (EIP-712 format).
 
-    hash = keccak256(abi.encode(packHash, entryPoint, chainId))
-    packHash = keccak256(abi.encode(sender, nonce, keccak(initCode), keccak(callData),
-                                    accountGasLimits, preVerificationGas, gasFees,
-                                    keccak(paymasterAndData)))
+    For EIP-7702 accounts: hashInitCode = keccak256(delegateAddress)
+    instead of keccak256(initCode).
+
+    Args:
+        delegate_address: If provided, overrides initCode hash with
+                         keccak256(abi.encodePacked(addr)).
+                         This is the EIP-7702 native support in EP v0.8.
     """
-    pack_hash = Web3.keccak(
+    # Domain separator
+    domain_separator = Web3.keccak(
+        encode(
+            ["bytes32", "bytes32", "bytes32", "uint256", "address"],
+            [
+                _DOMAIN_TYPEHASH,
+                _DOMAIN_NAME_HASH,
+                _DOMAIN_VERSION_HASH,
+                chain_id,
+                Web3.to_checksum_address(entry_point),
+            ],
+        )
+    )
+
+    # Init code hash (with EIP-7702 override)
+    if delegate_address is not None:
+        addr_bytes = bytes.fromhex(
+            delegate_address[2:] if delegate_address.startswith("0x") else delegate_address
+        )
+        hash_init_code = Web3.keccak(addr_bytes)
+    else:
+        hash_init_code = Web3.keccak(init_code)
+
+    # Struct hash
+    struct_hash = Web3.keccak(
         encode(
             [
+                "bytes32",
                 "address",
                 "uint256",
                 "bytes32",
@@ -119,9 +159,10 @@ def compute_userop_hash(
                 "bytes32",
             ],
             [
+                _PACKED_USEROP_TYPEHASH,
                 Web3.to_checksum_address(sender),
                 nonce,
-                Web3.keccak(init_code),
+                hash_init_code,
                 Web3.keccak(call_data),
                 account_gas_limits,
                 pre_verification_gas,
@@ -130,12 +171,9 @@ def compute_userop_hash(
             ],
         )
     )
-    return Web3.keccak(
-        encode(
-            ["bytes32", "address", "uint256"],
-            [pack_hash, Web3.to_checksum_address(entry_point), chain_id],
-        )
-    )
+
+    # EIP-712: keccak256(0x19 0x01 || domainSeparator || structHash)
+    return Web3.keccak(b"\x19\x01" + domain_separator + struct_hash)
 
 
 # ── Helper: pack gas fields ──

@@ -3,7 +3,7 @@
 E2E #3: Pimlico Bundler + Sponsored Paymaster (Python)
 
 Pure Python implementation — no CLI tools (no cast, no forge).
-Uses EntryPoint v0.7.
+Uses EntryPoint v0.8 with native EIP-7702 support.
 
 Flow:
   [1] Deploy MinimalAccount
@@ -38,7 +38,7 @@ from calls import erc20_transfer, erc7821_batch
 from config import (
     BLOCK_PROPAGATION_DELAY,
     CHAIN_ID_SEPOLIA,
-    EP_V07,
+    EP_V08,
     USDC_AMOUNT,
     USDC_PART1,
     USDC_PART2,
@@ -67,7 +67,7 @@ async def main() -> None:
     rpc_url = os.environ["RPC_URL"]
     pimlico_api_key = os.environ["PIMLICO_API_KEY"]
 
-    ep_address = EP_V07
+    ep_address = EP_V08
     pimlico_url = f"https://api.pimlico.io/v2/sepolia/rpc?apikey={pimlico_api_key}"
 
     # ── Setup signers ──
@@ -91,7 +91,7 @@ async def main() -> None:
 
     logger.info("=" * 54)
     logger.info("  E2E #3 Pimlico — Bundler + Sponsored Paymaster")
-    logger.info("  EntryPoint: v0.7")
+    logger.info("  EntryPoint: v0.8")
     logger.info("=" * 54)
     logger.info("")
     logger.info("Actors:")
@@ -101,7 +101,7 @@ async def main() -> None:
     logger.info("  Alice PK: %s", alice.private_key)
     logger.info("")
     logger.info("Infra:")
-    logger.info("  EntryPoint: %s (v0.7)", ep_address)
+    logger.info("  EntryPoint: %s (v0.8)", ep_address)
     logger.info("  Bundler+Paymaster: Pimlico (api.pimlico.io/v2/sepolia)")
     logger.info("")
 
@@ -204,6 +204,7 @@ async def main() -> None:
             auth=auth,
             bundler=bundler,
             paymaster=paymaster,
+            delegate_address=executor_address,
         )
 
         logger.info("  PASS: sponsored")

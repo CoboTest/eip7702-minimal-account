@@ -2,7 +2,7 @@
 
 [🇬🇧 English](README.md)
 
-EIP-7702 Minimal Batch Executor 的纯 Python E2E 测试套件。运行时无需 CLI 工具（不依赖 `cast`、`forge`）。使用 EntryPoint v0.7。
+EIP-7702 Minimal Batch Executor 的纯 Python E2E 测试套件。运行时无需 CLI 工具（不依赖 `cast`、`forge`）。使用 EntryPoint v0.8。
 
 ## 前置要求
 
@@ -195,7 +195,7 @@ Alice 链下签署委托授权。与 UserOp 内容无关，仅依赖（`chainId`
 ### [4] Alice 签署 UserOp
 
 1. **打包 gas 字段** — `accountGasLimits` = `verificationGas`(128bit) || `callGas`(128bit)，`gasFees` = `maxPriorityFee`(128bit) || `maxFee`(128bit)，`paymasterAndData` = `address`(20) + `pmVerGas`(16) + `pmPostGas`(16) + `pmData`
-2. **计算 `userOpHash`**（v0.7 packed keccak）— `packHash = keccak256(abi.encode(sender, nonce, keccak(initCode), keccak(callData), accountGasLimits, preVerGas, gasFees, keccak(paymasterAndData)))`，然后 `userOpHash = keccak256(abi.encode(packHash, entryPoint, chainId))`
+2. **计算 `userOpHash`**（v0.8 EIP-712）— `packHash = keccak256(abi.encode(sender, nonce, keccak(initCode), keccak(callData), accountGasLimits, preVerGas, gasFees, keccak(paymasterAndData)))`，然后 `userOpHash = keccak256(abi.encode(packHash, entryPoint, chainId))`
 3. **Alice 签名** 32 字节 `userOpHash`，使用原始 ECDSA（无 EIP-191 前缀）→ 65 字节签名 `r(32) + s(32) + v(1)`
 
 ### [5] 通过 Pimlico Bundler 提交

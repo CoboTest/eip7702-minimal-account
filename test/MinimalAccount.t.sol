@@ -9,7 +9,6 @@ import { IERC7821 } from "@openzeppelin/contracts/interfaces/draft-IERC7821.sol"
 import { Execution } from "@openzeppelin/contracts/interfaces/draft-IERC7579.sol";
 import { IERC721Receiver } from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import { IERC1155Receiver } from "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
-import { MessageHashUtils } from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 /// @dev Mock target contract for testing batch calls.
 contract MockTarget {
@@ -199,7 +198,7 @@ contract MinimalAccountTest is Test {
         bytes32 userOpHash = keccak256("test-userop-hash");
 
         // OZ SignerEIP7702 uses raw signature (no personal_sign prefix)
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, MessageHashUtils.toEthSignedMessageHash(userOpHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, userOpHash);
         bytes memory signature = abi.encodePacked(r, s, v);
 
         PackedUserOperation memory userOp = _dummyUserOp(signature);
@@ -216,7 +215,7 @@ contract MinimalAccountTest is Test {
         bytes32 userOpHash = keccak256("test-userop-hash");
 
         uint256 wrongKey = 0xBAD;
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(wrongKey, MessageHashUtils.toEthSignedMessageHash(userOpHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(wrongKey, userOpHash);
         bytes memory signature = abi.encodePacked(r, s, v);
 
         PackedUserOperation memory userOp = _dummyUserOp(signature);
@@ -245,7 +244,7 @@ contract MinimalAccountTest is Test {
 
     function test_validateUserOp_pays_prefund() public {
         bytes32 userOpHash = keccak256("test-userop-hash");
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, MessageHashUtils.toEthSignedMessageHash(userOpHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, userOpHash);
         bytes memory signature = abi.encodePacked(r, s, v);
 
         PackedUserOperation memory userOp = _dummyUserOp(signature);
@@ -267,7 +266,7 @@ contract MinimalAccountTest is Test {
 
         // Sign with wrong key
         uint256 wrongKey = 0xBAD;
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(wrongKey, MessageHashUtils.toEthSignedMessageHash(userOpHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(wrongKey, userOpHash);
         bytes memory signature = abi.encodePacked(r, s, v);
 
         PackedUserOperation memory userOp = _dummyUserOp(signature);
@@ -288,7 +287,7 @@ contract MinimalAccountTest is Test {
 
     function test_validateUserOp_onlyEntryPoint() public {
         bytes32 userOpHash = keccak256("test-userop-hash");
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, MessageHashUtils.toEthSignedMessageHash(userOpHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, userOpHash);
         bytes memory signature = abi.encodePacked(r, s, v);
         PackedUserOperation memory userOp = _dummyUserOp(signature);
 
@@ -377,7 +376,7 @@ contract MinimalAccountTest is Test {
         assertEq(eoaAddress.balance, 0);
 
         bytes32 userOpHash = keccak256("test-zero-prefund");
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, MessageHashUtils.toEthSignedMessageHash(userOpHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, userOpHash);
         bytes memory signature = abi.encodePacked(r, s, v);
         PackedUserOperation memory userOp = _dummyUserOp(signature);
 
@@ -418,7 +417,6 @@ contract MinimalAccountTest is Test {
         vm.assume(randomPk != eoaPrivateKey);
 
         bytes32 userOpHash = keccak256("fuzz-hash");
-        // Sign raw hash (not EIP-191 wrapped) — simulates incorrect signing
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(randomPk, userOpHash);
         bytes memory signature = abi.encodePacked(r, s, v);
 
@@ -432,9 +430,7 @@ contract MinimalAccountTest is Test {
     }
 
     function test_fuzz_validateUserOp_valid_key_any_hash(bytes32 hash) public {
-        // Sign the EIP-191 wrapped hash (matching _signableUserOpHash behavior)
-        bytes32 signableHash = MessageHashUtils.toEthSignedMessageHash(hash);
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, signableHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, hash);
         bytes memory signature = abi.encodePacked(r, s, v);
 
         PackedUserOperation memory userOp = _dummyUserOp(signature);

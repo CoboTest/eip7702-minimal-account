@@ -17,7 +17,7 @@ import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.s
 /// @dev Security features:
 ///   - EIP-712 typed data signing with domain separator (chain + paymaster bound)
 ///   - Replay protection: domain separator includes chainId + paymaster address;
-///     hash includes EntryPoint-provided userOpHash (binds calldata + gas + nonce)
+///     hash includes EntryPoint-compatible UserOp hash (binds calldata + gas + nonce)
 ///   - Signer/owner separation: owner = admin (cold), verifyingSigner = authorizer (hot)
 ///   - Ownable2Step: two-step ownership transfer to prevent accidental loss
 ///   - Pausable: emergency circuit breaker
@@ -33,7 +33,7 @@ contract VerifyingPaymaster is IPaymaster, Ownable2Step, Pausable, ReentrancyGua
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 
     /// @dev EIP-712 struct typehash for paymaster authorization.
-    ///      Binds signatures to the exact EntryPoint-provided userOpHash to prevent
+    ///      Binds signatures to an EntryPoint-compatible UserOp hash to prevent
     ///      payload/gas "bait-and-switch" after sponsorship approval.
     bytes32 public constant PAYMASTER_DATA_TYPEHASH =
         keccak256("PaymasterData(bytes32 userOpHash,uint48 validUntil,uint48 validAfter)");
@@ -52,11 +52,24 @@ contract VerifyingPaymaster is IPaymaster, Ownable2Step, Pausable, ReentrancyGua
     ///         Can be rotated by owner without redeploying.
     address public verifyingSigner;
 
+    /// @notice Maximum maxCost accepted from EntryPoint for a single sponsored UserOp.
+    ///         Acts as an on-chain budget guardrail. `type(uint256).max` means unlimited.
+    uint256 public maxCostAllowed;
+
     // ═══════════════════════════════════════════════════════════════════
     //                          EVENTS
     // ═══════════════════════════════════════════════════════════════════
 
     event SignerChanged(address indexed oldSigner, address indexed newSigner);
+    event MaxCostAllowedChanged(uint256 oldMaxCostAllowed, uint256 newMaxCostAllowed);
+    event SponsorshipValidated(
+        address indexed sender,
+        bytes32 indexed paymasterUserOpHash,
+        uint256 maxCost,
+        bool accepted,
+        uint48 validAfter,
+        uint48 validUntil
+    );
     event Deposited(address indexed from, uint256 amount);
     event Withdrawn(address indexed to, uint256 amount);
     event StakeAdded(uint256 amount, uint32 unstakeDelaySec);
@@ -98,6 +111,7 @@ contract VerifyingPaymaster is IPaymaster, Ownable2Step, Pausable, ReentrancyGua
         if (_signer == address(0)) revert InvalidSignerAddress();
         entryPoint = _ep;
         verifyingSigner = _signer;
+        maxCostAllowed = type(uint256).max;
 
         _cachedChainId = block.chainid;
         _cachedDomainSeparator = _buildDomainSeparator();
@@ -167,7 +181,7 @@ contract VerifyingPaymaster is IPaymaster, Ownable2Step, Pausable, ReentrancyGua
     function validatePaymasterUserOp(
         PackedUserOperation calldata userOp,
         bytes32 /* userOpHash */,
-        uint256 /* maxCost */
+        uint256 maxCost
     ) external onlyEP whenNotPaused returns (bytes memory context, uint256 validationData) {
         bytes calldata pmData = userOp.paymasterAndData[52:];
         if (pmData.length != 77) revert InvalidPaymasterDataLength(); // 6+6+65
@@ -180,13 +194,14 @@ contract VerifyingPaymaster is IPaymaster, Ownable2Step, Pausable, ReentrancyGua
         // Binds the UserOp payload/gas/nonce while excluding the trailing paymaster
         // signature bytes to avoid circular dependency.
         bytes32 paymasterUserOpHash = _getPaymasterUserOpHash(userOp);
-        bytes32 hash = getHash(paymasterUserOpHash, validUntil, validAfter);
+        bool accepted =
+            ECDSA.recover(getHash(paymasterUserOpHash, validUntil, validAfter), signature) == verifyingSigner
+            && maxCost <= maxCostAllowed;
 
-        address recovered = ECDSA.recover(hash, signature);
-        bool sigValid = (recovered == verifyingSigner);
-
-        validationData = _packValidation(sigValid, validAfter, validUntil);
+        validationData = _packValidation(accepted, validAfter, validUntil);
         context = "";
+
+        emit SponsorshipValidated(userOp.sender, paymasterUserOpHash, maxCost, accepted, validAfter, validUntil);
     }
 
     /// @dev Post-operation hook. Reserved for future token repayment logic.
@@ -208,6 +223,14 @@ contract VerifyingPaymaster is IPaymaster, Ownable2Step, Pausable, ReentrancyGua
         address oldSigner = verifyingSigner;
         verifyingSigner = newSigner;
         emit SignerChanged(oldSigner, newSigner);
+    }
+
+    /// @notice Set on-chain sponsorship budget cap for a single UserOp. Owner only.
+    /// @param newMaxCostAllowed New max allowed `maxCost` from EntryPoint.
+    function setMaxCostAllowed(uint256 newMaxCostAllowed) external onlyOwner {
+        uint256 oldMaxCostAllowed = maxCostAllowed;
+        maxCostAllowed = newMaxCostAllowed;
+        emit MaxCostAllowedChanged(oldMaxCostAllowed, newMaxCostAllowed);
     }
 
     // ═══════════════════════════════════════════════════════════════════

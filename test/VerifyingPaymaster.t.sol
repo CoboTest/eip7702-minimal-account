@@ -115,6 +115,27 @@ contract VerifyingPaymasterTest is Test {
         pm.setVerifyingSigner(attacker);
     }
 
+    function test_setMaxCostAllowed() public {
+        uint256 newCap = 1 ether;
+        vm.prank(owner);
+        pm.setMaxCostAllowed(newCap);
+        assertEq(pm.maxCostAllowed(), newCap);
+    }
+
+    function test_setMaxCostAllowed_emits_event() public {
+        uint256 newCap = 1 ether;
+        vm.expectEmit(false, false, false, true);
+        emit VerifyingPaymaster.MaxCostAllowedChanged(type(uint256).max, newCap);
+        vm.prank(owner);
+        pm.setMaxCostAllowed(newCap);
+    }
+
+    function test_setMaxCostAllowed_reverts_not_owner() public {
+        vm.prank(attacker);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, attacker));
+        pm.setMaxCostAllowed(1);
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     //                      OWNERSHIP (Ownable2Step)
     // ═══════════════════════════════════════════════════════════════════
@@ -215,6 +236,28 @@ contract VerifyingPaymasterTest is Test {
 
         uint160 authorizer = uint160(validationData);
         assertEq(authorizer, 1, "Should return failure (authorizer=1)");
+    }
+
+    function test_validate_maxCost_exceeds_cap_fails() public {
+        uint48 validUntil = uint48(block.timestamp + 1 hours);
+        uint48 validAfter = 0;
+        uint256 nonce = 0;
+
+        vm.prank(owner);
+        pm.setMaxCostAllowed(1);
+
+        bytes memory pmAndData = _buildPmAndData(validUntil, validAfter);
+        PackedUserOperation memory userOp = _dummyUserOp(alice, nonce, pmAndData);
+        bytes32 paymasterUserOpHash = _getPaymasterUserOpHash(userOp, pmAndData);
+        bytes32 hash = pm.getHash(paymasterUserOpHash, validUntil, validAfter);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, hash);
+        userOp.paymasterAndData = abi.encodePacked(pmAndData, r, s, v);
+
+        vm.prank(address(ep));
+        (, uint256 validationData) = pm.validatePaymasterUserOp(userOp, bytes32(0), 2);
+
+        uint160 authorizer = uint160(validationData);
+        assertEq(authorizer, 1, "maxCost above cap must fail");
     }
 
     function test_validate_reverts_bad_data_length() public {

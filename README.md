@@ -14,7 +14,7 @@ A minimal EIP-7702 delegate contract for EOAs built on **OpenZeppelin Contracts 
 
 ## 📋 E2E Test Reports
 
-> All tests verified on Sepolia. 62 unit tests + 4 E2E scripts passing.
+> All tests verified on Sepolia. 64 unit tests + 4 E2E scripts passing.
 
 - 📊 [ERC-4337 — Three Scenarios Compared](test-reports/e2e-4337-en.md) — Self-Bundled vs Self-Paymaster vs Pimlico
 - 📄 [Direct Execution](test-reports/e2e-direct-en.md) — Non-ERC-4337 direct execution flow
@@ -143,7 +143,7 @@ Four actors — Alice uses a VerifyingPaymaster for fully gasless 1 USDC batch t
 source .env  # DEPLOYER_PRIVATE_KEY, SPONSOR_PRIVATE_KEY, BUNDLER_PRIVATE_KEY, RPC_URL
 
 forge script script/E2EPaymaster.s.sol \
-  --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 500
+  --rpc-url $RPC_URL --broadcast --slow --gas-estimate-multiplier 800
 
 # After unstakeDelay, recover paymaster funds:
 PAYMASTER=0x... forge script script/PaymasterCleanup.s.sol \
@@ -188,7 +188,7 @@ forge script script/E2EDirect.s.sol \
 
 ### Notes
 
-- **Gas estimation**: Forge underestimates gas for type 4 (EIP-7702) txs → use `--gas-estimate-multiplier 500`
+- **Gas estimation**: Forge underestimates gas for type 4 (EIP-7702) txs. Use `--gas-estimate-multiplier 500` as baseline; `E2EPaymaster.s.sol` requires `800` under current settings
 - **Random Alice**: Each run generates a fresh Alice keypair via `vm.randomUint()`
 - **Signature format**: `_signableUserOpHash()` adds EIP-191 prefix. Standard ERC-4337 SDKs using `personal_sign` are compatible.
 - **E2EPimlico**: Uses `cast` + `curl` + `jq` instead of Forge Script (Pimlico API requires mid-flow HTTP calls)

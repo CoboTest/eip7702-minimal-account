@@ -266,6 +266,61 @@ contract VerifyingPaymasterTest is Test {
         assertEq(extractedValidUntil, validUntil);
     }
 
+    function test_tampered_callData_fails_with_reused_paymaster_signature() public {
+        uint48 validUntil = uint48(block.timestamp + 1 hours);
+        uint48 validAfter = 0;
+
+        bytes memory pmAndData = _buildPmAndData(validUntil, validAfter);
+
+        // 1) Build and sign a benign UserOp
+        PackedUserOperation memory benign = _dummyUserOpWithCallData(alice, 0, pmAndData, hex"11");
+        bytes32 benignHash = _getPaymasterUserOpHash(benign, pmAndData);
+        bytes32 typed = pm.getHash(benignHash, validUntil, validAfter);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, typed);
+        bytes memory sig = abi.encodePacked(r, s, v);
+
+        // 2) Reuse same signature on tampered UserOp (different callData)
+        PackedUserOperation memory tampered = _dummyUserOpWithCallData(alice, 0, pmAndData, hex"deadbeef");
+        tampered.paymasterAndData = abi.encodePacked(pmAndData, sig);
+
+        vm.prank(address(ep));
+        (, uint256 validationData) = pm.validatePaymasterUserOp(tampered, bytes32(0), 0);
+
+        uint160 authorizer = uint160(validationData);
+        assertEq(authorizer, 1, "tampered callData must fail");
+    }
+
+    function test_tampered_gas_fails_with_reused_paymaster_signature() public {
+        uint48 validUntil = uint48(block.timestamp + 1 hours);
+        uint48 validAfter = 0;
+
+        bytes memory pmAndData = _buildPmAndData(validUntil, validAfter);
+
+        // 1) Build and sign with low gas envelope
+        PackedUserOperation memory lowGas = _dummyUserOpWithGas(alice, 0, pmAndData, 10_000, 0, bytes32(0));
+        bytes32 lowGasHash = _getPaymasterUserOpHash(lowGas, pmAndData);
+        bytes32 typed = pm.getHash(lowGasHash, validUntil, validAfter);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, typed);
+        bytes memory sig = abi.encodePacked(r, s, v);
+
+        // 2) Reuse same signature on inflated gas envelope
+        PackedUserOperation memory highGas = _dummyUserOpWithGas(
+            alice,
+            0,
+            pmAndData,
+            300_000,
+            1_000_000,
+            bytes32(uint256(uint128(1 gwei)) << 128 | uint128(100 gwei))
+        );
+        highGas.paymasterAndData = abi.encodePacked(pmAndData, sig);
+
+        vm.prank(address(ep));
+        (, uint256 validationData) = pm.validatePaymasterUserOp(highGas, bytes32(0), 0);
+
+        uint160 authorizer = uint160(validationData);
+        assertEq(authorizer, 1, "tampered gas envelope must fail");
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     //                      REPLAY PROTECTION
     // ═══════════════════════════════════════════════════════════════════
@@ -472,14 +527,44 @@ contract VerifyingPaymasterTest is Test {
         uint256 nonce,
         bytes memory paymasterAndData
     ) internal pure returns (PackedUserOperation memory) {
+        return _dummyUserOpWithGas(sender, nonce, paymasterAndData, 0, 0, bytes32(0));
+    }
+
+    function _dummyUserOpWithCallData(
+        address sender,
+        uint256 nonce,
+        bytes memory paymasterAndData,
+        bytes memory callData
+    ) internal pure returns (PackedUserOperation memory) {
+        return PackedUserOperation({
+            sender: sender,
+            nonce: nonce,
+            initCode: "",
+            callData: callData,
+            accountGasLimits: bytes32(0),
+            preVerificationGas: 0,
+            gasFees: bytes32(0),
+            paymasterAndData: paymasterAndData,
+            signature: ""
+        });
+    }
+
+    function _dummyUserOpWithGas(
+        address sender,
+        uint256 nonce,
+        bytes memory paymasterAndData,
+        uint256 preVerificationGas,
+        uint256 accountGasLow128,
+        bytes32 gasFees
+    ) internal pure returns (PackedUserOperation memory) {
         return PackedUserOperation({
             sender: sender,
             nonce: nonce,
             initCode: "",
             callData: "",
-            accountGasLimits: bytes32(0),
-            preVerificationGas: 0,
-            gasFees: bytes32(0),
+            accountGasLimits: bytes32(uint256(uint128(accountGasLow128))),
+            preVerificationGas: preVerificationGas,
+            gasFees: gasFees,
             paymasterAndData: paymasterAndData,
             signature: ""
         });

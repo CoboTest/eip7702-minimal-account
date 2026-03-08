@@ -179,13 +179,13 @@ contract VerifyingPaymasterTest is Test {
         uint256 nonce = 42;
 
         bytes memory pmAndData = _buildPmAndData(validUntil, validAfter);
-        // Sign with the correct signer key
-        bytes32 hash = pm.getHash(alice, nonce, validUntil, validAfter);
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, hash);
-        // Append signature to pmAndData
-        pmAndData = abi.encodePacked(pmAndData, r, s, v);
-
         PackedUserOperation memory userOp = _dummyUserOp(alice, nonce, pmAndData);
+
+        // Sign with the correct signer key over paymasterUserOpHash (without pm signature bytes)
+        bytes32 paymasterUserOpHash = _getPaymasterUserOpHash(userOp, pmAndData);
+        bytes32 hash = pm.getHash(paymasterUserOpHash, validUntil, validAfter);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, hash);
+        userOp.paymasterAndData = abi.encodePacked(pmAndData, r, s, v);
 
         vm.prank(address(ep));
         (, uint256 validationData) = pm.validatePaymasterUserOp(userOp, bytes32(0), 0);
@@ -201,13 +201,14 @@ contract VerifyingPaymasterTest is Test {
         uint256 nonce = 0;
 
         bytes memory pmAndData = _buildPmAndData(validUntil, validAfter);
-        bytes32 hash = pm.getHash(alice, nonce, validUntil, validAfter);
+        PackedUserOperation memory userOp = _dummyUserOp(alice, nonce, pmAndData);
+        bytes32 paymasterUserOpHash = _getPaymasterUserOpHash(userOp, pmAndData);
+        bytes32 hash = pm.getHash(paymasterUserOpHash, validUntil, validAfter);
+
         // Sign with wrong key
         uint256 wrongPk = 0xDEAD;
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(wrongPk, hash);
-        pmAndData = abi.encodePacked(pmAndData, r, s, v);
-
-        PackedUserOperation memory userOp = _dummyUserOp(alice, nonce, pmAndData);
+        userOp.paymasterAndData = abi.encodePacked(pmAndData, r, s, v);
 
         vm.prank(address(ep));
         (, uint256 validationData) = pm.validatePaymasterUserOp(userOp, bytes32(0), 0);
@@ -249,11 +250,11 @@ contract VerifyingPaymasterTest is Test {
         uint256 nonce = 0;
 
         bytes memory pmAndData = _buildPmAndData(validUntil, validAfter);
-        bytes32 hash = pm.getHash(alice, nonce, validUntil, validAfter);
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, hash);
-        pmAndData = abi.encodePacked(pmAndData, r, s, v);
-
         PackedUserOperation memory userOp = _dummyUserOp(alice, nonce, pmAndData);
+        bytes32 paymasterUserOpHash = _getPaymasterUserOpHash(userOp, pmAndData);
+        bytes32 hash = pm.getHash(paymasterUserOpHash, validUntil, validAfter);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, hash);
+        userOp.paymasterAndData = abi.encodePacked(pmAndData, r, s, v);
 
         vm.prank(address(ep));
         (, uint256 validationData) = pm.validatePaymasterUserOp(userOp, bytes32(0), 0);
@@ -270,7 +271,7 @@ contract VerifyingPaymasterTest is Test {
     // ═══════════════════════════════════════════════════════════════════
 
     function test_different_chain_different_hash() public view {
-        bytes32 hash1 = pm.getHash(alice, 0, 1000, 0);
+        bytes32 hash1 = pm.getHash(_mockUserOpHash(alice, 0), 1000, 0);
 
         // The hash includes chainId via domain separator
         // On a different chain, the domain separator would differ
@@ -279,19 +280,19 @@ contract VerifyingPaymasterTest is Test {
         assertTrue(ds != bytes32(0), "Domain separator should be non-zero");
 
         // Same params produce same hash (deterministic)
-        bytes32 hash2 = pm.getHash(alice, 0, 1000, 0);
+        bytes32 hash2 = pm.getHash(_mockUserOpHash(alice, 0), 1000, 0);
         assertEq(hash1, hash2, "Same params should produce same hash");
     }
 
     function test_different_nonce_different_hash() public view {
-        bytes32 hash1 = pm.getHash(alice, 0, 1000, 0);
-        bytes32 hash2 = pm.getHash(alice, 1, 1000, 0);
+        bytes32 hash1 = pm.getHash(_mockUserOpHash(alice, 0), 1000, 0);
+        bytes32 hash2 = pm.getHash(_mockUserOpHash(alice, 1), 1000, 0);
         assertTrue(hash1 != hash2, "Different nonces should produce different hashes");
     }
 
     function test_different_sender_different_hash() public view {
-        bytes32 hash1 = pm.getHash(alice, 0, 1000, 0);
-        bytes32 hash2 = pm.getHash(attacker, 0, 1000, 0);
+        bytes32 hash1 = pm.getHash(_mockUserOpHash(alice, 0), 1000, 0);
+        bytes32 hash2 = pm.getHash(_mockUserOpHash(attacker, 0), 1000, 0);
         assertTrue(hash1 != hash2, "Different senders should produce different hashes");
     }
 
@@ -353,11 +354,11 @@ contract VerifyingPaymasterTest is Test {
         uint48 validAfter = 0;
 
         bytes memory pmAndData = _buildPmAndData(validUntil, validAfter);
-        bytes32 hash = pm.getHash(alice, 0, validUntil, validAfter);
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(randomPk, hash);
-        pmAndData = abi.encodePacked(pmAndData, r, s, v);
-
         PackedUserOperation memory userOp = _dummyUserOp(alice, 0, pmAndData);
+        bytes32 paymasterUserOpHash = _getPaymasterUserOpHash(userOp, pmAndData);
+        bytes32 hash = pm.getHash(paymasterUserOpHash, validUntil, validAfter);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(randomPk, hash);
+        userOp.paymasterAndData = abi.encodePacked(pmAndData, r, s, v);
 
         vm.prank(address(ep));
         (, uint256 validationData) = pm.validatePaymasterUserOp(userOp, bytes32(0), 0);
@@ -376,9 +377,11 @@ contract VerifyingPaymasterTest is Test {
 
         // Sign with old signer
         bytes memory pmAndData = _buildPmAndData(validUntil, validAfter);
-        bytes32 hash = pm.getHash(alice, 0, validUntil, validAfter);
+        PackedUserOperation memory userOp = _dummyUserOp(alice, 0, pmAndData);
+        bytes32 paymasterUserOpHash = _getPaymasterUserOpHash(userOp, pmAndData);
+        bytes32 hash = pm.getHash(paymasterUserOpHash, validUntil, validAfter);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, hash);
-        pmAndData = abi.encodePacked(pmAndData, r, s, v);
+        userOp.paymasterAndData = abi.encodePacked(pmAndData, r, s, v);
 
         // Rotate signer
         uint256 newSignerPk = 0xCAFE;
@@ -387,7 +390,6 @@ contract VerifyingPaymasterTest is Test {
         pm.setVerifyingSigner(newSigner);
 
         // Old signature should now fail
-        PackedUserOperation memory userOp = _dummyUserOp(alice, 0, pmAndData);
         vm.prank(address(ep));
         (, uint256 validationData) = pm.validatePaymasterUserOp(userOp, bytes32(0), 0);
 
@@ -406,11 +408,12 @@ contract VerifyingPaymasterTest is Test {
         uint48 validAfter = 0;
 
         bytes memory pmAndData = _buildPmAndData(validUntil, validAfter);
-        bytes32 hash = pm.getHash(alice, 0, validUntil, validAfter);
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(newSignerPk, hash);
-        pmAndData = abi.encodePacked(pmAndData, r, s, v);
-
         PackedUserOperation memory userOp = _dummyUserOp(alice, 0, pmAndData);
+        bytes32 paymasterUserOpHash = _getPaymasterUserOpHash(userOp, pmAndData);
+        bytes32 hash = pm.getHash(paymasterUserOpHash, validUntil, validAfter);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(newSignerPk, hash);
+        userOp.paymasterAndData = abi.encodePacked(pmAndData, r, s, v);
+
         vm.prank(address(ep));
         (, uint256 validationData) = pm.validatePaymasterUserOp(userOp, bytes32(0), 0);
 
@@ -431,6 +434,28 @@ contract VerifyingPaymasterTest is Test {
     // ═══════════════════════════════════════════════════════════════════
     //                      HELPERS
     // ═══════════════════════════════════════════════════════════════════
+
+    function _mockUserOpHash(address sender, uint256 nonce) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked("userOpHash", sender, nonce));
+    }
+
+    function _getPaymasterUserOpHash(
+        PackedUserOperation memory userOp,
+        bytes memory paymasterAndDataNoSig
+    ) internal view returns (bytes32) {
+        bytes32 packHash = keccak256(abi.encode(
+            userOp.sender,
+            userOp.nonce,
+            keccak256(userOp.initCode),
+            keccak256(userOp.callData),
+            userOp.accountGasLimits,
+            userOp.preVerificationGas,
+            userOp.gasFees,
+            keccak256(paymasterAndDataNoSig)
+        ));
+
+        return keccak256(abi.encode(packHash, address(ep), block.chainid));
+    }
 
     function _buildPmAndData(uint48 validUntil, uint48 validAfter) internal view returns (bytes memory) {
         return abi.encodePacked(

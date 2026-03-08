@@ -157,24 +157,33 @@ contract E2EPaymaster is Script {
         ));
     }
 
-    function _buildPaymasterAndData() internal returns (bytes memory) {
-        uint48 validUntil = uint48(block.timestamp + 1 hours);
-        uint48 validAfter = 0;
-
-        // EIP-712 typed data hash via VerifyingPaymaster.getHash()
-        bytes32 pmHash = paymaster.getHash(alice, 0, validUntil, validAfter);
-        (uint8 pmV, bytes32 pmR, bytes32 pmS) = vm.sign(deployerPk, pmHash);
-
-        console.log("  PM authorization hash (EIP-712):", vm.toString(pmHash));
-
+    function _buildPaymasterDataNoSig(uint48 validUntil, uint48 validAfter) internal view returns (bytes memory) {
         return abi.encodePacked(
             address(paymaster),
             uint128(100_000),  // pmVerificationGas
             uint128(50_000),   // pmPostOpGas
             bytes6(validUntil),
-            bytes6(validAfter),
-            pmR, pmS, pmV
+            bytes6(validAfter)
         );
+    }
+
+    /// @dev Compute paymaster hash input from UserOp, excluding trailing paymaster signature bytes.
+    function _getPaymasterUserOpHash(
+        PackedUserOperation memory op,
+        bytes memory paymasterAndDataNoSig
+    ) internal view returns (bytes32) {
+        bytes32 packHash = keccak256(abi.encode(
+            op.sender,
+            op.nonce,
+            keccak256(op.initCode),
+            keccak256(op.callData),
+            op.accountGasLimits,
+            op.preVerificationGas,
+            op.gasFees,
+            keccak256(paymasterAndDataNoSig)
+        ));
+
+        return keccak256(abi.encode(packHash, address(EP), block.chainid));
     }
 
     function _signUserOp(PackedUserOperation memory op) internal returns (bytes memory) {
@@ -198,6 +207,10 @@ contract E2EPaymaster is Script {
         batch[1] = Execution(address(USDC), 0, abi.encodeCall(IERC20.transfer, (sponsor, part2)));
         bytes memory executionData = abi.encode(batch);
 
+        uint48 validUntil = uint48(block.timestamp + 1 hours);
+        uint48 validAfter = 0;
+        bytes memory pmDataNoSig = _buildPaymasterDataNoSig(validUntil, validAfter);
+
         op = PackedUserOperation({
             sender: alice,
             nonce: 0,
@@ -206,9 +219,16 @@ contract E2EPaymaster is Script {
             accountGasLimits: bytes32(uint256(uint128(200_000)) << 128 | uint128(300_000)),
             preVerificationGas: 100_000,
             gasFees: bytes32(uint256(uint128(1 gwei)) << 128 | uint128(3 gwei)),
-            paymasterAndData: _buildPaymasterAndData(),
+            paymasterAndData: pmDataNoSig,
             signature: ""
         });
+
+        // Sign paymaster authorization over the full UserOp payload/gas (excluding pm signature bytes).
+        bytes32 paymasterUserOpHash = _getPaymasterUserOpHash(op, pmDataNoSig);
+        bytes32 pmHash = paymaster.getHash(paymasterUserOpHash, validUntil, validAfter);
+        (uint8 pmV, bytes32 pmR, bytes32 pmS) = vm.sign(deployerPk, pmHash);
+        op.paymasterAndData = abi.encodePacked(pmDataNoSig, pmR, pmS, pmV);
+        console.log("  PM authorization hash (EIP-712):", vm.toString(pmHash));
 
         op.signature = _signUserOp(op);
 

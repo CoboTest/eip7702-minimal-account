@@ -17,7 +17,7 @@ import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.s
 /// @dev Security features:
 ///   - EIP-712 typed data signing with domain separator (chain + paymaster bound)
 ///   - Replay protection: domain separator includes chainId + paymaster address;
-///     hash includes sender + nonce (unique per UserOp in EntryPoint)
+///     hash includes EntryPoint-provided userOpHash (binds calldata + gas + nonce)
 ///   - Signer/owner separation: owner = admin (cold), verifyingSigner = authorizer (hot)
 ///   - Ownable2Step: two-step ownership transfer to prevent accidental loss
 ///   - Pausable: emergency circuit breaker
@@ -32,9 +32,11 @@ contract VerifyingPaymaster is IPaymaster, Ownable2Step, Pausable, ReentrancyGua
     bytes32 private constant _DOMAIN_TYPEHASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 
-    /// @dev EIP-712 struct typehash for paymaster authorization
+    /// @dev EIP-712 struct typehash for paymaster authorization.
+    ///      Binds signatures to the exact EntryPoint-provided userOpHash to prevent
+    ///      payload/gas "bait-and-switch" after sponsorship approval.
     bytes32 public constant PAYMASTER_DATA_TYPEHASH =
-        keccak256("PaymasterData(address sender,uint256 nonce,uint48 validUntil,uint48 validAfter)");
+        keccak256("PaymasterData(bytes32 userOpHash,uint48 validUntil,uint48 validAfter)");
 
     /// @dev Cached domain separator (recomputed on chain fork via _domainSeparator())
     bytes32 private immutable _cachedDomainSeparator;
@@ -134,16 +136,16 @@ contract VerifyingPaymaster is IPaymaster, Ownable2Step, Pausable, ReentrancyGua
 
     /// @notice Computes the hash that the verifyingSigner must sign.
     /// @dev Exposed for off-chain tooling to construct signatures.
+    ///      `paymasterUserOpHash` must be computed with paymasterAndData excluding
+    ///      the trailing 65-byte paymaster signature to avoid circular dependency.
     function getHash(
-        address sender,
-        uint256 nonce,
+        bytes32 paymasterUserOpHash,
         uint48 validUntil,
         uint48 validAfter
     ) public view returns (bytes32) {
         bytes32 structHash = keccak256(abi.encode(
             PAYMASTER_DATA_TYPEHASH,
-            sender,
-            nonce,
+            paymasterUserOpHash,
             validUntil,
             validAfter
         ));
@@ -174,8 +176,11 @@ contract VerifyingPaymaster is IPaymaster, Ownable2Step, Pausable, ReentrancyGua
         uint48 validAfter = uint48(bytes6(pmData[6:12]));
         bytes calldata signature = pmData[12:77];
 
-        // EIP-712 typed hash — includes chainId + paymaster address via domain separator
-        bytes32 hash = getHash(userOp.sender, userOp.nonce, validUntil, validAfter);
+        // EIP-712 typed hash — includes chainId + paymaster address via domain separator.
+        // Binds the UserOp payload/gas/nonce while excluding the trailing paymaster
+        // signature bytes to avoid circular dependency.
+        bytes32 paymasterUserOpHash = _getPaymasterUserOpHash(userOp);
+        bytes32 hash = getHash(paymasterUserOpHash, validUntil, validAfter);
 
         address recovered = ECDSA.recover(hash, signature);
         bool sigValid = (recovered == verifyingSigner);
@@ -261,6 +266,25 @@ contract VerifyingPaymaster is IPaymaster, Ownable2Step, Pausable, ReentrancyGua
     // ═══════════════════════════════════════════════════════════════════
     //                     INTERNALS
     // ═══════════════════════════════════════════════════════════════════
+
+    /// @dev Computes EntryPoint-style userOpHash, but with paymasterAndData excluding
+    ///      the trailing 65-byte paymaster signature.
+    function _getPaymasterUserOpHash(PackedUserOperation calldata userOp) internal view returns (bytes32) {
+        bytes calldata paymasterAndDataNoSig = userOp.paymasterAndData[:64]; // 20+16+16+6+6
+
+        bytes32 packHash = keccak256(abi.encode(
+            userOp.sender,
+            userOp.nonce,
+            keccak256(userOp.initCode),
+            keccak256(userOp.callData),
+            userOp.accountGasLimits,
+            userOp.preVerificationGas,
+            userOp.gasFees,
+            keccak256(paymasterAndDataNoSig)
+        ));
+
+        return keccak256(abi.encode(packHash, address(entryPoint), block.chainid));
+    }
 
     /// @dev Pack ERC-4337 validationData: [validAfter:6][validUntil:6][authorizer:20]
     function _packValidation(

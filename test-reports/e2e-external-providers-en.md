@@ -162,13 +162,3 @@ Provider evidence links (with reproducible data artifact):
   - <https://docs.zerodev.app/sdk/faqs/chains>
 
 
-## Repro
-
-```bash
-cd script/python
-uv run e2e_pimlico.py
-uv run e2e_alchemy.py
-uv run e2e_zerodev.py
-```
-
-Env source of truth: `.env.example`.

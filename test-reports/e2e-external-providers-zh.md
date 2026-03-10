@@ -178,13 +178,3 @@ ZeroDev sponsor 返回（完整字段）：
   - <https://docs.zerodev.app/sdk/faqs/chains>
 
 
-## 5) 复现命令
-
-```bash
-cd script/python
-uv run e2e_pimlico.py
-uv run e2e_alchemy.py
-uv run e2e_zerodev.py
-```
-
-环境变量统一来自：`.env.example`。

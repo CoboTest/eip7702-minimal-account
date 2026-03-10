@@ -1,6 +1,6 @@
 """Shared utilities for ZeroDev provider implementations."""
 
-from providers.pimlico.base import JsonRpcMixin
+from providers.base import JsonRpcMixin
 
 
 class ZeroDevJsonRpcMixin(JsonRpcMixin):

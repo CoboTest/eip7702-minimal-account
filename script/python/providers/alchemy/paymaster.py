@@ -31,10 +31,8 @@ class AlchemyPaymaster(AlchemyJsonRpcMixin, Paymaster):
             "userOperation": user_op.to_dict(),
         }
 
-        # Alchemy API shape is [policyId, requestObject]
-        result = await self._rpc(
-            "alchemy_requestGasAndPaymasterAndData", [self._policy_id, request]
-        )
+        # Alchemy API shape: [requestObject] (policyId embedded in request)
+        result = await self._rpc("alchemy_requestGasAndPaymasterAndData", [request])
 
         # Response may include fields at root or under `userOperation`.
         op = result.get("userOperation", result)
@@ -42,6 +40,10 @@ class AlchemyPaymaster(AlchemyJsonRpcMixin, Paymaster):
         call_gas_limit = int(op["callGasLimit"], 16)
         verification_gas_limit = int(op["verificationGasLimit"], 16)
         pre_verification_gas = int(op["preVerificationGas"], 16)
+        max_fee_per_gas = int(op["maxFeePerGas"], 16) if op.get("maxFeePerGas") else None
+        max_priority_fee_per_gas = (
+            int(op["maxPriorityFeePerGas"], 16) if op.get("maxPriorityFeePerGas") else None
+        )
 
         paymaster = op.get("paymaster")
         paymaster_data_hex = op.get("paymasterData")
@@ -72,6 +74,8 @@ class AlchemyPaymaster(AlchemyJsonRpcMixin, Paymaster):
             verification_gas_limit=verification_gas_limit,
             call_gas_limit=call_gas_limit,
             pre_verification_gas=pre_verification_gas,
+            max_fee_per_gas=max_fee_per_gas,
+            max_priority_fee_per_gas=max_priority_fee_per_gas,
         )
 
     def __repr__(self) -> str:

@@ -72,10 +72,10 @@ async def build_userop(
     )
 
     # Request sponsorship
-    logger.info("  Requesting pm_sponsorUserOperation...")
+    logger.info("  Requesting paymaster sponsorship...")
     spon = await paymaster.sponsor(user_op)
 
-    logger.info("  Pimlico paymaster: %s", spon.paymaster)
+    logger.info("  Sponsored paymaster: %s", spon.paymaster)
     logger.info(
         "  verGas=%s callGas=%s preVerGas=%s",
         hex(spon.verification_gas_limit),

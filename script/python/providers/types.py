@@ -24,6 +24,8 @@ class SponsorResult(BaseModel):
     verification_gas_limit: int
     call_gas_limit: int
     pre_verification_gas: int
+    max_fee_per_gas: int | None = None
+    max_priority_fee_per_gas: int | None = None
 
 
 class UserOperation(BaseModel):
@@ -81,6 +83,10 @@ class UserOperation(BaseModel):
         self.verification_gas_limit = result.verification_gas_limit
         self.call_gas_limit = result.call_gas_limit
         self.pre_verification_gas = result.pre_verification_gas
+        if result.max_fee_per_gas is not None:
+            self.max_fee_per_gas = result.max_fee_per_gas
+        if result.max_priority_fee_per_gas is not None:
+            self.max_priority_fee_per_gas = result.max_priority_fee_per_gas
 
 
 class UserOpReceipt(BaseModel):

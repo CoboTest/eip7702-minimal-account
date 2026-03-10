@@ -166,12 +166,8 @@ ZeroDev sponsor 返回（完整字段）：
 三家判定依据（含可复现数据源）：
 - Pimlico 链清单由脚本提取并固化：`script/python/tools/extract_pimlico_supported_chains.py` → `test-reports/data/pimlico-supported-chains.json`
 
-- Pimlico（链覆盖主来源：Supported Chains；EIP-7702语义补充：FAQ）：
-  - <https://docs.pimlico.io/guides/supported-chains>
-  - <https://docs.pimlico.io/guides/eip7702/faqs>
-- Alchemy（EIP-7702 默认模式 + Supported Chains 列表；链表由脚本提取并固化）：
-  - <https://www.alchemy.com/docs/wallets/transactions/using-eip-7702>
-  - <https://www.alchemy.com/docs/wallets/supported-chains>
+- Pimlico：<https://docs.pimlico.io/guides/supported-chains>
+- Alchemy：<https://www.alchemy.com/docs/wallets/supported-chains>
   - `script/python/tools/extract_alchemy_supported_chains.py` → `test-reports/data/alchemy-supported-chains.json`
 - ZeroDev（官方声明支持 ERC-4337 + EIP-7702，50+ networks，但未公开完整逐链矩阵）：
   - <https://docs.zerodev.app/meta-infra/rpcs>

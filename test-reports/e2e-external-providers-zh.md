@@ -132,15 +132,46 @@ ZeroDev sponsor 返回（完整字段）：
 
 ---
 
-## 4) Provider 扩展信息（EIP-7702 支持链对比）
+## 4) Provider 扩展信息（基于 7702 链清单的三方支持梳理）
 
-> 说明：下表仅基于官方公开文档中“明确可核验”的描述。
+链清单来源（baseline）：
+- 7702checker chains API：<https://7702checker.azfuller.com/chains>
+- 7702 Beat 页面：<https://swiss-knife.xyz/7702beat>
 
-| Provider | EIP-7702 支持链（官方描述） | 备注 | 来源 |
-|---|---|---|---|
-| Pimlico | Ethereum Mainnet（含 Sepolia）、BSC Mainnet、OP-Stack chains（Base/Optimism/Zora 等）、Odyssey Testnet | 文档为明确枚举描述 | <https://docs.pimlico.io/guides/eip7702/faqs> |
-| Alchemy | 文档明确支持 EIP-7702（Wallet Transactions 默认模式）；链覆盖参考 Account Kit Supported Chains（bundler + gas sponsorship） | 官方未在同一页给出“EIP-7702 专属链表”，需结合两页阅读 | <https://www.alchemy.com/docs/wallets/transactions/using-eip-7702> / <https://www.alchemy.com/docs/wallets/supported-chains> |
-| ZeroDev | 官方明确支持 ERC-4337 + EIP-7702，并声明覆盖 50+ networks | 官方公开页未给完整 EIP-7702 链清单（需 dashboard/SDK 实测） | <https://docs.zerodev.app/meta-infra/rpcs> / <https://docs.zerodev.app/sdk/faqs/chains> |
+说明：
+- ✅ = 官方文档明确可核验支持
+- 🟡 = 可推断/部分匹配（例如 OP-Stack 泛化描述）
+- ❓ = 暂无公开逐链明确信息
+
+| Chain (7702checker) | Pimlico | Alchemy | ZeroDev |
+|---|---:|---:|---:|
+| Ethereum (1) | ✅ | ✅ | 🟡 |
+| Sepolia (11155111) | ✅ | ✅ | 🟡 |
+| BNB Smart Chain (56) | ✅ | ✅ | 🟡 |
+| OP Mainnet (10) | ✅ | ✅ | 🟡 |
+| Base (8453) | ✅ | ✅ | 🟡 |
+| Zora (7777777) | ✅ | ✅ | 🟡 |
+| Unichain (130) | 🟡 (OP-Stack) | ✅ | 🟡 |
+| Soneium (1868) | 🟡 (OP-Stack) | ✅ | 🟡 |
+| Ink (57073) | 🟡 (OP-Stack) | ✅ | 🟡 |
+| Mode (34443) | 🟡 (OP-Stack) | ❓ | 🟡 |
+| Berachain (80094) | ❓ | ✅ | 🟡 |
+| Polygon (137) | ❓ | ✅ | 🟡 |
+| Arbitrum One (42161) | ❓ | ✅ | 🟡 |
+| Scroll (534352) | ❓ | ❓ | 🟡 |
+| Linea (59144) | ❓ | ❓ | 🟡 |
+| Sonic (146) | ❓ | ❓ | 🟡 |
+| Gnosis (100) | ❓ | ❓ | 🟡 |
+
+三家判定依据：
+- Pimlico（EIP-7702 FAQ 明确枚举）：<https://docs.pimlico.io/guides/eip7702/faqs>
+- Alchemy（EIP-7702 默认模式 + Supported Chains 列表）：
+  - <https://www.alchemy.com/docs/wallets/transactions/using-eip-7702>
+  - <https://www.alchemy.com/docs/wallets/supported-chains>
+- ZeroDev（官方声明支持 ERC-4337 + EIP-7702，50+ networks，但未公开完整逐链矩阵）：
+  - <https://docs.zerodev.app/meta-infra/rpcs>
+  - <https://docs.zerodev.app/sdk/faqs/chains>
+
 
 ## 5) 复现命令
 

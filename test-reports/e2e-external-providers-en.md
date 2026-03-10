@@ -116,15 +116,46 @@ Current code now aligns behavior for all providers:
 - apply sponsor gas/paymaster fields
 - apply sponsor fee overrides when present
 
-## Provider extra context (EIP-7702 chain support comparison)
+## Provider extra context (3-provider support vs 7702 chain list)
 
-> Table below includes only claims that are explicitly verifiable in public docs.
+Baseline chain list sources:
+- 7702checker chains API: <https://7702checker.azfuller.com/chains>
+- 7702 Beat page: <https://swiss-knife.xyz/7702beat>
 
-| Provider | EIP-7702 chain support (official wording) | Notes | Source |
-|---|---|---|---|
-| Pimlico | Ethereum Mainnet (incl. Sepolia), BSC Mainnet, OP-Stack chains (Base/Optimism/Zora/etc.), Odyssey Testnet | Explicit chain-level wording in FAQ | <https://docs.pimlico.io/guides/eip7702/faqs> |
-| Alchemy | EIP-7702 is documented as default mode in Wallet Transactions; chain coverage referenced via Account Kit Supported Chains (bundler + gas sponsorship) | No single page with a dedicated “EIP-7702 chain list”; needs combined reading | <https://www.alchemy.com/docs/wallets/transactions/using-eip-7702> / <https://www.alchemy.com/docs/wallets/supported-chains> |
-| ZeroDev | Official docs state support for ERC-4337 + EIP-7702 and mention 50+ networks | Public docs do not provide a complete EIP-7702 per-chain matrix; dashboard/SDK validation still needed | <https://docs.zerodev.app/meta-infra/rpcs> / <https://docs.zerodev.app/sdk/faqs/chains> |
+Legend:
+- ✅ = explicitly verifiable support in official docs
+- 🟡 = inferred / partially matched (e.g., OP-Stack generalized wording)
+- ❓ = no explicit per-chain public statement found
+
+| Chain (7702checker) | Pimlico | Alchemy | ZeroDev |
+|---|---:|---:|---:|
+| Ethereum (1) | ✅ | ✅ | 🟡 |
+| Sepolia (11155111) | ✅ | ✅ | 🟡 |
+| BNB Smart Chain (56) | ✅ | ✅ | 🟡 |
+| OP Mainnet (10) | ✅ | ✅ | 🟡 |
+| Base (8453) | ✅ | ✅ | 🟡 |
+| Zora (7777777) | ✅ | ✅ | 🟡 |
+| Unichain (130) | 🟡 (OP-Stack) | ✅ | 🟡 |
+| Soneium (1868) | 🟡 (OP-Stack) | ✅ | 🟡 |
+| Ink (57073) | 🟡 (OP-Stack) | ✅ | 🟡 |
+| Mode (34443) | 🟡 (OP-Stack) | ❓ | 🟡 |
+| Berachain (80094) | ❓ | ✅ | 🟡 |
+| Polygon (137) | ❓ | ✅ | 🟡 |
+| Arbitrum One (42161) | ❓ | ✅ | 🟡 |
+| Scroll (534352) | ❓ | ❓ | 🟡 |
+| Linea (59144) | ❓ | ❓ | 🟡 |
+| Sonic (146) | ❓ | ❓ | 🟡 |
+| Gnosis (100) | ❓ | ❓ | 🟡 |
+
+Provider evidence links:
+- Pimlico (explicit chain wording in EIP-7702 FAQ): <https://docs.pimlico.io/guides/eip7702/faqs>
+- Alchemy (EIP-7702 default mode + Supported Chains list):
+  - <https://www.alchemy.com/docs/wallets/transactions/using-eip-7702>
+  - <https://www.alchemy.com/docs/wallets/supported-chains>
+- ZeroDev (supports ERC-4337 + EIP-7702, 50+ networks claim; no public full per-chain matrix):
+  - <https://docs.zerodev.app/meta-infra/rpcs>
+  - <https://docs.zerodev.app/sdk/faqs/chains>
+
 
 ## Repro
 

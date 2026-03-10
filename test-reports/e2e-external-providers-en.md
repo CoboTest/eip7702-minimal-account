@@ -153,8 +153,6 @@ Provider evidence links (with reproducible data artifact):
 - Pimlico: <https://docs.pimlico.io/guides/supported-chains>
 - Alchemy: <https://www.alchemy.com/docs/wallets/supported-chains>
   - `script/python/tools/extract_alchemy_supported_chains.py` -> `test-reports/data/alchemy-supported-chains.json`
-- ZeroDev (supports ERC-4337 + EIP-7702, 50+ networks claim; no public full per-chain matrix):
-  - <https://docs.zerodev.app/meta-infra/rpcs>
-  - <https://docs.zerodev.app/sdk/faqs/chains>
+- ZeroDev: <https://docs.zerodev.app/sdk/faqs/chains>
 
 

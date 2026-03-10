@@ -169,8 +169,6 @@ ZeroDev sponsor 返回（完整字段）：
 - Pimlico：<https://docs.pimlico.io/guides/supported-chains>
 - Alchemy：<https://www.alchemy.com/docs/wallets/supported-chains>
   - `script/python/tools/extract_alchemy_supported_chains.py` → `test-reports/data/alchemy-supported-chains.json`
-- ZeroDev（官方声明支持 ERC-4337 + EIP-7702，50+ networks，但未公开完整逐链矩阵）：
-  - <https://docs.zerodev.app/meta-infra/rpcs>
-  - <https://docs.zerodev.app/sdk/faqs/chains>
+- ZeroDev：<https://docs.zerodev.app/sdk/faqs/chains>
 
 

@@ -41,10 +41,8 @@ async def main() -> None:
     secret_key = os.environ.get("THIRDWEB_SECRET_KEY")
 
     # thirdweb bundler API format: https://<chain_id>.bundler.thirdweb.com/v2
-    # Allow explicit override via THIRDWEB_BUNDLER_URL.
     thirdweb_url = os.environ.get("THIRDWEB_BUNDLER_URL", "").strip()
-    if not thirdweb_url:
-        thirdweb_url = f"https://{CHAIN_ID_SEPOLIA}.bundler.thirdweb.com/v2"
+    assert thirdweb_url, "Set THIRDWEB_BUNDLER_URL"
 
     # optional; fallback to bundler url
     paymaster_url = os.environ.get("THIRDWEB_PAYMASTER_URL", "").strip() or thirdweb_url

@@ -21,8 +21,22 @@ class ZeroDevPaymaster(ZeroDevJsonRpcMixin, Paymaster):
         self._session = None
 
     async def sponsor(self, user_op: UserOperation) -> SponsorResult:
-        # Default to pm_sponsorUserOperation (widely supported across paymaster providers).
-        result = await self._rpc("pm_sponsorUserOperation", [user_op.to_dict(), self._entry_point])
+        # ZeroDev native shape:
+        # method: zd_sponsorUserOperation
+        # params: [{ userOp, entryPointAddress }]
+        try:
+            result = await self._rpc(
+                "zd_sponsorUserOperation",
+                [
+                    {
+                        "userOp": user_op.to_dict(),
+                        "entryPointAddress": self._entry_point,
+                    }
+                ],
+            )
+        except Exception:
+            # Compatibility fallback for pm-style paymaster endpoints.
+            result = await self._rpc("pm_sponsorUserOperation", [user_op.to_dict(), self._entry_point])
 
         op: dict[str, Any] = result.get("userOperation", result)
 

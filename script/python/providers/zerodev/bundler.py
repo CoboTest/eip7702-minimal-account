@@ -23,18 +23,26 @@ class ZeroDevBundler(ZeroDevJsonRpcMixin, Bundler):
         self._session = None
 
     async def get_gas_price(self) -> GasPrice:
-        try:
-            priority_hex = await self._rpc("rundler_maxPriorityFeePerGas", [])
-            priority = int(priority_hex, 16)
-        except Exception:
-            priority_hex = await self._rpc("eth_maxPriorityFeePerGas", [])
-            priority = int(priority_hex, 16)
-
         gas_price_hex = await self._rpc("eth_gasPrice", [])
         gas_price = int(gas_price_hex, 16)
 
+        try:
+            priority_hex = await self._rpc("rundler_maxPriorityFeePerGas", [])
+            priority = int(priority_hex, 16)
+            max_fee = max(gas_price + priority, priority * 2)
+        except Exception:
+            try:
+                priority_hex = await self._rpc("eth_maxPriorityFeePerGas", [])
+                priority = int(priority_hex, 16)
+                max_fee = max(gas_price + priority, priority * 2)
+            except Exception:
+                # Some endpoints disable priority-fee methods. Use a safer fallback.
+                # Keep maxFee sufficiently above base gas price to avoid immediate rejection.
+                priority = gas_price * 2
+                max_fee = gas_price * 4
+
         return GasPrice(
-            max_fee_per_gas=max(gas_price + priority, priority * 2),
+            max_fee_per_gas=max_fee,
             max_priority_fee_per_gas=priority,
         )
 

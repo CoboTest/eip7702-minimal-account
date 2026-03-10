@@ -57,7 +57,7 @@
 
 - Pimlico：`pm_sponsorUserOperation`
 - Alchemy：`alchemy_requestGasAndPaymasterAndData`
-- ZeroDev：`zd_sponsorUserOperation`（本端点实测可用；并保留 `pm_sponsorUserOperation` 兼容 fallback）
+- ZeroDev：`zd_sponsorUserOperation`（本端点实测可用）
 
 三者都返回：
 - `paymaster`

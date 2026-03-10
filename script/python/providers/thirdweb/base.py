@@ -2,7 +2,7 @@
 
 import aiohttp
 
-from providers.base import JsonRpcMixin
+from providers.jsonrpc import JsonRpcMixin
 
 
 class ThirdwebJsonRpcMixin(JsonRpcMixin):

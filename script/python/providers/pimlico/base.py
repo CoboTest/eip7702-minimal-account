@@ -1,6 +1,6 @@
 """Backward-compat shim for provider base mixin location."""
 
-from providers.base import JsonRpcMixin
+from providers.jsonrpc import JsonRpcMixin
 
 __all__ = ["JsonRpcMixin"]
 

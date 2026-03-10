@@ -1,6 +1,6 @@
 """Shared utilities for ZeroDev provider implementations."""
 
-from providers.base import JsonRpcMixin
+from providers.jsonrpc import JsonRpcMixin
 
 
 class ZeroDevJsonRpcMixin(JsonRpcMixin):

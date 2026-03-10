@@ -116,27 +116,15 @@ Current code now aligns behavior for all providers:
 - apply sponsor gas/paymaster fields
 - apply sponsor fee overrides when present
 
-## Provider extra context (supported chains / infra notes)
+## Provider extra context (EIP-7702 chain support comparison)
 
-> These are directly traceable to official docs and useful for chain expansion decisions.
+> Table below includes only claims that are explicitly verifiable in public docs.
 
-### Pimlico
-
-- Public endpoint uses `/{chain_id}/rpc`; docs explicitly show replacing `chain_id` (examples include 1 and 137) and list supported ERC-4337 methods.
-- Source:
-  - <https://docs.pimlico.io/references/bundler/public-endpoint>
-
-### Alchemy
-
-- Official “Supported Chains” page lists bundler + gas sponsorship support and documents endpoint construction via `NETWORK_IDENTIFIER`.
-- Source:
-  - <https://www.alchemy.com/docs/wallets/supported-chains>
-
-### ZeroDev
-
-- Official docs state support for both ERC-4337 and EIP-7702; intro also states deployment scale across 50+ networks. RPC endpoints are provided via dashboard.
-- Source:
-  - <https://docs.zerodev.app/meta-infra/rpcs>
+| Provider | EIP-7702 chain support (official wording) | Notes | Source |
+|---|---|---|---|
+| Pimlico | Ethereum Mainnet (incl. Sepolia), BSC Mainnet, OP-Stack chains (Base/Optimism/Zora/etc.), Odyssey Testnet | Explicit chain-level wording in FAQ | <https://docs.pimlico.io/guides/eip7702/faqs> |
+| Alchemy | EIP-7702 is documented as default mode in Wallet Transactions; chain coverage referenced via Account Kit Supported Chains (bundler + gas sponsorship) | No single page with a dedicated “EIP-7702 chain list”; needs combined reading | <https://www.alchemy.com/docs/wallets/transactions/using-eip-7702> / <https://www.alchemy.com/docs/wallets/supported-chains> |
+| ZeroDev | Official docs state support for ERC-4337 + EIP-7702 and mention 50+ networks | Public docs do not provide a complete EIP-7702 per-chain matrix; dashboard/SDK validation still needed | <https://docs.zerodev.app/meta-infra/rpcs> / <https://docs.zerodev.app/sdk/faqs/chains> |
 
 ## Repro
 

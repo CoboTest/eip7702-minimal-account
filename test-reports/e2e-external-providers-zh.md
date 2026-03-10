@@ -132,48 +132,17 @@ ZeroDev sponsor 返回（完整字段）：
 
 ---
 
-## 4) 已修复问题记录（Alchemy 路径）
+## 4) Provider 扩展信息（EIP-7702 支持链对比）
 
-### 问题
+> 说明：下表仅基于官方公开文档中“明确可核验”的描述。
 
-- `eth_sendUserOperation` 报错：`Invalid paymaster signature`
+| Provider | EIP-7702 支持链（官方描述） | 备注 | 来源 |
+|---|---|---|---|
+| Pimlico | Ethereum Mainnet（含 Sepolia）、BSC Mainnet、OP-Stack chains（Base/Optimism/Zora 等）、Odyssey Testnet | 文档为明确枚举描述 | <https://docs.pimlico.io/guides/eip7702/faqs> |
+| Alchemy | 文档明确支持 EIP-7702（Wallet Transactions 默认模式）；链覆盖参考 Account Kit Supported Chains（bundler + gas sponsorship） | 官方未在同一页给出“EIP-7702 专属链表”，需结合两页阅读 | <https://www.alchemy.com/docs/wallets/transactions/using-eip-7702> / <https://www.alchemy.com/docs/wallets/supported-chains> |
+| ZeroDev | 官方明确支持 ERC-4337 + EIP-7702，并声明覆盖 50+ networks | 官方公开页未给完整 EIP-7702 链清单（需 dashboard/SDK 实测） | <https://docs.zerodev.app/meta-infra/rpcs> / <https://docs.zerodev.app/sdk/faqs/chains> |
 
-### 根因
-
-- sponsor 返回的 `maxFeePerGas/maxPriorityFeePerGas` 未并入最终签名 UserOp；
-- 导致最终提交字段与 paymaster 授权上下文不一致。
-
-### 修复
-
-- `SponsorResult` 增加可选 fee 字段；
-- `UserOperation.apply_sponsorship()` 合并 fee 覆盖；
-- 同时将 Pimlico 路径对齐为同样规则（若返回 fee 也覆盖）。
-
----
-
-## 5) Provider 扩展信息（支持链 / 生态能力）
-
-> 说明：以下是官方文档中可核验的信息，便于后续扩链或选型。
-
-### Pimlico
-
-- 官方公共 endpoint 采用 `/{chain_id}/rpc` 路径，文档明确可替换 `chain_id`（示例给出 1/137），并列出 ERC-4337 方法集。
-- 来源：
-  - <https://docs.pimlico.io/references/bundler/public-endpoint>
-
-### Alchemy
-
-- 官方给出“Supported Chains”页面，明确 bundler + gas sponsorship 支持链列表，并说明 endpoint 由 `NETWORK_IDENTIFIER` 组成。
-- 来源：
-  - <https://www.alchemy.com/docs/wallets/supported-chains>
-
-### ZeroDev
-
-- 官方文档说明支持 ERC-4337 + EIP-7702，并在介绍中给出“50+ networks”能力描述；RPC 通过 dashboard 下发。
-- 来源：
-  - <https://docs.zerodev.app/meta-infra/rpcs>
-
-## 6) 复现命令
+## 5) 复现命令
 
 ```bash
 cd script/python

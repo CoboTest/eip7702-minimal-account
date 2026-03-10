@@ -151,19 +151,21 @@ ZeroDev sponsor 返回（完整字段）：
 | OP Mainnet (10) | ✅ | ✅ | 🟡 |
 | Base (8453) | ✅ | ✅ | 🟡 |
 | Zora (7777777) | ✅ | ✅ | 🟡 |
-| Unichain (130) | 🟡 (OP-Stack) | ✅ | 🟡 |
-| Soneium (1868) | 🟡 (OP-Stack) | ✅ | 🟡 |
-| Ink (57073) | 🟡 (OP-Stack) | ✅ | 🟡 |
-| Mode (34443) | 🟡 (OP-Stack) | ❓ | 🟡 |
-| Berachain (80094) | ❓ | ✅ | 🟡 |
-| Polygon (137) | ❓ | ✅ | 🟡 |
-| Arbitrum One (42161) | ❓ | ✅ | 🟡 |
-| Scroll (534352) | ❓ | ❓ | 🟡 |
-| Linea (59144) | ❓ | ❓ | 🟡 |
-| Sonic (146) | ❓ | ❓ | 🟡 |
-| Gnosis (100) | ❓ | ❓ | 🟡 |
+| Unichain (130) | ✅ | ✅ | 🟡 |
+| Soneium (1868) | ✅ | ✅ | 🟡 |
+| Ink (57073) | ✅ | ✅ | 🟡 |
+| Mode (34443) | ✅ | ❓ | 🟡 |
+| Berachain (80094) | ✅ | ✅ | 🟡 |
+| Polygon (137) | ✅ | ✅ | 🟡 |
+| Arbitrum One (42161) | ✅ | ✅ | 🟡 |
+| Scroll (534352) | ✅ | ❓ | 🟡 |
+| Linea (59144) | ✅ | ❓ | 🟡 |
+| Sonic (146) | ✅ | ❓ | 🟡 |
+| Gnosis (100) | ✅ | ❓ | 🟡 |
 
-三家判定依据：
+三家判定依据（含可复现数据源）：
+- Pimlico 链清单由脚本提取并固化：`script/python/tools/extract_pimlico_supported_chains.py` → `test-reports/data/pimlico-supported-chains.json`
+
 - Pimlico（EIP-7702 FAQ 明确枚举）：<https://docs.pimlico.io/guides/eip7702/faqs>
 - Alchemy（EIP-7702 默认模式 + Supported Chains 列表）：
   - <https://www.alchemy.com/docs/wallets/transactions/using-eip-7702>

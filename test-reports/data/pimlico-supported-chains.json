@@ -1,0 +1,518 @@
+{
+  "source": "https://docs.pimlico.io/guides/supported-chains",
+  "mainnets": [
+    {
+      "name": "Ethereum",
+      "chainId": 1,
+      "slug": "ethereum"
+    },
+    {
+      "name": "Base",
+      "chainId": 8453,
+      "slug": "base"
+    },
+    {
+      "name": "Polygon",
+      "chainId": 137,
+      "slug": "polygon"
+    },
+    {
+      "name": "Arbitrum",
+      "chainId": 42161,
+      "slug": "arbitrum"
+    },
+    {
+      "name": "Arbitrum Nova",
+      "chainId": 42170,
+      "slug": "arbitrum-nova"
+    },
+    {
+      "name": "Optimism",
+      "chainId": 10,
+      "slug": "optimism"
+    },
+    {
+      "name": "Avalanche",
+      "chainId": 43114,
+      "slug": "avalanche"
+    },
+    {
+      "name": "BNB",
+      "chainId": 56,
+      "slug": "binance"
+    },
+    {
+      "name": "Zora",
+      "chainId": 7777777,
+      "slug": "zora"
+    },
+    {
+      "name": "Mantle",
+      "chainId": 5000,
+      "slug": "mantle"
+    },
+    {
+      "name": "Ancient8",
+      "chainId": 888888888,
+      "slug": "ancient8"
+    },
+    {
+      "name": "Berachain",
+      "chainId": 80094,
+      "slug": "berachain"
+    },
+    {
+      "name": "Blast",
+      "chainId": 81457,
+      "slug": "blast"
+    },
+    {
+      "name": "Bob",
+      "chainId": 60808,
+      "slug": "bob"
+    },
+    {
+      "name": "Celo",
+      "chainId": 42220,
+      "slug": "celo"
+    },
+    {
+      "name": "Citrea",
+      "chainId": 4114,
+      "slug": "citrea"
+    },
+    {
+      "name": "Cyber Mainnet",
+      "chainId": 7560,
+      "slug": "cyber-mainnet"
+    },
+    {
+      "name": "Degen",
+      "chainId": 666666666,
+      "slug": "degen"
+    },
+    {
+      "name": "DFK",
+      "chainId": 53935,
+      "slug": "dfk-chain"
+    },
+    {
+      "name": "DOS",
+      "chainId": 7979,
+      "slug": "dos-mainnet"
+    },
+    {
+      "name": "Etherlink Mainnet",
+      "chainId": 42793,
+      "slug": "etherlink-mainnet"
+    },
+    {
+      "name": "Fuse",
+      "chainId": 122,
+      "slug": "fuse"
+    },
+    {
+      "name": "Geo",
+      "chainId": 80451,
+      "slug": "geo"
+    },
+    {
+      "name": "Gnosis",
+      "chainId": 100,
+      "slug": "gnosis"
+    },
+    {
+      "name": "Hyper EVM",
+      "chainId": 999,
+      "slug": "hyper-evm"
+    },
+    {
+      "name": "Kaia",
+      "chainId": 8217,
+      "slug": "kaia"
+    },
+    {
+      "name": "Linea",
+      "chainId": 59144,
+      "slug": "linea"
+    },
+    {
+      "name": "MegaETH",
+      "chainId": 4326,
+      "slug": "megaeth"
+    },
+    {
+      "name": "Mode",
+      "chainId": 34443,
+      "slug": "mode"
+    },
+    {
+      "name": "Monad",
+      "chainId": 143,
+      "slug": "monad"
+    },
+    {
+      "name": "Moonbeam",
+      "chainId": 1284,
+      "slug": "moonbeam"
+    },
+    {
+      "name": "OP BNB",
+      "chainId": 204,
+      "slug": "opbnb"
+    },
+    {
+      "name": "Plume Mainnet",
+      "chainId": 98866,
+      "slug": "plume"
+    },
+    {
+      "name": "Redstone",
+      "chainId": 690,
+      "slug": "redstone"
+    },
+    {
+      "name": "Scroll",
+      "chainId": 534352,
+      "slug": "scroll"
+    },
+    {
+      "name": "Sei",
+      "chainId": 1329,
+      "slug": "sei"
+    },
+    {
+      "name": "Somnia Mainnet",
+      "chainId": 5031,
+      "slug": "somnia"
+    },
+    {
+      "name": "Sonic Mainnet",
+      "chainId": 146,
+      "slug": "sonic"
+    },
+    {
+      "name": "Story Mainnet",
+      "chainId": 1514,
+      "slug": "story-mainnet"
+    },
+    {
+      "name": "Superposition",
+      "chainId": 55244,
+      "slug": "superposition"
+    },
+    {
+      "name": "Unichain",
+      "chainId": 130,
+      "slug": "unichain"
+    },
+    {
+      "name": "World Chain",
+      "chainId": 480,
+      "slug": "worldchain"
+    }
+  ],
+  "testnets": [
+    {
+      "name": "Base Sepolia",
+      "chainId": 84532,
+      "slug": "base-sepolia"
+    },
+    {
+      "name": "Polygon Amoy",
+      "chainId": 80002,
+      "slug": "polygon-amoy"
+    },
+    {
+      "name": "OP Sepolia",
+      "chainId": 11155420,
+      "slug": "optimism-sepolia"
+    },
+    {
+      "name": "Arbitrum Sepolia",
+      "chainId": 421614,
+      "slug": "arbitrum-sepolia"
+    },
+    {
+      "name": "Zora Sepolia",
+      "chainId": 999999999,
+      "slug": "zora-sepolia"
+    },
+    {
+      "name": "Binance Testnet",
+      "chainId": 97,
+      "slug": "binance-testnet"
+    },
+    {
+      "name": "Mantle Sepolia",
+      "chainId": 5003,
+      "slug": "mantle-sepolia"
+    },
+    {
+      "name": "Ancient8 Testnet",
+      "chainId": 28122024,
+      "slug": "ancient8-testnet"
+    },
+    {
+      "name": "Arc Testnet",
+      "chainId": 5042002,
+      "slug": "arc-testnet"
+    },
+    {
+      "name": "Avalanche Fuji",
+      "chainId": 43113,
+      "slug": "avalanche-fuji"
+    },
+    {
+      "name": "Berachain Bepolia",
+      "chainId": 80069,
+      "slug": "berachain-bepolia"
+    },
+    {
+      "name": "Blast Sepolia",
+      "chainId": 168587773,
+      "slug": "blast-sepolia"
+    },
+    {
+      "name": "BOB Sepolia",
+      "chainId": 808813,
+      "slug": "bob-sepolia"
+    },
+    {
+      "name": "Chiado Testnet",
+      "chainId": 10200,
+      "slug": "chiado-testnet"
+    },
+    {
+      "name": "Citrea Testnet",
+      "chainId": 5115,
+      "slug": "citrea-testnet"
+    },
+    {
+      "name": "Cyber Testnet",
+      "chainId": 111557560,
+      "slug": "cyber-testnet"
+    },
+    {
+      "name": "DFK Subnet Testnet",
+      "chainId": 335,
+      "slug": "dfk-chain-test"
+    },
+    {
+      "name": "Etherlink Shadow Testnet",
+      "chainId": 127823,
+      "slug": "etherlink-shadow-testnet"
+    },
+    {
+      "name": "Fuse Sparknet",
+      "chainId": 123,
+      "slug": "fuse-sparknet"
+    },
+    {
+      "name": "Geo Testnet",
+      "chainId": 19411,
+      "slug": "geo-testnet"
+    },
+    {
+      "name": "Hoodi Testnet",
+      "chainId": 560048,
+      "slug": "hoodi-testnet"
+    },
+    {
+      "name": "Kaia Kairos",
+      "chainId": 1001,
+      "slug": "kaia-kairos"
+    },
+    {
+      "name": "Linea Sepolia",
+      "chainId": 59141,
+      "slug": "linea-sepolia"
+    },
+    {
+      "name": "Moca Devnet",
+      "chainId": 5151,
+      "slug": "moca-devnet"
+    },
+    {
+      "name": "Moca Testnet",
+      "chainId": 222888,
+      "slug": "moca-testnet"
+    },
+    {
+      "name": "Monad Testnet",
+      "chainId": 10143,
+      "slug": "monad-testnet"
+    },
+    {
+      "name": "Plume Testnet",
+      "chainId": 98867,
+      "slug": "plume-testnet"
+    },
+    {
+      "name": "Pyrope Testnet",
+      "chainId": 695569,
+      "slug": "pyrope-testnet"
+    },
+    {
+      "name": "Scroll Sepolia Testnet",
+      "chainId": 534351,
+      "slug": "scroll-sepolia-testnet"
+    },
+    {
+      "name": "Sei Testnet",
+      "chainId": 1328,
+      "slug": "sei-testnet"
+    },
+    {
+      "name": "Sepolia",
+      "chainId": 11155111,
+      "slug": "sepolia"
+    },
+    {
+      "name": "SKALE Calypso Testnet",
+      "chainId": 974399131,
+      "slug": "calypso-testnet"
+    },
+    {
+      "name": "SKALE Europa Testnet",
+      "chainId": 1444673419,
+      "slug": "europa-testnet"
+    },
+    {
+      "name": "SKALE Nebula Testnet",
+      "chainId": 37084624,
+      "slug": "nebula-testnet"
+    },
+    {
+      "name": "SKALE Titan Testnet",
+      "chainId": 1020352220,
+      "slug": "titan-testnet"
+    },
+    {
+      "name": "Somnia Testnet",
+      "chainId": 50312,
+      "slug": "somnia-testnet"
+    },
+    {
+      "name": "Soneium Minato",
+      "chainId": 1946,
+      "slug": "soneium-minato"
+    },
+    {
+      "name": "Sonic Testnet",
+      "chainId": 14601,
+      "slug": "sonic-testnet"
+    },
+    {
+      "name": "Story Aeneid Testnet",
+      "chainId": 1315,
+      "slug": "story-aeneid-testnet"
+    },
+    {
+      "name": "Tempo Testnet",
+      "chainId": 42431,
+      "slug": "tempo-testnet"
+    },
+    {
+      "name": "Unichain Sepolia",
+      "chainId": 1301,
+      "slug": "unichain-testnet"
+    },
+    {
+      "name": "World Chain Sepolia",
+      "chainId": 4801,
+      "slug": "worldchain-sepolia"
+    }
+  ],
+  "allChainIds": [
+    1,
+    10,
+    56,
+    97,
+    100,
+    122,
+    123,
+    130,
+    137,
+    143,
+    146,
+    204,
+    335,
+    480,
+    690,
+    999,
+    1001,
+    1284,
+    1301,
+    1315,
+    1328,
+    1329,
+    1514,
+    1946,
+    4114,
+    4326,
+    4801,
+    5000,
+    5003,
+    5031,
+    5115,
+    5151,
+    7560,
+    7979,
+    8217,
+    8453,
+    10143,
+    10200,
+    14601,
+    19411,
+    34443,
+    42161,
+    42170,
+    42220,
+    42431,
+    42793,
+    43113,
+    43114,
+    50312,
+    53935,
+    55244,
+    59141,
+    59144,
+    60808,
+    80002,
+    80069,
+    80094,
+    80451,
+    81457,
+    84532,
+    98866,
+    98867,
+    127823,
+    222888,
+    421614,
+    534351,
+    534352,
+    560048,
+    695569,
+    808813,
+    5042002,
+    7777777,
+    11155111,
+    11155420,
+    28122024,
+    37084624,
+    111557560,
+    168587773,
+    666666666,
+    888888888,
+    974399131,
+    999999999,
+    1020352220,
+    1444673419
+  ],
+  "counts": {
+    "mainnets": 42,
+    "testnets": 42,
+    "all": 84
+  }
+}

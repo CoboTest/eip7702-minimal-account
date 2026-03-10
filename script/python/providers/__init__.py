@@ -7,6 +7,7 @@ Usage:
     from providers.pimlico import PimlicoBundler, PimlicoPaymaster
     from providers.alchemy import AlchemyBundler, AlchemyPaymaster
     from providers.zerodev import ZeroDevBundler, ZeroDevPaymaster
+    from providers.thirdweb import ThirdwebBundler, ThirdwebPaymaster
 """
 
 from providers.bundler import Bundler  # noqa: F401

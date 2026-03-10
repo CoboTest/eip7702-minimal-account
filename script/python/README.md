@@ -19,6 +19,8 @@ uv run e2e_pimlico.py
 uv run e2e_alchemy.py
 # or ZeroDev
 uv run e2e_zerodev.py
+# or thirdweb
+uv run e2e_thirdweb.py
 ```
 
 `uv run` automatically creates `.venv` and installs dependencies on first run.
@@ -57,6 +59,7 @@ Required by provider:
 - Pimlico: `PIMLICO_API_KEY`
 - Alchemy: `ALCHEMY_API_KEY`, `ALCHEMY_GAS_POLICY_ID`
 - ZeroDev: `ZERODEV_BUNDLER_RPC`, `ZERODEV_PAYMASTER_RPC`
+- thirdweb: `THIRDWEB_BUNDLER_URL`, (`THIRDWEB_SECRET_KEY` or `THIRDWEB_CLIENT_ID`)
 
 
 ## Architecture
@@ -66,6 +69,7 @@ script/python/
 ├── e2e_pimlico.py           # E2E #3 orchestrator (async, Pimlico)
 ├── e2e_alchemy.py           # E2E orchestrator (async, Alchemy)
 ├── e2e_zerodev.py           # E2E orchestrator (async, ZeroDev)
+├── e2e_thirdweb.py          # E2E orchestrator (async, thirdweb)
 ├── calls.py                 # Call encoding: erc20_transfer(), contract_call(), erc7821_batch()
 ├── userop.py                # UserOp lifecycle: build_userop(), sign_userop(), submit_and_wait()
 ├── config.py                # Chain constants (EP address, USDC)
@@ -87,7 +91,8 @@ script/python/
 │   ├── paymaster.py         # Paymaster ABC
 │   ├── pimlico/             # Pimlico implementation
 │   ├── alchemy/             # Alchemy implementation
-│   └── zerodev/             # ZeroDev implementation
+│   ├── zerodev/             # ZeroDev implementation
+│   └── thirdweb/            # thirdweb implementation
 │       ├── base.py          # JsonRpcMixin (async JSON-RPC)
 │       ├── bundler.py       # PimlicoBundler
 │       └── paymaster.py     # PimlicoPaymaster

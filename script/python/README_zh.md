@@ -19,6 +19,8 @@ uv run e2e_pimlico.py
 uv run e2e_alchemy.py
 # or ZeroDev
 uv run e2e_zerodev.py
+# or thirdweb
+uv run e2e_thirdweb.py
 ```
 
 `uv run` 首次运行时自动创建 `.venv` 并安装依赖。

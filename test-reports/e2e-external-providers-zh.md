@@ -1,10 +1,10 @@
-# 外部 Provider E2E 测试报告（Pimlico vs Alchemy）
+# 外部 Provider E2E 测试报告（Pimlico vs Alchemy vs ZeroDev）
 
 [🇬🇧 English](e2e-external-providers-en.md)
 
 > 目标：记录使用外部 Bundler/Paymaster provider 的真实链上结果，并对比接口/响应/行为差异。
 > 网络：Sepolia（EntryPoint v0.7）
-> 测试脚本：`script/python/e2e_pimlico.py`、`script/python/e2e_alchemy.py`
+> 测试脚本：`script/python/e2e_pimlico.py`、`script/python/e2e_alchemy.py`、`script/python/e2e_zerodev.py`
 
 ---
 
@@ -12,6 +12,7 @@
 
 - ✅ Pimlico 路径：通过
 - ✅ Alchemy 路径：通过
+- ✅ ZeroDev 路径：通过
 - ✅ Alice 全程 0 ETH（gas sponsor 生效）
 - ✅ Alice USDC 最终归零（1 USDC 批量转回 Sponsor）
 - ✅ Alice 代码长度 23 bytes（EIP-7702 delegation 生效）
@@ -38,6 +39,16 @@
 |---|---|---|
 | UserOp on-chain tx | <https://sepolia.etherscan.io/tx/0xc44e17cd76b960a899b0345f42debc1faad59671898c729a2292627b7477402c> | `0x9ef8e1` |
 
+
+### C. ZeroDev（Bundler + Paymaster）
+
+- Alice: `0xc0fb5624c988030096A2D87327AE0d8595EAd525`
+- MinimalAccount: `0xc50F8D8b5055dd61e305c447d17644411994ef5F`
+
+| 步骤 | 交易 | 区块 |
+|---|---|---|
+| UserOp on-chain tx | <https://sepolia.etherscan.io/tx/0x894bf7dcdb0241164234210751b16194cd723d82e7b97ac0d0c8a9fec72c74f6> | `0x9ef9f9` |
+
 ---
 
 ## 3) Provider 响应差异对比
@@ -46,6 +57,7 @@
 
 - Pimlico：`pm_sponsorUserOperation`
 - Alchemy：`alchemy_requestGasAndPaymasterAndData`
+- ZeroDev：`zd_sponsorUserOperation`（本端点实测可用；并保留 `pm_sponsorUserOperation` 兼容 fallback）
 
 二者都返回：
 - `paymaster`
@@ -92,12 +104,31 @@ Alchemy sponsor 返回（完整字段）：
 
 > 说明：上述为测试时 provider 返回的原始 sponsor 字段（十六进制字符串），已经与最终签名 UserOp 对齐使用。
 
+ZeroDev sponsor 返回（完整字段）：
+
+```json
+{
+  "paymaster": "0x777777777777AeC03fd955926DbF81597e66834C",
+  "paymasterData": "0x01000069afa060000000000000f77a647bcc1ed87cfd7258ca3a3aebc3c7d068253ea0d8c7a08bfbaa405af28f1d25eaf340d9d8b0e553c9976d296bf20a8a31d48a0488232a6cc0b4292f30f91b",
+  "paymasterVerificationGasLimit": "0x8a8e",
+  "paymasterPostOpGasLimit": "0x1",
+  "verificationGasLimit": "0xc9f2",
+  "callGasLimit": "0xa48c",
+  "preVerificationGas": "0x13e96",
+  "maxFeePerGas": "0x3d0930",
+  "maxPriorityFeePerGas": "0x1e8498"
+}
+```
+
+> 说明：ZeroDev 当前这个 endpoint 对 fee 下限较严格；已在 bundler 侧加入更稳健的 gas price fallback，避免低费率被拒。
+
 ### 3.3 关键差异（落地影响）
 
 - **Pimlico**：通常以 bundler 返回 fee + sponsor 返回 paymaster/gas 为主。
 - **Alchemy**：sponsor 响应可能带 fee 覆盖。若不应用到最终 UserOp，可能触发 `Invalid paymaster signature`（签名上下文不一致）。
+- **ZeroDev**：当前 endpoint 采用 `zd_sponsorUserOperation` 方法族；fee 下限策略更严格，低费率会在 `eth_sendUserOperation` 阶段被拒。
 
-> 当前代码已统一：**若 sponsor 响应包含 fee 覆盖，都会合并到最终 UserOp**（Pimlico/Alchemy 对齐）。
+> 当前代码已统一：**若 sponsor 响应包含 fee 覆盖，都会合并到最终 UserOp**（Pimlico/Alchemy/ZeroDev 对齐）。
 
 ---
 
@@ -126,6 +157,7 @@ Alchemy sponsor 返回（完整字段）：
 cd script/python
 uv run e2e_pimlico.py
 uv run e2e_alchemy.py
+uv run e2e_zerodev.py
 ```
 
 环境变量统一来自：`.env.example`。

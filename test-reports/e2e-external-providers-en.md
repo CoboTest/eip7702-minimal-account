@@ -1,15 +1,16 @@
-# External Provider E2E Report (Pimlico vs Alchemy)
+# External Provider E2E Report (Pimlico vs Alchemy vs ZeroDev)
 
 [🇨🇳 中文版](e2e-external-providers-zh.md)
 
 > Purpose: track real on-chain outcomes for external Bundler/Paymaster providers, and compare RPC/response behavior.
 > Network: Sepolia (EntryPoint v0.7)
-> Scripts: `script/python/e2e_pimlico.py`, `script/python/e2e_alchemy.py`
+> Scripts: `script/python/e2e_pimlico.py`, `script/python/e2e_alchemy.py`, `script/python/e2e_zerodev.py`
 
 ## Summary
 
 - ✅ Pimlico flow passed
 - ✅ Alchemy flow passed
+- ✅ ZeroDev flow passed
 - ✅ Alice stayed at 0 ETH (sponsorship effective)
 - ✅ Alice USDC ended at 0 (1 USDC round-trip to Sponsor)
 - ✅ Alice code length is 23 bytes (EIP-7702 delegation active)
@@ -34,12 +35,23 @@
 |---|---|---|
 | UserOp on-chain tx | <https://sepolia.etherscan.io/tx/0xc44e17cd76b960a899b0345f42debc1faad59671898c729a2292627b7477402c> | `0x9ef8e1` |
 
+
+### ZeroDev
+
+- Alice: `0xc0fb5624c988030096A2D87327AE0d8595EAd525`
+- MinimalAccount: `0xc50F8D8b5055dd61e305c447d17644411994ef5F`
+
+| Step | Tx | Block |
+|---|---|---|
+| UserOp on-chain tx | <https://sepolia.etherscan.io/tx/0x894bf7dcdb0241164234210751b16194cd723d82e7b97ac0d0c8a9fec72c74f6> | `0x9ef9f9` |
+
 ## Provider Differences
 
 ### Sponsorship RPC
 
 - Pimlico: `pm_sponsorUserOperation`
 - Alchemy: `alchemy_requestGasAndPaymasterAndData`
+- ZeroDev: `zd_sponsorUserOperation` (working on this endpoint; `pm_sponsorUserOperation` kept as compatibility fallback)
 
 ### Full paymaster sponsor responses (captured)
 
@@ -77,12 +89,30 @@ Alchemy (full fields):
 
 > Note: these are raw sponsor-returned fields (hex strings) consumed by the final signed UserOp.
 
+ZeroDev (full fields):
+
+```json
+{
+  "paymaster": "0x777777777777AeC03fd955926DbF81597e66834C",
+  "paymasterData": "0x01000069afa060000000000000f77a647bcc1ed87cfd7258ca3a3aebc3c7d068253ea0d8c7a08bfbaa405af28f1d25eaf340d9d8b0e553c9976d296bf20a8a31d48a0488232a6cc0b4292f30f91b",
+  "paymasterVerificationGasLimit": "0x8a8e",
+  "paymasterPostOpGasLimit": "0x1",
+  "verificationGasLimit": "0xc9f2",
+  "callGasLimit": "0xa48c",
+  "preVerificationGas": "0x13e96",
+  "maxFeePerGas": "0x3d0930",
+  "maxPriorityFeePerGas": "0x1e8498"
+}
+```
+
+> Note: this ZeroDev endpoint enforces stricter fee floors; a robust gas-price fallback is required to avoid low-fee rejections at `eth_sendUserOperation`.
+
 ### Practical impact
 
 - If provider returns fee overrides, they must be merged into the final signed UserOp.
 - Otherwise, paymaster validation context can mismatch and fail (`Invalid paymaster signature`).
 
-Current code now aligns behavior for both providers:
+Current code now aligns behavior for all providers:
 - apply sponsor gas/paymaster fields
 - apply sponsor fee overrides when present
 
@@ -92,6 +122,7 @@ Current code now aligns behavior for both providers:
 cd script/python
 uv run e2e_pimlico.py
 uv run e2e_alchemy.py
+uv run e2e_zerodev.py
 ```
 
 Env source of truth: `.env.example`.

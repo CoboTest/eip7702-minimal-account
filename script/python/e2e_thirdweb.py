@@ -42,13 +42,13 @@ async def main() -> None:
 
     # thirdweb default RPC format: https://1.rpc.thirdweb.com/<client_id>
     # Allow explicit override via THIRDWEB_BUNDLER_URL.
-    thirdweb_url = os.environ.get("THIRDWEB_BUNDLER_URL")
+    thirdweb_url = os.environ.get("THIRDWEB_BUNDLER_URL", "").strip()
     if not thirdweb_url:
         assert client_id, "Set THIRDWEB_BUNDLER_URL or THIRDWEB_CLIENT_ID"
         thirdweb_url = f"https://1.rpc.thirdweb.com/{client_id}"
 
     # optional; fallback to bundler url
-    paymaster_url = os.environ.get("THIRDWEB_PAYMASTER_URL", thirdweb_url)
+    paymaster_url = os.environ.get("THIRDWEB_PAYMASTER_URL", "").strip() or thirdweb_url
 
     ep_address = EP_V07
 

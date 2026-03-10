@@ -15,6 +15,8 @@ EIP-7702 Minimal Batch Executor 的纯 Python E2E 测试套件。运行时无需
 ```bash
 cd script/python
 uv run e2e_pimlico.py
+# or
+uv run e2e_alchemy.py
 ```
 
 `uv run` 首次运行时自动创建 `.venv` 并安装依赖。
@@ -48,6 +50,8 @@ RPC_URL=https://eth-sepolia.g.alchemy.com/v2/<your-key>
 DEPLOYER_PRIVATE_KEY=0x...
 SPONSOR_PRIVATE_KEY=0x...
 PIMLICO_API_KEY=pim_...
+ALCHEMY_API_KEY=...
+ALCHEMY_GAS_POLICY_ID=...
 ```
 
 | 变量                   | 说明                                 |
@@ -116,6 +120,7 @@ Bundler 和 Paymaster 是独立接口，切换 provider 无需修改 E2E 逻辑�
 
 ```python
 from providers.pimlico import PimlicoBundler, PimlicoPaymaster
+from providers.alchemy import AlchemyBundler, AlchemyPaymaster
 
 # 当前
 bundler = PimlicoBundler(url, entry_point)
@@ -123,7 +128,7 @@ paymaster = PimlicoPaymaster(url, entry_point)
 
 # 未来：自由组合
 # bundler = AlchemyBundler(url, entry_point)
-# paymaster = StackupPaymaster(url, entry_point)
+# paymaster = AlchemyPaymaster(url, entry_point, policy_id)
 ```
 
 ### 异步优先

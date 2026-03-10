@@ -15,6 +15,8 @@ Pure Python E2E test suite for the EIP-7702 Minimal Batch Executor. No CLI tools
 ```bash
 cd script/python
 uv run e2e_pimlico.py
+# or
+uv run e2e_alchemy.py
 ```
 
 `uv run` automatically creates `.venv` and installs dependencies on first run.
@@ -48,6 +50,8 @@ RPC_URL=https://eth-sepolia.g.alchemy.com/v2/<your-key>
 DEPLOYER_PRIVATE_KEY=0x...
 SPONSOR_PRIVATE_KEY=0x...
 PIMLICO_API_KEY=pim_...
+ALCHEMY_API_KEY=...
+ALCHEMY_GAS_POLICY_ID=...
 ```
 
 | Variable               | Description                         |
@@ -56,12 +60,15 @@ PIMLICO_API_KEY=pim_...
 | `DEPLOYER_PRIVATE_KEY` | Deploys MinimalAccount contract     |
 | `SPONSOR_PRIVATE_KEY`  | Transfers USDC to Alice             |
 | `PIMLICO_API_KEY`      | Pimlico bundler + paymaster API key |
+| `ALCHEMY_API_KEY`      | Alchemy API key (bundler/paymaster) |
+| `ALCHEMY_GAS_POLICY_ID`| Alchemy Gas Manager policy id |
 
 ## Architecture
 
 ```
 script/python/
-├── e2e_pimlico.py           # E2E #3 orchestrator (async)
+├── e2e_pimlico.py           # E2E #3 orchestrator (async, Pimlico)
+├── e2e_alchemy.py           # E2E orchestrator (async, Alchemy)
 ├── calls.py                 # Call encoding: erc20_transfer(), contract_call(), erc7821_batch()
 ├── userop.py                # UserOp lifecycle: build_userop(), sign_userop(), submit_and_wait()
 ├── config.py                # Chain constants (EP address, USDC)
@@ -81,7 +88,8 @@ script/python/
 │   ├── types.py             # GasPrice, UserOpReceipt, SponsorResult
 │   ├── bundler.py           # Bundler ABC
 │   ├── paymaster.py         # Paymaster ABC
-│   └── pimlico/             # Pimlico implementation
+│   ├── pimlico/             # Pimlico implementation
+│   └── alchemy/             # Alchemy implementation
 │       ├── base.py          # JsonRpcMixin (async JSON-RPC)
 │       ├── bundler.py       # PimlicoBundler
 │       └── paymaster.py     # PimlicoPaymaster
@@ -116,6 +124,7 @@ Bundler and Paymaster are independent interfaces. Swap providers without changin
 
 ```python
 from providers.pimlico import PimlicoBundler, PimlicoPaymaster
+from providers.alchemy import AlchemyBundler, AlchemyPaymaster
 
 # Current
 bundler = PimlicoBundler(url, entry_point)
@@ -123,7 +132,7 @@ paymaster = PimlicoPaymaster(url, entry_point)
 
 # Future: mix and match
 # bundler = AlchemyBundler(url, entry_point)
-# paymaster = StackupPaymaster(url, entry_point)
+# paymaster = AlchemyPaymaster(url, entry_point, policy_id)
 ```
 
 ### Async-First

@@ -5,6 +5,7 @@ Usage:
     from providers import Bundler, Paymaster
     from providers.types import GasPrice, SponsorResult, UserOpReceipt
     from providers.pimlico import PimlicoBundler, PimlicoPaymaster
+    from providers.alchemy import AlchemyBundler, AlchemyPaymaster
 """
 
 from providers.bundler import Bundler  # noqa: F401

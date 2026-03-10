@@ -56,18 +56,41 @@ Alchemy 额外常见返回：
 - `maxFeePerGas`
 - `maxPriorityFeePerGas`
 
-### 3.2 本次实测参数（示例）
+### 3.2 本次实测参数（完整展示）
 
-- Pimlico sponsor 返回：
-  - paymaster: `0x777777777777AeC03fd955926DbF81597e66834C`
-  - `verGas=0xc9f2` `callGas=0xa48c` `preVerGas=0x13e96`
-  - `pmVerGas=0x8a8e` `pmPostGas=0x1`
+Pimlico sponsor 返回（完整字段）：
 
-- Alchemy sponsor 返回：
-  - paymaster: `0x2cc0c7981D846b9F2a16276556f6e8cb52BfB633`
-  - `verGas=0x9d9d` `callGas=0xa1f3` `preVerGas=0x12694`
-  - `pmVerGas=0x7e17` `pmPostGas=0x0`
-  - 且返回 fee 覆盖（`maxFeePerGas/maxPriorityFeePerGas`）
+```json
+{
+  "paymaster": "0x777777777777AeC03fd955926DbF81597e66834C",
+  "paymasterData": "0x01000069af93b70000000000009a6b48fb9adff1e07ed97b136bc1da33d34d458e88cf981f971cf00aac2bcfb7786cb3fdca5b3145af85e07d1c35284988e25da9e0f3a0bce7d34e41342d05ff1c",
+  "paymasterVerificationGasLimit": "0x8a8e",
+  "paymasterPostOpGasLimit": "0x1",
+  "verificationGasLimit": "0xc9f2",
+  "callGasLimit": "0xa48c",
+  "preVerificationGas": "0x13e96",
+  "maxFeePerGas": "0x6795f0",
+  "maxPriorityFeePerGas": "0x6791b5"
+}
+```
+
+Alchemy sponsor 返回（完整字段）：
+
+```json
+{
+  "paymaster": "0x2cc0c7981D846b9F2a16276556f6e8cb52BfB633",
+  "paymasterData": "0x000000000000000069af9417001a4f95e51861103f9a488e36c4614769856e2e2aa7b75656f1bd99ced2c91d35de8e9553becaf6151e2b8f4907ff4d1b927965fff2afc6526d7304d37c6a651c",
+  "paymasterVerificationGasLimit": "0x7e17",
+  "paymasterPostOpGasLimit": "0x0",
+  "verificationGasLimit": "0x9d9d",
+  "callGasLimit": "0xa1f3",
+  "preVerificationGas": "0x12694",
+  "maxFeePerGas": "0x68e7b3b",
+  "maxPriorityFeePerGas": "0x68e7780"
+}
+```
+
+> 说明：上述为测试时 provider 返回的原始 sponsor 字段（十六进制字符串），已经与最终签名 UserOp 对齐使用。
 
 ### 3.3 关键差异（落地影响）
 

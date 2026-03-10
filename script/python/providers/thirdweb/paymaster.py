@@ -10,11 +10,25 @@ from providers.types import SponsorResult, UserOperation
 
 
 class ThirdwebPaymaster(ThirdwebJsonRpcMixin, Paymaster):
-    """thirdweb paymaster via pm_sponsorUserOperation."""
+    """thirdweb paymaster integration.
 
-    def __init__(self, url: str, entry_point: str, client_id: str | None = None, secret_key: str | None = None):
+    Tries the recommended paymaster data endpoint first, then falls back to
+    pm_sponsorUserOperation for compatibility.
+    """
+
+    def __init__(
+        self,
+        url: str,
+        entry_point: str,
+        chain_id: int,
+        client_id: str | None = None,
+        secret_key: str | None = None,
+        paymaster_context: dict[str, Any] | None = None,
+    ):
         self._url = url
         self._entry_point = entry_point
+        self._chain_id = chain_id
+        self._paymaster_context = paymaster_context
         self._session = None
         self._headers = {}
         if secret_key:
@@ -23,17 +37,23 @@ class ThirdwebPaymaster(ThirdwebJsonRpcMixin, Paymaster):
             self._headers["X-Client-Id"] = client_id
 
     async def sponsor(self, user_op: UserOperation) -> SponsorResult:
-        # thirdweb docs: params [userOp, entryPoint, chainId]
-        # chainId may be required on some deployments.
-        params: list[Any] = [user_op.to_dict(), self._entry_point]
+        chain_id_hex = hex(self._chain_id)
+
+        params_full: list[Any] = [user_op.to_dict(), self._entry_point, chain_id_hex]
+        if self._paymaster_context is not None:
+            params_full.append(self._paymaster_context)
+
+        # thirdweb-recommended shape (ERC-7677 style)
+        # 1) pm_getPaymasterData
+        # 2) fallback to pm_sponsorUserOperation
         try:
-            result = await self._rpc("pm_sponsorUserOperation", params)
+            result = await self._rpc("pm_getPaymasterData", params_full)
         except Exception:
-            # fallback with chainId (hex) when required by endpoint
-            chain_id_hex = "0x0"
-            if user_op.eip7702_auth is not None and "chainId" in user_op.eip7702_auth:
-                chain_id_hex = user_op.eip7702_auth["chainId"]
-            result = await self._rpc("pm_sponsorUserOperation", [user_op.to_dict(), self._entry_point, chain_id_hex])
+            try:
+                result = await self._rpc("pm_sponsorUserOperation", params_full)
+            except Exception:
+                # legacy shape fallback: [userOp, entryPoint]
+                result = await self._rpc("pm_sponsorUserOperation", [user_op.to_dict(), self._entry_point])
 
         op: dict[str, Any] = result.get("userOperation", result)
 

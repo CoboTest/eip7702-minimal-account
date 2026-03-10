@@ -2,6 +2,7 @@
 """E2E: thirdweb Bundler + Paymaster (Python, EP v0.7)."""
 
 import asyncio
+import json
 import logging
 import os
 from pathlib import Path
@@ -47,6 +48,11 @@ async def main() -> None:
     # optional; fallback to bundler url
     paymaster_url = os.environ.get("THIRDWEB_PAYMASTER_URL", "").strip() or thirdweb_url
 
+    paymaster_context = None
+    context_raw = os.environ.get("THIRDWEB_PAYMASTER_CONTEXT_JSON", "").strip()
+    if context_raw:
+        paymaster_context = json.loads(context_raw)
+
     ep_address = ENTRYPOINT_V07
 
     deployer = LocalSigner(os.environ["DEPLOYER_PRIVATE_KEY"])
@@ -62,8 +68,10 @@ async def main() -> None:
     paymaster = ThirdwebPaymaster(
         paymaster_url,
         ep_address,
+        chain_id=chain_id,
         client_id=client_id,
         secret_key=secret_key,
+        paymaster_context=paymaster_context,
     )
 
     usdc = w3.eth.contract(address=Web3.to_checksum_address(USDC_ADDRESS), abi=USDC_ABI)

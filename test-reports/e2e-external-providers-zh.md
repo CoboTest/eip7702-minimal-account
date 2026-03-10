@@ -1,5 +1,7 @@
 # 外部 Provider E2E 测试报告（Pimlico vs Alchemy）
 
+[🇬🇧 English](e2e-external-providers-en.md)
+
 > 目标：记录使用外部 Bundler/Paymaster provider 的真实链上结果，并对比接口/响应/行为差异。
 > 网络：Sepolia（EntryPoint v0.7）
 > 测试脚本：`script/python/e2e_pimlico.py`、`script/python/e2e_alchemy.py`

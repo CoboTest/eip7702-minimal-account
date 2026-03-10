@@ -1,5 +1,7 @@
 # External Provider E2E Report (Pimlico vs Alchemy)
 
+[🇨🇳 中文版](e2e-external-providers-zh.md)
+
 > Purpose: track real on-chain outcomes for external Bundler/Paymaster providers, and compare RPC/response behavior.
 > Network: Sepolia (EntryPoint v0.7)
 > Scripts: `script/python/e2e_pimlico.py`, `script/python/e2e_alchemy.py`

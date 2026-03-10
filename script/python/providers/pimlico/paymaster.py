@@ -23,6 +23,10 @@ class PimlicoPaymaster(JsonRpcMixin, Paymaster):
             verification_gas_limit=int(result["verificationGasLimit"], 16),
             call_gas_limit=int(result["callGasLimit"], 16),
             pre_verification_gas=int(result["preVerificationGas"], 16),
+            max_fee_per_gas=(int(result["maxFeePerGas"], 16) if result.get("maxFeePerGas") else None),
+            max_priority_fee_per_gas=(
+                int(result["maxPriorityFeePerGas"], 16) if result.get("maxPriorityFeePerGas") else None
+            ),
         )
 
     def __repr__(self) -> str:

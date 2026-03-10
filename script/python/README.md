@@ -17,6 +17,8 @@ cd script/python
 uv run e2e_pimlico.py
 # or
 uv run e2e_alchemy.py
+# or ZeroDev
+uv run e2e_zerodev.py
 ```
 
 `uv run` automatically creates `.venv` and installs dependencies on first run.
@@ -54,6 +56,7 @@ Required by provider:
 - Shared: `RPC_URL`, `DEPLOYER_PRIVATE_KEY`, `SPONSOR_PRIVATE_KEY`
 - Pimlico: `PIMLICO_API_KEY`
 - Alchemy: `ALCHEMY_API_KEY`, `ALCHEMY_GAS_POLICY_ID`
+- ZeroDev: `ZERODEV_BUNDLER_RPC`, `ZERODEV_PAYMASTER_RPC`
 
 
 ## Architecture
@@ -62,6 +65,7 @@ Required by provider:
 script/python/
 ├── e2e_pimlico.py           # E2E #3 orchestrator (async, Pimlico)
 ├── e2e_alchemy.py           # E2E orchestrator (async, Alchemy)
+├── e2e_zerodev.py           # E2E orchestrator (async, ZeroDev)
 ├── calls.py                 # Call encoding: erc20_transfer(), contract_call(), erc7821_batch()
 ├── userop.py                # UserOp lifecycle: build_userop(), sign_userop(), submit_and_wait()
 ├── config.py                # Chain constants (EP address, USDC)
@@ -82,7 +86,8 @@ script/python/
 │   ├── bundler.py           # Bundler ABC
 │   ├── paymaster.py         # Paymaster ABC
 │   ├── pimlico/             # Pimlico implementation
-│   └── alchemy/             # Alchemy implementation
+│   ├── alchemy/             # Alchemy implementation
+│   └── zerodev/             # ZeroDev implementation
 │       ├── base.py          # JsonRpcMixin (async JSON-RPC)
 │       ├── bundler.py       # PimlicoBundler
 │       └── paymaster.py     # PimlicoPaymaster

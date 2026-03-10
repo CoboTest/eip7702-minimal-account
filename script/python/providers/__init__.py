@@ -6,6 +6,7 @@ Usage:
     from providers.types import GasPrice, SponsorResult, UserOpReceipt
     from providers.pimlico import PimlicoBundler, PimlicoPaymaster
     from providers.alchemy import AlchemyBundler, AlchemyPaymaster
+    from providers.zerodev import ZeroDevBundler, ZeroDevPaymaster
 """
 
 from providers.bundler import Bundler  # noqa: F401

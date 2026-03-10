@@ -178,6 +178,8 @@ cd script/python
 uv run e2e_pimlico.py
 # 或 Alchemy
 uv run e2e_alchemy.py
+# 或 ZeroDev
+uv run e2e_zerodev.py
 ```
 
 #### E2E #4: 直接执行流程（`E2EDirect.s.sol`）
@@ -216,6 +218,7 @@ forge script script/E2EDirect.s.sol \
 - 自建 bundler 脚本：`BUNDLER_PRIVATE_KEY`
 - Pimlico 流程：`PIMLICO_API_KEY`
 - Python Alchemy 流程：`ALCHEMY_API_KEY`、`ALCHEMY_GAS_POLICY_ID`
+- Python ZeroDev 流程：`ZERODEV_BUNDLER_RPC`、`ZERODEV_PAYMASTER_RPC`
 
 > Alice 的密钥通过 `vm.randomUint()` 生成 — 每次运行全新随机密钥对，无需环境变量。
 

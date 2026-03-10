@@ -1,0 +1,622 @@
+{
+  "source": "https://www.alchemy.com/docs/wallets/supported-chains",
+  "rows": [
+    {
+      "chain": "AnimeChain",
+      "mainnet": "✅ 69000 (anime-mainnet)",
+      "testnet": "✅ 6900 (anime-sepolia)",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [
+        69000
+      ],
+      "testnetChainIds": [
+        6900
+      ]
+    },
+    {
+      "chain": "Arbitrum Nova",
+      "mainnet": "✅ 42170 (arbnova-mainnet)",
+      "testnet": "❌",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [
+        42170
+      ],
+      "testnetChainIds": []
+    },
+    {
+      "chain": "Arbitrum One",
+      "mainnet": "✅ 42161 (arb-mainnet)",
+      "testnet": "✅ 421614 (arb-sepolia)",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [
+        42161
+      ],
+      "testnetChainIds": [
+        421614
+      ]
+    },
+    {
+      "chain": "Base",
+      "mainnet": "✅ 8453 (base-mainnet)",
+      "testnet": "✅ 84532 (base-sepolia)",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [
+        8453
+      ],
+      "testnetChainIds": [
+        84532
+      ]
+    },
+    {
+      "chain": "BNB",
+      "mainnet": "✅ 56 (bnb-mainnet)",
+      "testnet": "✅ 97 (bnb-testnet)",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [
+        56
+      ],
+      "testnetChainIds": [
+        97
+      ]
+    },
+    {
+      "chain": "BeraChain",
+      "mainnet": "✅ 80094 (berachain-mainnet)",
+      "testnet": "✅ 80084 (berachain-bartio)",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [
+        80094
+      ],
+      "testnetChainIds": [
+        80084
+      ]
+    },
+    {
+      "chain": "Celo",
+      "mainnet": "✅ 42220 (celo-mainnet)",
+      "testnet": "✅ 44787 (celo-alfajores)",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [
+        42220
+      ],
+      "testnetChainIds": [
+        44787
+      ]
+    },
+    {
+      "chain": "Ethereum",
+      "mainnet": "✅ 1 (eth-mainnet)",
+      "testnet": "✅ 11155111 (eth-sepolia)",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [
+        1
+      ],
+      "testnetChainIds": [
+        11155111
+      ]
+    },
+    {
+      "chain": "Frax",
+      "mainnet": "✅ 252 (frax-mainnet)",
+      "testnet": "❌",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [
+        252
+      ],
+      "testnetChainIds": []
+    },
+    {
+      "chain": "Hyperliquid",
+      "mainnet": "✅ 999 (hyperliquid-mainnet)",
+      "testnet": "✅ 998 (hyperliquid-testnet)",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [
+        999
+      ],
+      "testnetChainIds": [
+        998
+      ]
+    },
+    {
+      "chain": "Ink",
+      "mainnet": "✅ 57073 (ink-mainnet)",
+      "testnet": "✅ 763373 (ink-sepolia)",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [
+        57073
+      ],
+      "testnetChainIds": [
+        763373
+      ]
+    },
+    {
+      "chain": "Monad",
+      "mainnet": "✅ 143 (monad-mainnet)",
+      "testnet": "✅ 10143 (monad-testnet)",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [
+        143
+      ],
+      "testnetChainIds": [
+        10143
+      ]
+    },
+    {
+      "chain": "opBNB",
+      "mainnet": "✅ 204 (opbnb-mainnet)",
+      "testnet": "✅ 5611 (opbnb-testnet)",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [
+        204
+      ],
+      "testnetChainIds": [
+        5611
+      ]
+    },
+    {
+      "chain": "Optimism",
+      "mainnet": "✅ 10 (opt-mainnet)",
+      "testnet": "✅ 11155420 (opt-sepolia)",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [
+        10
+      ],
+      "testnetChainIds": [
+        11155420
+      ]
+    },
+    {
+      "chain": "Polygon",
+      "mainnet": "✅ 137 (polygon-mainnet)",
+      "testnet": "✅ 80002 (polygon-amoy)",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [
+        137
+      ],
+      "testnetChainIds": [
+        80002
+      ]
+    },
+    {
+      "chain": "Polynomial",
+      "mainnet": "✅ 8008 (polynomial-mainnet)",
+      "testnet": "✅ 8009 (polynomial-sepolia)",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [
+        8008
+      ],
+      "testnetChainIds": [
+        8009
+      ]
+    },
+    {
+      "chain": "Race",
+      "mainnet": "✅ 6805 (race-mainnet)",
+      "testnet": "✅ 6806 (race-sepolia)",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [
+        6805
+      ],
+      "testnetChainIds": [
+        6806
+      ]
+    },
+    {
+      "chain": "Rise",
+      "mainnet": "❌",
+      "testnet": "✅ 11155931 (rise-testnet)",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [],
+      "testnetChainIds": [
+        11155931
+      ]
+    },
+    {
+      "chain": "Shape",
+      "mainnet": "✅ 360 (shape-mainnet)",
+      "testnet": "✅ 11011 (shape-sepolia)",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [
+        360
+      ],
+      "testnetChainIds": [
+        11011
+      ]
+    },
+    {
+      "chain": "Solana",
+      "mainnet": "✅ (solana-mainnet)",
+      "testnet": "✅ solana-devnet",
+      "bundler": false,
+      "gasSponsorship": true,
+      "mainnetChainIds": [],
+      "testnetChainIds": []
+    },
+    {
+      "chain": "Soneium",
+      "mainnet": "✅ 1868 (soneium-mainnet)",
+      "testnet": "✅ 1946 (soneium-minato)",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [
+        1868
+      ],
+      "testnetChainIds": [
+        1946
+      ]
+    },
+    {
+      "chain": "Story",
+      "mainnet": "✅ 1514 (story-mainnet)",
+      "testnet": "✅ 1315 (story-aeneid)",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [
+        1514
+      ],
+      "testnetChainIds": [
+        1315
+      ]
+    },
+    {
+      "chain": "UniChain",
+      "mainnet": "✅ 130 (unichain-mainnet)",
+      "testnet": "✅ 1301 (unichain-sepolia)",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [
+        130
+      ],
+      "testnetChainIds": [
+        1301
+      ]
+    },
+    {
+      "chain": "WorldChain",
+      "mainnet": "✅ 480 (worldchain-mainnet)",
+      "testnet": "✅ 4801 (worldchain-sepolia)",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [
+        480
+      ],
+      "testnetChainIds": [
+        4801
+      ]
+    },
+    {
+      "chain": "Zora",
+      "mainnet": "✅ 7777777 (zora-mainnet)",
+      "testnet": "✅ 999999999 (zora-sepolia)",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [
+        7777777
+      ],
+      "testnetChainIds": [
+        999999999
+      ]
+    },
+    {
+      "chain": "Boba",
+      "mainnet": "✅ 288 (boba-mainnet)",
+      "testnet": "✅ 28882 (boba-sepolia)",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [
+        288
+      ],
+      "testnetChainIds": [
+        28882
+      ]
+    },
+    {
+      "chain": "Degen",
+      "mainnet": "✅ 666666666 (degen-mainnet)",
+      "testnet": "❌",
+      "bundler": false,
+      "gasSponsorship": false,
+      "mainnetChainIds": [
+        666666666
+      ],
+      "testnetChainIds": []
+    },
+    {
+      "chain": "Openloot",
+      "mainnet": "❌",
+      "testnet": "✅ 905905 (openloot-sepolia)",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [],
+      "testnetChainIds": [
+        905905
+      ]
+    },
+    {
+      "chain": "Tea",
+      "mainnet": "❌",
+      "testnet": "✅ 10218 (tea-sepolia)",
+      "bundler": true,
+      "gasSponsorship": true,
+      "mainnetChainIds": [],
+      "testnetChainIds": [
+        10218
+      ]
+    }
+  ],
+  "byChainId": {
+    "69000": {
+      "chain": "AnimeChain",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "6900": {
+      "chain": "AnimeChain",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "42170": {
+      "chain": "Arbitrum Nova",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "42161": {
+      "chain": "Arbitrum One",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "421614": {
+      "chain": "Arbitrum One",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "8453": {
+      "chain": "Base",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "84532": {
+      "chain": "Base",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "56": {
+      "chain": "BNB",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "97": {
+      "chain": "BNB",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "80094": {
+      "chain": "BeraChain",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "80084": {
+      "chain": "BeraChain",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "42220": {
+      "chain": "Celo",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "44787": {
+      "chain": "Celo",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "1": {
+      "chain": "Ethereum",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "11155111": {
+      "chain": "Ethereum",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "252": {
+      "chain": "Frax",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "999": {
+      "chain": "Hyperliquid",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "998": {
+      "chain": "Hyperliquid",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "57073": {
+      "chain": "Ink",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "763373": {
+      "chain": "Ink",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "143": {
+      "chain": "Monad",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "10143": {
+      "chain": "Monad",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "204": {
+      "chain": "opBNB",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "5611": {
+      "chain": "opBNB",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "10": {
+      "chain": "Optimism",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "11155420": {
+      "chain": "Optimism",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "137": {
+      "chain": "Polygon",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "80002": {
+      "chain": "Polygon",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "8008": {
+      "chain": "Polynomial",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "8009": {
+      "chain": "Polynomial",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "6805": {
+      "chain": "Race",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "6806": {
+      "chain": "Race",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "11155931": {
+      "chain": "Rise",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "360": {
+      "chain": "Shape",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "11011": {
+      "chain": "Shape",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "1868": {
+      "chain": "Soneium",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "1946": {
+      "chain": "Soneium",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "1514": {
+      "chain": "Story",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "1315": {
+      "chain": "Story",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "130": {
+      "chain": "UniChain",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "1301": {
+      "chain": "UniChain",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "480": {
+      "chain": "WorldChain",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "4801": {
+      "chain": "WorldChain",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "7777777": {
+      "chain": "Zora",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "999999999": {
+      "chain": "Zora",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "288": {
+      "chain": "Boba",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "28882": {
+      "chain": "Boba",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "666666666": {
+      "chain": "Degen",
+      "bundler": false,
+      "gasSponsorship": false
+    },
+    "905905": {
+      "chain": "Openloot",
+      "bundler": true,
+      "gasSponsorship": true
+    },
+    "10218": {
+      "chain": "Tea",
+      "bundler": true,
+      "gasSponsorship": true
+    }
+  },
+  "counts": {
+    "rows": 29,
+    "chainIds": 50
+  }
+}

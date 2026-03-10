@@ -147,12 +147,13 @@ Legend:
 | Sonic (146) | ✅ | ❓ | 🟡 |
 | Gnosis (100) | ✅ | ❓ | 🟡 |
 
-Provider evidence links (with reproducible data artifact):
-- Pimlico chain list is extracted and versioned by script: `script/python/tools/extract_pimlico_supported_chains.py` -> `test-reports/data/pimlico-supported-chains.json`
-
+Evidence links:
 - Pimlico: <https://docs.pimlico.io/guides/supported-chains>
 - Alchemy: <https://www.alchemy.com/docs/wallets/supported-chains>
-  - `script/python/tools/extract_alchemy_supported_chains.py` -> `test-reports/data/alchemy-supported-chains.json`
 - ZeroDev: <https://docs.zerodev.app/sdk/faqs/chains>
+
+Data artifacts:
+- `test-reports/data/pimlico-supported-chains.json`
+- `test-reports/data/alchemy-supported-chains.json`
 
 

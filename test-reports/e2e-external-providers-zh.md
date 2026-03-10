@@ -163,12 +163,13 @@ ZeroDev sponsor 返回（完整字段）：
 | Sonic (146) | ✅ | ❓ | 🟡 |
 | Gnosis (100) | ✅ | ❓ | 🟡 |
 
-三家判定依据（含可复现数据源）：
-- Pimlico 链清单由脚本提取并固化：`script/python/tools/extract_pimlico_supported_chains.py` → `test-reports/data/pimlico-supported-chains.json`
-
+判定依据：
 - Pimlico：<https://docs.pimlico.io/guides/supported-chains>
 - Alchemy：<https://www.alchemy.com/docs/wallets/supported-chains>
-  - `script/python/tools/extract_alchemy_supported_chains.py` → `test-reports/data/alchemy-supported-chains.json`
 - ZeroDev：<https://docs.zerodev.app/sdk/faqs/chains>
+
+数据文件：
+- `test-reports/data/pimlico-supported-chains.json`
+- `test-reports/data/alchemy-supported-chains.json`
 
 

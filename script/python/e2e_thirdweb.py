@@ -40,12 +40,11 @@ async def main() -> None:
     client_id = os.environ.get("THIRDWEB_CLIENT_ID")
     secret_key = os.environ.get("THIRDWEB_SECRET_KEY")
 
-    # thirdweb default RPC format: https://1.rpc.thirdweb.com/<client_id>
+    # thirdweb bundler API format: https://<chain_id>.bundler.thirdweb.com/v2
     # Allow explicit override via THIRDWEB_BUNDLER_URL.
     thirdweb_url = os.environ.get("THIRDWEB_BUNDLER_URL", "").strip()
     if not thirdweb_url:
-        assert client_id, "Set THIRDWEB_BUNDLER_URL or THIRDWEB_CLIENT_ID"
-        thirdweb_url = f"https://1.rpc.thirdweb.com/{client_id}"
+        thirdweb_url = f"https://{CHAIN_ID_SEPOLIA}.bundler.thirdweb.com/v2"
 
     # optional; fallback to bundler url
     paymaster_url = os.environ.get("THIRDWEB_PAYMASTER_URL", "").strip() or thirdweb_url

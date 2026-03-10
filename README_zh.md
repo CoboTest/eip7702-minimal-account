@@ -221,7 +221,7 @@ forge script script/E2EDirect.s.sol \
 - Pimlico 流程：`PIMLICO_API_KEY`
 - Python Alchemy 流程：`ALCHEMY_API_KEY`、`ALCHEMY_GAS_POLICY_ID`
 - Python ZeroDev 流程：`ZERODEV_BUNDLER_RPC`、`ZERODEV_PAYMASTER_RPC`
-- Python thirdweb 流程：（`THIRDWEB_BUNDLER_URL` 或 `THIRDWEB_CLIENT_ID` 自动拼 URL）+（`THIRDWEB_SECRET_KEY` 或 `THIRDWEB_CLIENT_ID`）
+- Python thirdweb 流程：`THIRDWEB_BUNDLER_URL`（或自动 `https://<chain_id>.bundler.thirdweb.com/v2`）+（`THIRDWEB_SECRET_KEY` 或 `THIRDWEB_CLIENT_ID`）
 
 > Alice 的密钥通过 `vm.randomUint()` 生成 — 每次运行全新随机密钥对，无需环境变量。
 

@@ -59,7 +59,7 @@ cp ../../.env.example ../../.env
 - Pimlico：`PIMLICO_API_KEY`
 - Alchemy：`ALCHEMY_API_KEY`、`ALCHEMY_GAS_POLICY_ID`
 - ZeroDev：`ZERODEV_BUNDLER_RPC`、`ZERODEV_PAYMASTER_RPC`
-- thirdweb：（`THIRDWEB_BUNDLER_URL` 或 `THIRDWEB_CLIENT_ID` 自动拼 URL），以及（`THIRDWEB_SECRET_KEY` 或 `THIRDWEB_CLIENT_ID`）
+- thirdweb：`THIRDWEB_BUNDLER_URL`（或自动 `https://<chain_id>.bundler.thirdweb.com/v2`），以及（`THIRDWEB_SECRET_KEY` 或 `THIRDWEB_CLIENT_ID`）
 
 
 ## 架构

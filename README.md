@@ -216,7 +216,7 @@ Required by scenario:
 - Self-bundled scripts: `BUNDLER_PRIVATE_KEY`
 - Pimlico flow: `PIMLICO_API_KEY`
 - Python Alchemy flow: `ALCHEMY_API_KEY`, `ALCHEMY_GAS_POLICY_ID`
-- Python ZeroDev flow: `ZERODEV_BUNDLER_RPC`, `ZERODEV_PAYMASTER_RPC`
+- Python ZeroDev flow: `ZERODEV_BUNDLER_RPC` (+ optional `ZERODEV_PAYMASTER_RPC` override)
 - Python thirdweb flow: `THIRDWEB_BUNDLER_URL` (required) + (`THIRDWEB_SECRET_KEY` or `THIRDWEB_CLIENT_ID`)
 
 > Alice's key is generated via `vm.randomUint()` — fresh random keypair each run, no env var needed.

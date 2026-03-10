@@ -47,7 +47,7 @@ async def main() -> None:
 
     rpc_url = os.environ["RPC_URL"]
     zerodev_bundler_url = os.environ["ZERODEV_BUNDLER_RPC"]
-    zerodev_paymaster_url = os.environ["ZERODEV_PAYMASTER_RPC"]
+    zerodev_paymaster_url = os.environ.get("ZERODEV_PAYMASTER_RPC", "").strip() or zerodev_bundler_url
 
     ep_address = EP_V07
 

@@ -220,7 +220,7 @@ forge script script/E2EDirect.s.sol \
 - 自建 bundler 脚本：`BUNDLER_PRIVATE_KEY`
 - Pimlico 流程：`PIMLICO_API_KEY`
 - Python Alchemy 流程：`ALCHEMY_API_KEY`、`ALCHEMY_GAS_POLICY_ID`
-- Python ZeroDev 流程：`ZERODEV_BUNDLER_RPC`、`ZERODEV_PAYMASTER_RPC`
+- Python ZeroDev 流程：`ZERODEV_BUNDLER_RPC`（+ 可选 `ZERODEV_PAYMASTER_RPC` 覆盖）
 - Python thirdweb 流程：`THIRDWEB_BUNDLER_URL`（必填）+（`THIRDWEB_SECRET_KEY` 或 `THIRDWEB_CLIENT_ID`）
 
 > Alice 的密钥通过 `vm.randomUint()` 生成 — 每次运行全新随机密钥对，无需环境变量。

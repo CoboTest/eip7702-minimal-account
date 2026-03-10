@@ -22,12 +22,13 @@ from artifacts import EP_ABI, USDC_ABI, load_artifact
 from calls import erc20_transfer, erc7821_batch
 from config import (
     BLOCK_PROPAGATION_DELAY,
-    CHAIN_ID_SEPOLIA,
-    EP_V07,
+    CHAIN_ID,
+    ENTRYPOINT_V07,
+    USDC_ADDRESS,
     USDC_AMOUNT,
     USDC_PART1,
     USDC_PART2,
-    USDC_SEPOLIA,
+    get_zerodev_rpc_url,
 )
 from hash import build_delegation_auth, compute_delegation_hash
 from providers.zerodev import ZeroDevBundler, ZeroDevPaymaster
@@ -46,10 +47,10 @@ async def main() -> None:
     load_dotenv(script_dir.parent.parent / ".env")
 
     rpc_url = os.environ["RPC_URL"]
-    zerodev_bundler_url = os.environ["ZERODEV_BUNDLER_RPC"]
+    zerodev_bundler_url = get_zerodev_rpc_url()
     zerodev_paymaster_url = os.environ.get("ZERODEV_PAYMASTER_RPC", "").strip() or zerodev_bundler_url
 
-    ep_address = EP_V07
+    ep_address = ENTRYPOINT_V07
 
     deployer = LocalSigner(os.environ["DEPLOYER_PRIVATE_KEY"])
     sponsor = LocalSigner(os.environ["SPONSOR_PRIVATE_KEY"])
@@ -58,12 +59,12 @@ async def main() -> None:
     w3 = AsyncWeb3(AsyncHTTPProvider(rpc_url))
     assert await w3.is_connected(), "Failed to connect to RPC"
     chain_id = await w3.eth.chain_id
-    assert chain_id == CHAIN_ID_SEPOLIA, f"Expected Sepolia ({CHAIN_ID_SEPOLIA}), got {chain_id}"
+    assert chain_id == CHAIN_ID, f"Expected CHAIN_ID={CHAIN_ID}, got {chain_id}"
 
     bundler = ZeroDevBundler(zerodev_bundler_url, ep_address)
     paymaster = ZeroDevPaymaster(zerodev_paymaster_url, ep_address)
 
-    usdc = w3.eth.contract(address=Web3.to_checksum_address(USDC_SEPOLIA), abi=USDC_ABI)
+    usdc = w3.eth.contract(address=Web3.to_checksum_address(USDC_ADDRESS), abi=USDC_ABI)
     ep = w3.eth.contract(address=Web3.to_checksum_address(ep_address), abi=EP_ABI)
 
     logger.info("=" * 56)
@@ -142,8 +143,8 @@ async def main() -> None:
 
         call_data = erc7821_batch(
             [
-                erc20_transfer(USDC_SEPOLIA, sponsor.address, USDC_PART1),
-                erc20_transfer(USDC_SEPOLIA, sponsor.address, USDC_PART2),
+                erc20_transfer(USDC_ADDRESS, sponsor.address, USDC_PART1),
+                erc20_transfer(USDC_ADDRESS, sponsor.address, USDC_PART2),
             ]
         )
         logger.info("  callData: %d bytes", len(call_data))

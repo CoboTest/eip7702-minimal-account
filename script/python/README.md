@@ -58,8 +58,8 @@ Required by provider:
 - Shared: `RPC_URL`, `DEPLOYER_PRIVATE_KEY`, `SPONSOR_PRIVATE_KEY`
 - Pimlico: `PIMLICO_API_KEY`
 - Alchemy: `ALCHEMY_API_KEY`, `ALCHEMY_GAS_POLICY_ID`
-- ZeroDev: `ZERODEV_BUNDLER_RPC` (+ optional `ZERODEV_PAYMASTER_RPC` override)
-- thirdweb: `THIRDWEB_BUNDLER_URL` (required), plus (`THIRDWEB_SECRET_KEY` or `THIRDWEB_CLIENT_ID`)
+- ZeroDev: (`ZERODEV_PROJECT_ID` or `ZERODEV_BUNDLER_RPC`) + optional `ZERODEV_PAYMASTER_RPC` override
+- thirdweb: (`THIRDWEB_BUNDLER_URL` or CHAIN_ID-derived default) + (`THIRDWEB_SECRET_KEY` or `THIRDWEB_CLIENT_ID`)
 
 
 ## Architecture

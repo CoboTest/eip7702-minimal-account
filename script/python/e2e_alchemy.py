@@ -32,12 +32,13 @@ from artifacts import EP_ABI, USDC_ABI, load_artifact
 from calls import erc20_transfer, erc7821_batch
 from config import (
     BLOCK_PROPAGATION_DELAY,
-    CHAIN_ID_SEPOLIA,
-    EP_V07,
+    CHAIN_ID,
+    ENTRYPOINT_V07,
+    USDC_ADDRESS,
     USDC_AMOUNT,
     USDC_PART1,
     USDC_PART2,
-    USDC_SEPOLIA,
+    get_alchemy_rpc_url,
 )
 from hash import build_delegation_auth, compute_delegation_hash
 from providers.alchemy import AlchemyBundler, AlchemyPaymaster
@@ -46,15 +47,6 @@ from tx import Transaction, sign_and_send_tx
 from userop import build_userop, sign_userop, submit_and_wait
 
 logger = logging.getLogger(__name__)
-
-
-def _alchemy_urls(api_key: str) -> tuple[str, str]:
-    # Defaults can be overridden for custom infra routing.
-    bundler_url = os.environ.get("ALCHEMY_BUNDLER_URL")
-    paymaster_url = os.environ.get("ALCHEMY_PAYMASTER_URL")
-
-    default = f"https://eth-sepolia.g.alchemy.com/v2/{api_key}"
-    return bundler_url or default, paymaster_url or default
 
 
 async def main() -> None:
@@ -69,8 +61,9 @@ async def main() -> None:
     alchemy_api_key = os.environ["ALCHEMY_API_KEY"]
     policy_id = os.environ["ALCHEMY_GAS_POLICY_ID"]
 
-    ep_address = EP_V07
-    bundler_url, paymaster_url = _alchemy_urls(alchemy_api_key)
+    ep_address = ENTRYPOINT_V07
+    bundler_url = get_alchemy_rpc_url(alchemy_api_key)
+    paymaster_url = os.environ.get("ALCHEMY_PAYMASTER_URL", "").strip() or bundler_url
 
     # ── Setup signers ──
     deployer = LocalSigner(os.environ["DEPLOYER_PRIVATE_KEY"])
@@ -81,14 +74,14 @@ async def main() -> None:
     w3 = AsyncWeb3(AsyncHTTPProvider(rpc_url))
     assert await w3.is_connected(), "Failed to connect to RPC"
     chain_id = await w3.eth.chain_id
-    assert chain_id == CHAIN_ID_SEPOLIA, f"Expected Sepolia ({CHAIN_ID_SEPOLIA}), got {chain_id}"
+    assert chain_id == CHAIN_ID, f"Expected CHAIN_ID={CHAIN_ID}, got {chain_id}"
 
     # ── Bundler + Paymaster ──
     bundler = AlchemyBundler(bundler_url, ep_address)
     paymaster = AlchemyPaymaster(paymaster_url, ep_address, policy_id)
 
     # ── Contracts ──
-    usdc = w3.eth.contract(address=Web3.to_checksum_address(USDC_SEPOLIA), abi=USDC_ABI)
+    usdc = w3.eth.contract(address=Web3.to_checksum_address(USDC_ADDRESS), abi=USDC_ABI)
     ep = w3.eth.contract(address=Web3.to_checksum_address(ep_address), abi=EP_ABI)
 
     logger.info("=" * 56)
@@ -175,8 +168,8 @@ async def main() -> None:
 
         call_data = erc7821_batch(
             [
-                erc20_transfer(USDC_SEPOLIA, sponsor.address, USDC_PART1),
-                erc20_transfer(USDC_SEPOLIA, sponsor.address, USDC_PART2),
+                erc20_transfer(USDC_ADDRESS, sponsor.address, USDC_PART1),
+                erc20_transfer(USDC_ADDRESS, sponsor.address, USDC_PART2),
             ]
         )
         logger.info("  callData: %d bytes", len(call_data))

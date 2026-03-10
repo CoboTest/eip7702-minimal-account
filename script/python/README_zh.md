@@ -136,7 +136,7 @@ paymaster = PimlicoPaymaster(url, entry_point)
 [1]  部署 MinimalAccount（Deployer）
 [2]  Sponsor 向 Alice 转 1 USDC（Sponsor）
 [3a] Alice 签署 EIP-7702 delegation（链下）
-[3b] 构建 UserOp + 请求 Pimlico 赞助
+[3b] 构建 UserOp + 请求 provider 赞助
 [4]  Alice 签署 UserOp（链下，0 gas）
 [5]  通过 Pimlico bundler 提交 UserOp（附带 eip7702Auth）
 [6a] 从 bundler 获取回执
@@ -185,7 +185,7 @@ Alice 链下签署委托授权。与 UserOp 内容无关，仅依赖（`chainId`
 - **签名：** 原始 ECDSA →（`yParity`、`r`、`s`）授权元组
 - **产出：** `eip7702Auth` JSON 对象，用于 bundler API
 
-### [3b] 构建 UserOp + 请求 Pimlico 赞助
+### [3b] 构建 UserOp + 请求 provider 赞助
 
 1. **构建 `callData`** — 编码 ERC-7821 `execute(BATCH_MODE, encodedBatch)`，包含两笔 USDC 转账（0.6 + 0.4）转回 Sponsor
 2. **组装 UserOp** — unpacked 格式：`sender`、`nonce`、`callData`、gas 字段（暂为零）、dummy `signature`，加上 `eip7702Auth`

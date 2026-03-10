@@ -138,7 +138,7 @@ All I/O operations (RPC calls, bundler API) use `async/await` with `aiohttp` and
 [1]  Deploy MinimalAccount (Deployer)
 [2]  Sponsor transfers 1 USDC to Alice (Sponsor)
 [3a] Alice signs EIP-7702 delegation (off-chain)
-[3b] Build UserOp + request Pimlico sponsorship
+[3b] Build UserOp + request provider sponsorship
 [4]  Alice signs UserOp (off-chain, 0 gas)
 [5]  Submit UserOp via Pimlico bundler (with eip7702Auth)
 [6a] Wait for receipt from bundler
@@ -187,7 +187,7 @@ Alice signs the delegation authorization off-chain. This is independent of UserO
 - **Sign:** raw ECDSA → (`yParity`, `r`, `s`) authorization tuple
 - **Result:** `eip7702Auth` JSON object for bundler API
 
-### [3b] Build UserOp + Request Pimlico Sponsorship
+### [3b] Build UserOp + Request Provider Sponsorship
 
 1. **Build `callData`** — Encode ERC-7821 `execute(BATCH_MODE, encodedBatch)` with two USDC transfers (0.6 + 0.4) back to Sponsor
 2. **Assemble UserOp** — Unpacked format: `sender`, `nonce`, `callData`, gas fields (zeros for now), dummy `signature`, plus `eip7702Auth`

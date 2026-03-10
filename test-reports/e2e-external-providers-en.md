@@ -116,6 +116,28 @@ Current code now aligns behavior for all providers:
 - apply sponsor gas/paymaster fields
 - apply sponsor fee overrides when present
 
+## Provider extra context (supported chains / infra notes)
+
+> These are directly traceable to official docs and useful for chain expansion decisions.
+
+### Pimlico
+
+- Public endpoint uses `/{chain_id}/rpc`; docs explicitly show replacing `chain_id` (examples include 1 and 137) and list supported ERC-4337 methods.
+- Source:
+  - <https://docs.pimlico.io/references/bundler/public-endpoint>
+
+### Alchemy
+
+- Official “Supported Chains” page lists bundler + gas sponsorship support and documents endpoint construction via `NETWORK_IDENTIFIER`.
+- Source:
+  - <https://www.alchemy.com/docs/wallets/supported-chains>
+
+### ZeroDev
+
+- Official docs state support for both ERC-4337 and EIP-7702; intro also states deployment scale across 50+ networks. RPC endpoints are provided via dashboard.
+- Source:
+  - <https://docs.zerodev.app/meta-infra/rpcs>
+
 ## Repro
 
 ```bash

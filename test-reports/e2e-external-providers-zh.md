@@ -151,7 +151,29 @@ ZeroDev sponsor 返回（完整字段）：
 
 ---
 
-## 5) 复现命令
+## 5) Provider 扩展信息（支持链 / 生态能力）
+
+> 说明：以下是官方文档中可核验的信息，便于后续扩链或选型。
+
+### Pimlico
+
+- 官方公共 endpoint 采用 `/{chain_id}/rpc` 路径，文档明确可替换 `chain_id`（示例给出 1/137），并列出 ERC-4337 方法集。
+- 来源：
+  - <https://docs.pimlico.io/references/bundler/public-endpoint>
+
+### Alchemy
+
+- 官方给出“Supported Chains”页面，明确 bundler + gas sponsorship 支持链列表，并说明 endpoint 由 `NETWORK_IDENTIFIER` 组成。
+- 来源：
+  - <https://www.alchemy.com/docs/wallets/supported-chains>
+
+### ZeroDev
+
+- 官方文档说明支持 ERC-4337 + EIP-7702，并在介绍中给出“50+ networks”能力描述；RPC 通过 dashboard 下发。
+- 来源：
+  - <https://docs.zerodev.app/meta-infra/rpcs>
+
+## 6) 复现命令
 
 ```bash
 cd script/python

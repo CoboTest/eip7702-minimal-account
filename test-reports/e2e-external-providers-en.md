@@ -51,7 +51,7 @@
 
 - Pimlico: `pm_sponsorUserOperation`
 - Alchemy: `alchemy_requestGasAndPaymasterAndData`
-- ZeroDev: `zd_sponsorUserOperation` (validated on this endpoint)
+- ZeroDev: `zd_sponsorUserOperation`
 
 ### Full paymaster sponsor responses (captured)
 

@@ -14,9 +14,9 @@ import os
 BLOCK_PROPAGATION_DELAY = 5  # seconds
 
 # ── Test parameters ──
-USDC_AMOUNT = 1_000_000  # 1 USDC (6 decimals)
-USDC_PART1 = 600_000  # 0.6 USDC
-USDC_PART2 = 400_000  # 0.4 USDC
+USDC_AMOUNT = 10_000  # 0.01 USDC (6 decimals)
+USDC_PART1 = 6_000  # 0.006 USDC
+USDC_PART2 = 4_000  # 0.004 USDC
 
 # ── Chain ──
 CHAIN_ID = int(os.getenv("CHAIN_ID", "11155111"))

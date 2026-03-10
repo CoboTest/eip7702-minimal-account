@@ -138,7 +138,7 @@ paymaster = PimlicoPaymaster(url, entry_point)
 [3a] Alice 签署 EIP-7702 delegation（链下）
 [3b] 构建 UserOp + 请求 provider 赞助
 [4]  Alice 签署 UserOp（链下，0 gas）
-[5]  通过 Pimlico bundler 提交 UserOp（附带 eip7702Auth）
+[5]  通过 provider bundler 提交 UserOp（附带 eip7702Auth）
 [6a] 从 bundler 获取回执
 [6b] 验证链上状态
 ```
@@ -160,7 +160,7 @@ sequenceDiagram
     participant A as Alice
     participant RPC as Sepolia RPC
     participant PM as Pimlico Paymaster
-    participant B as Pimlico Bundler
+    participant B as Provider Bundler
 
     A->>A: [3a] 签署 EIP-7702 delegation
     A->>PM: [3b] 请求 sponsorship（provider-specific RPC）
@@ -201,10 +201,10 @@ Alice 链下签署委托授权。与 UserOp 内容无关，仅依赖（`chainId`
 2. **计算 `userOpHash`**（v0.7 packed keccak）— `packHash = keccak256(abi.encode(sender, nonce, keccak(initCode), keccak(callData), accountGasLimits, preVerGas, gasFees, keccak(paymasterAndData)))`，然后 `userOpHash = keccak256(abi.encode(packHash, entryPoint, chainId))`
 3. **Alice 签名** 32 字节 `userOpHash`，使用 EIP-191 前缀（`toEthSignedMessageHash`）→ 65 字节签名 `r(32) + s(32) + v(1)`
 
-### [5] 通过 Pimlico Bundler 提交
+### [5] 通过 Provider Bundler 提交
 
 1. **附加 `signature`** 到 UserOp，替换 dummy 签名
-2. **调用 `eth_sendUserOperation`**，携带完整 UserOp + `eip7702Auth` — Pimlico bundler 将其包装为 type 4（EIP-7702）交易，在 `authorizationList` 中携带 Alice 的 delegation
+2. **调用 `eth_sendUserOperation`**，携带完整 UserOp + `eip7702Auth` — provider bundler 将其包装为 type 4（EIP-7702）交易，在 `authorizationList` 中携带 Alice 的 delegation
 3. **原子执行** — EVM 先处理 `authorizationList`（设置 `Alice.code = 0xef0100 || implAddress`），再执行 `handleOps`：EntryPoint → Alice 委托的 MinimalAccount 逻辑 → USDC 批量转账
 
 ### [6a] 等待回执

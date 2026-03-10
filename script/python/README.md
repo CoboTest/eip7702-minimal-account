@@ -140,7 +140,7 @@ All I/O operations (RPC calls, bundler API) use `async/await` with `aiohttp` and
 [3a] Alice signs EIP-7702 delegation (off-chain)
 [3b] Build UserOp + request provider sponsorship
 [4]  Alice signs UserOp (off-chain, 0 gas)
-[5]  Submit UserOp via Pimlico bundler (with eip7702Auth)
+[5]  Submit UserOp via provider bundler (with eip7702Auth)
 [6a] Wait for receipt from bundler
 [6b] Verify on-chain state
 ```
@@ -162,7 +162,7 @@ sequenceDiagram
     participant A as Alice
     participant RPC as Sepolia RPC
     participant PM as Pimlico Paymaster
-    participant B as Pimlico Bundler
+    participant B as Provider Bundler
 
     A->>A: [3a] sign EIP-7702 delegation
     A->>PM: [3b] request sponsorship (provider-specific RPC)
@@ -203,7 +203,7 @@ Alice signs the delegation authorization off-chain. This is independent of UserO
 2. **Compute `userOpHash`** (v0.7 packed keccak) — `packHash = keccak256(abi.encode(sender, nonce, keccak(initCode), keccak(callData), accountGasLimits, preVerGas, gasFees, keccak(paymasterAndData)))`, then `userOpHash = keccak256(abi.encode(packHash, entryPoint, chainId))`
 3. **Alice signs** the 32-byte `userOpHash` with EIP-191 prefix (`toEthSignedMessageHash`) → 65-byte signature `r(32) + s(32) + v(1)`
 
-### [5] Submit via Pimlico Bundler
+### [5] Submit via Provider Bundler
 
 1. **Attach `signature`** to UserOp, replacing the dummy
 2. **Call `eth_sendUserOperation`** with the complete UserOp + `eip7702Auth` — Pimlico's bundler wraps it in a type 4 (EIP-7702) transaction carrying Alice's delegation in `authorizationList`
@@ -211,7 +211,7 @@ Alice signs the delegation authorization off-chain. This is independent of UserO
 
 ### [6a] Wait for Receipt
 
-- **Poll `eth_getUserOperationReceipt(userOpHash)`** from Pimlico Bundler every 3s (up to 120s timeout)
+- **Poll `eth_getUserOperationReceipt(userOpHash)`** from provider bundler every 3s (up to 120s timeout)
 - **Returns:** `transactionHash`, `blockNumber`, `success`
 
 ### [6b] Verify On-Chain State

@@ -100,7 +100,7 @@ async def main() -> None:
         assert executor_address is not None
         await asyncio.sleep(BLOCK_PROPAGATION_DELAY)
 
-        logger.info("[2] Sponsor transfers 1 USDC to Alice...")
+        logger.info("[2] Sponsor transfers %s USDC to Alice...", f"{USDC_AMOUNT / 1_000_000:g}")
         transfer_dict = await usdc.functions.transfer(
             Web3.to_checksum_address(alice.address), USDC_AMOUNT
         ).build_transaction(

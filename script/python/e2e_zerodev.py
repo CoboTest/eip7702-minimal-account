@@ -106,7 +106,7 @@ async def main() -> None:
         await asyncio.sleep(BLOCK_PROPAGATION_DELAY)
         logger.info("")
 
-        logger.info("[2] Sponsor transfers %d USDC to Alice...", USDC_AMOUNT // 1_000_000)
+        logger.info("[2] Sponsor transfers %s USDC to Alice...", f"{USDC_AMOUNT / 1_000_000:g}")
         transfer_dict = await usdc.functions.transfer(
             Web3.to_checksum_address(alice.address), USDC_AMOUNT
         ).build_transaction(

@@ -43,25 +43,18 @@ ruff format .
 
 ## Environment Variables
 
-Create a `.env` file in the **project root directory** (same level as `foundry.toml`). See [`.env.example`](../../.env.example) for a template:
+Use [`.env.example`](../../.env.example) as the single source of truth:
 
-```env
-RPC_URL=https://eth-sepolia.g.alchemy.com/v2/<your-key>
-DEPLOYER_PRIVATE_KEY=0x...
-SPONSOR_PRIVATE_KEY=0x...
-PIMLICO_API_KEY=pim_...
-ALCHEMY_API_KEY=...
-ALCHEMY_GAS_POLICY_ID=...
+```bash
+cp ../../.env.example ../../.env
 ```
 
-| Variable               | Description                         |
-| ---------------------- | ----------------------------------- |
-| `RPC_URL`              | Ethereum Sepolia RPC endpoint       |
-| `DEPLOYER_PRIVATE_KEY` | Deploys MinimalAccount contract     |
-| `SPONSOR_PRIVATE_KEY`  | Transfers USDC to Alice             |
-| `PIMLICO_API_KEY`      | Pimlico bundler + paymaster API key |
-| `ALCHEMY_API_KEY`      | Alchemy API key (bundler/paymaster) |
-| `ALCHEMY_GAS_POLICY_ID`| Alchemy Gas Manager policy id |
+Required by provider:
+
+- Shared: `RPC_URL`, `DEPLOYER_PRIVATE_KEY`, `SPONSOR_PRIVATE_KEY`
+- Pimlico: `PIMLICO_API_KEY`
+- Alchemy: `ALCHEMY_API_KEY`, `ALCHEMY_GAS_POLICY_ID`
+
 
 ## Architecture
 

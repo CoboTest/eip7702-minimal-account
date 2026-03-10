@@ -204,15 +204,17 @@ forge script script/E2EDirect.s.sol \
 
 ## Environment Variables
 
-| Variable               | Used By                           | Description                               |
-| ---------------------- | --------------------------------- | ----------------------------------------- |
-| `DEPLOYER_PRIVATE_KEY` | All                               | Deploys MinimalAccount                    |
-| `SPONSOR_PRIVATE_KEY`  | E2E4337, E2EPaymaster, E2EPimlico | Funds Alice (ETH deposit / USDC transfer) |
-| `BUNDLER_PRIVATE_KEY`  | E2E4337, E2EPaymaster             | Submits handleOps tx                      |
-| `PIMLICO_API_KEY`      | E2EPimlico                        | Pimlico bundler + paymaster API key       |
-| `ALCHEMY_API_KEY`      | Python e2e_alchemy                | Alchemy API key                           |
-| `ALCHEMY_GAS_POLICY_ID`| Python e2e_alchemy                | Alchemy Gas Manager policy id (UUID)      |
-| `RPC_URL`              | All                               | Sepolia RPC endpoint                      |
+Use **`.env.example`** as the single source of truth for env format and ordering:
+
+- File: `.env.example`
+- Copy: `cp .env.example .env`
+
+Required by scenario:
+
+- Core: `RPC_URL`, `DEPLOYER_PRIVATE_KEY`, `SPONSOR_PRIVATE_KEY`
+- Self-bundled scripts: `BUNDLER_PRIVATE_KEY`
+- Pimlico flow: `PIMLICO_API_KEY`
+- Python Alchemy flow: `ALCHEMY_API_KEY`, `ALCHEMY_GAS_POLICY_ID`
 
 > Alice's key is generated via `vm.randomUint()` — fresh random keypair each run, no env var needed.
 

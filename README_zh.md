@@ -204,15 +204,17 @@ forge script script/E2EDirect.s.sol \
 
 ## 环境变量
 
-| 变量                   | 使用场景                          | 说明                                      |
-| ---------------------- | --------------------------------- | ----------------------------------------- |
-| `DEPLOYER_PRIVATE_KEY` | 所有脚本                          | 部署 MinimalAccount                       |
-| `SPONSOR_PRIVATE_KEY`  | E2E4337, E2EPaymaster, E2EPimlico | 为 Alice 提供资金（ETH 存款 / USDC 转账） |
-| `BUNDLER_PRIVATE_KEY`  | E2E4337, E2EPaymaster             | 提交 handleOps 交易                       |
-| `PIMLICO_API_KEY`      | E2EPimlico                        | Pimlico bundler + paymaster API key       |
-| `ALCHEMY_API_KEY`      | Python e2e_alchemy                | Alchemy API key                           |
-| `ALCHEMY_GAS_POLICY_ID`| Python e2e_alchemy                | Alchemy Gas Manager policy id（UUID）      |
-| `RPC_URL`              | 所有脚本                          | Sepolia RPC 端点                          |
+环境变量格式与顺序以 **`.env.example`** 为唯一来源：
+
+- 文件：`.env.example`
+- 复制：`cp .env.example .env`
+
+按场景需要：
+
+- 核心：`RPC_URL`、`DEPLOYER_PRIVATE_KEY`、`SPONSOR_PRIVATE_KEY`
+- 自建 bundler 脚本：`BUNDLER_PRIVATE_KEY`
+- Pimlico 流程：`PIMLICO_API_KEY`
+- Python Alchemy 流程：`ALCHEMY_API_KEY`、`ALCHEMY_GAS_POLICY_ID`
 
 > Alice 的密钥通过 `vm.randomUint()` 生成 — 每次运行全新随机密钥对，无需环境变量。
 

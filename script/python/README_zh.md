@@ -43,23 +43,18 @@ ruff format .
 
 ## 环境变量
 
-在**项目根目录**（与 `foundry.toml` 同级）创建 `.env` 文件。参考 [`.env.example`](../../.env.example) 模板：
+以 [`.env.example`](../../.env.example) 作为唯一来源：
 
-```env
-RPC_URL=https://eth-sepolia.g.alchemy.com/v2/<your-key>
-DEPLOYER_PRIVATE_KEY=0x...
-SPONSOR_PRIVATE_KEY=0x...
-PIMLICO_API_KEY=pim_...
-ALCHEMY_API_KEY=...
-ALCHEMY_GAS_POLICY_ID=...
+```bash
+cp ../../.env.example ../../.env
 ```
 
-| 变量                   | 说明                                 |
-| ---------------------- | ------------------------------------ |
-| `RPC_URL`              | Ethereum Sepolia RPC 端点            |
-| `DEPLOYER_PRIVATE_KEY` | 部署 MinimalAccount 合约             |
-| `SPONSOR_PRIVATE_KEY`  | 向 Alice 转 USDC                     |
-| `PIMLICO_API_KEY`      | Pimlico bundler + paymaster API 密钥 |
+按 provider 需要：
+
+- 共享：`RPC_URL`、`DEPLOYER_PRIVATE_KEY`、`SPONSOR_PRIVATE_KEY`
+- Pimlico：`PIMLICO_API_KEY`
+- Alchemy：`ALCHEMY_API_KEY`、`ALCHEMY_GAS_POLICY_ID`
+
 
 ## 架构
 

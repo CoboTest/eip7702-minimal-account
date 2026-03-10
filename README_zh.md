@@ -201,6 +201,8 @@ forge script script/E2EDirect.s.sol \
 | `SPONSOR_PRIVATE_KEY`  | E2E4337, E2EPaymaster, E2EPimlico | 为 Alice 提供资金（ETH 存款 / USDC 转账） |
 | `BUNDLER_PRIVATE_KEY`  | E2E4337, E2EPaymaster             | 提交 handleOps 交易                       |
 | `PIMLICO_API_KEY`      | E2EPimlico                        | Pimlico bundler + paymaster API key       |
+| `ALCHEMY_API_KEY`      | Python e2e_alchemy                | Alchemy API key                           |
+| `ALCHEMY_GAS_POLICY_ID`| Python e2e_alchemy                | Alchemy Gas Manager policy id（UUID）      |
 | `RPC_URL`              | 所有脚本                          | Sepolia RPC 端点                          |
 
 > Alice 的密钥通过 `vm.randomUint()` 生成 — 每次运行全新随机密钥对，无需环境变量。

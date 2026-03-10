@@ -170,6 +170,15 @@ source .env  # DEPLOYER_PRIVATE_KEY, SPONSOR_PRIVATE_KEY, PIMLICO_API_KEY, RPC_U
 bash script/E2EPimlico.sh
 ```
 
+Python variant (provider abstraction in `script/python/`):
+
+```bash
+cd script/python
+uv run e2e_pimlico.py
+# or Alchemy
+uv run e2e_alchemy.py
+```
+
 #### E2E #4: Direct Execution Flow (`E2EDirect.s.sol`)
 
 Two actors — Deployer sets up delegation, Alice executes directly:

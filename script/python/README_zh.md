@@ -168,8 +168,8 @@ sequenceDiagram
     participant B as Pimlico Bundler
 
     A->>A: [3a] 签署 EIP-7702 delegation
-    A->>PM: [3b] pm_sponsorUserOperation(userOp + eip7702Auth)
-    PM-->>A: paymaster + paymasterData + gas limits
+    A->>PM: [3b] 请求 sponsorship（provider-specific RPC）
+    PM-->>A: paymaster + paymasterData + gas/fee limits
 
     A->>A: [4] 签署 userOpHash（EIP-191）
 
@@ -194,8 +194,11 @@ Alice 链下签署委托授权。与 UserOp 内容无关，仅依赖（`chainId`
 
 1. **构建 `callData`** — 编码 ERC-7821 `execute(BATCH_MODE, encodedBatch)`，包含两笔 USDC 转账（0.6 + 0.4）转回 Sponsor
 2. **组装 UserOp** — unpacked 格式：`sender`、`nonce`、`callData`、gas 字段（暂为零）、dummy `signature`，加上 `eip7702Auth`
-3. **调用 `pm_sponsorUserOperation`** — Pimlico 模拟后返回：`paymaster` 地址、`paymasterData`（签名）、gas 限制（`verificationGasLimit` / `callGasLimit` / `preVerificationGas` / `paymasterVerificationGasLimit` / `paymasterPostOpGasLimit`）
-4. **合并赞助字段**到 UserOp — Pimlico 的 gas 限制和 paymaster 数据替换零值占位符
+3. **调用 sponsorship RPC** — provider 模拟并返回赞助字段：
+   - Pimlico: `pm_sponsorUserOperation`
+   - Alchemy: `alchemy_requestGasAndPaymasterAndData`
+   返回内容包括 `paymaster`、`paymasterData`、gas 限制（`verificationGasLimit` / `callGasLimit` / `preVerificationGas` / `paymasterVerificationGasLimit` / `paymasterPostOpGasLimit`），以及可能返回 fee 覆盖（`maxFeePerGas` / `maxPriorityFeePerGas`）。
+4. **合并赞助字段**到 UserOp — 应用 paymaster/gas 字段；若 provider 返回 fee 覆盖，也一并应用，保证最终签名 UserOp 与 paymaster 授权上下文一致
 
 ### [4] Alice 签署 UserOp
 

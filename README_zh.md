@@ -170,6 +170,15 @@ source .env  # DEPLOYER_PRIVATE_KEY, SPONSOR_PRIVATE_KEY, PIMLICO_API_KEY, RPC_U
 bash script/E2EPimlico.sh
 ```
 
+Python 版本（`script/python/` provider 抽象）：
+
+```bash
+cd script/python
+uv run e2e_pimlico.py
+# 或 Alchemy
+uv run e2e_alchemy.py
+```
+
 #### E2E #4: 直接执行流程（`E2EDirect.s.sol`）
 
 两个参与者 — Deployer 设置 delegation，Alice 直接执行：

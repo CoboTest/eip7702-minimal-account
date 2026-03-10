@@ -172,8 +172,8 @@ sequenceDiagram
     participant B as Pimlico Bundler
 
     A->>A: [3a] sign EIP-7702 delegation
-    A->>PM: [3b] pm_sponsorUserOperation(userOp + eip7702Auth)
-    PM-->>A: paymaster + paymasterData + gas limits
+    A->>PM: [3b] request sponsorship (provider-specific RPC)
+    PM-->>A: paymaster + paymasterData + gas/fee limits
 
     A->>A: [4] sign userOpHash (EIP-191)
 
@@ -198,8 +198,11 @@ Alice signs the delegation authorization off-chain. This is independent of UserO
 
 1. **Build `callData`** — Encode ERC-7821 `execute(BATCH_MODE, encodedBatch)` with two USDC transfers (0.6 + 0.4) back to Sponsor
 2. **Assemble UserOp** — Unpacked format: `sender`, `nonce`, `callData`, gas fields (zeros for now), dummy `signature`, plus `eip7702Auth`
-3. **Call `pm_sponsorUserOperation`** — Pimlico simulates and returns: `paymaster` address, `paymasterData` (signature), gas limits (`verificationGasLimit` / `callGasLimit` / `preVerificationGas` / `paymasterVerificationGasLimit` / `paymasterPostOpGasLimit`)
-4. **Merge sponsored fields** into UserOp — Pimlico's gas limits and paymaster data replace the zero placeholders
+3. **Call sponsorship RPC** — provider simulates and returns sponsorship fields:
+   - Pimlico: `pm_sponsorUserOperation`
+   - Alchemy: `alchemy_requestGasAndPaymasterAndData`
+   Returned fields include `paymaster`, `paymasterData`, gas limits (`verificationGasLimit` / `callGasLimit` / `preVerificationGas` / `paymasterVerificationGasLimit` / `paymasterPostOpGasLimit`), and may include fee overrides (`maxFeePerGas` / `maxPriorityFeePerGas`).
+4. **Merge sponsored fields** into UserOp — apply paymaster/gas fields and, when returned, fee overrides to keep final signed UserOp consistent with paymaster authorization context
 
 ### [4] Alice Signs UserOp
 

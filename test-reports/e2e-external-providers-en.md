@@ -150,7 +150,9 @@ Legend:
 Provider evidence links (with reproducible data artifact):
 - Pimlico chain list is extracted and versioned by script: `script/python/tools/extract_pimlico_supported_chains.py` -> `test-reports/data/pimlico-supported-chains.json`
 
-- Pimlico (explicit chain wording in EIP-7702 FAQ): <https://docs.pimlico.io/guides/eip7702/faqs>
+- Pimlico (primary chain coverage source: Supported Chains; EIP-7702 semantics supplement: FAQ):
+  - <https://docs.pimlico.io/guides/supported-chains>
+  - <https://docs.pimlico.io/guides/eip7702/faqs>
 - Alchemy (EIP-7702 default mode + Supported Chains list; chain table extracted and versioned):
   - <https://www.alchemy.com/docs/wallets/transactions/using-eip-7702>
   - <https://www.alchemy.com/docs/wallets/supported-chains>

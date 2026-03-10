@@ -37,9 +37,9 @@ class ZeroDevBundler(ZeroDevJsonRpcMixin, Bundler):
                 max_fee = max(gas_price + priority, priority * 2)
             except Exception:
                 # Some endpoints disable priority-fee methods. Use a safer fallback.
-                # Keep maxFee sufficiently above base gas price to avoid immediate rejection.
-                priority = gas_price * 2
-                max_fee = gas_price * 4
+                # Keep fees aggressively above base gas price to avoid immediate rejection.
+                priority = max(gas_price * 10, 8_000_000)
+                max_fee = max(gas_price * 20, priority * 2)
 
         return GasPrice(
             max_fee_per_gas=max_fee,

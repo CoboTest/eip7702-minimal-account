@@ -37,11 +37,18 @@ async def main() -> None:
     load_dotenv(script_dir.parent.parent / ".env")
 
     rpc_url = os.environ["RPC_URL"]
-    thirdweb_url = os.environ["THIRDWEB_BUNDLER_URL"]
-    # optional; fallback to bundler url
-    paymaster_url = os.environ.get("THIRDWEB_PAYMASTER_URL", thirdweb_url)
     client_id = os.environ.get("THIRDWEB_CLIENT_ID")
     secret_key = os.environ.get("THIRDWEB_SECRET_KEY")
+
+    # thirdweb default RPC format: https://1.rpc.thirdweb.com/<client_id>
+    # Allow explicit override via THIRDWEB_BUNDLER_URL.
+    thirdweb_url = os.environ.get("THIRDWEB_BUNDLER_URL")
+    if not thirdweb_url:
+        assert client_id, "Set THIRDWEB_BUNDLER_URL or THIRDWEB_CLIENT_ID"
+        thirdweb_url = f"https://1.rpc.thirdweb.com/{client_id}"
+
+    # optional; fallback to bundler url
+    paymaster_url = os.environ.get("THIRDWEB_PAYMASTER_URL", thirdweb_url)
 
     ep_address = EP_V07
 

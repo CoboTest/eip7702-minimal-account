@@ -23,6 +23,18 @@ class ZeroDevBundler(ZeroDevJsonRpcMixin, Bundler):
         self._session = None
 
     async def get_gas_price(self) -> GasPrice:
+        # Some ZeroDev deployments proxy Pimlico-compatible pricing.
+        try:
+            quoted = await self._rpc("pimlico_getUserOperationGasPrice", [])
+            fast = quoted.get("fast") or quoted.get("standard") or quoted.get("slow")
+            if fast:
+                return GasPrice(
+                    max_fee_per_gas=int(fast["maxFeePerGas"], 16),
+                    max_priority_fee_per_gas=int(fast["maxPriorityFeePerGas"], 16),
+                )
+        except Exception:
+            pass
+
         gas_price_hex = await self._rpc("eth_gasPrice", [])
         gas_price = int(gas_price_hex, 16)
 
@@ -36,10 +48,9 @@ class ZeroDevBundler(ZeroDevJsonRpcMixin, Bundler):
                 priority = int(priority_hex, 16)
                 max_fee = max(gas_price + priority, priority * 2)
             except Exception:
-                # Some endpoints disable priority-fee methods. Use a safer fallback.
-                # Keep fees aggressively above base gas price to avoid immediate rejection.
-                priority = max(gas_price * 10, 8_000_000)
-                max_fee = max(gas_price * 20, priority * 2)
+                # Conservative fallback for endpoints without fee helpers.
+                priority = max(gas_price * 100, 100_000_000)
+                max_fee = max(gas_price * 200, priority * 2)
 
         return GasPrice(
             max_fee_per_gas=max_fee,

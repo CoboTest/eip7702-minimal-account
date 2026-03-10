@@ -27,8 +27,6 @@
 
 | 步骤 | 交易 | 区块 |
 |---|---|---|
-| Deploy MinimalAccount | <https://sepolia.etherscan.io/tx/0xad56bbbc442c2a65e4544917e9d8d4e4659fef9e91390ef4fa176b34622d6e16> | `0x9ef8d2` |
-| Sponsor → Alice (1 USDC) | <https://sepolia.etherscan.io/tx/0x88a4778729c6a07b2a88e40e4289b0f9bc0abbc446277c060e1c4e77bcb928f8> | `0x9ef8d3` |
 | UserOp on-chain tx | <https://sepolia.etherscan.io/tx/0x19d955ede3fe76720d964d06ac20f0ed3509279b6ab8a9e965b7e61608ecc703> | `0x9ef8d4` |
 
 ### B. Pimlico（Bundler + Sponsored Paymaster）
@@ -38,8 +36,6 @@
 
 | 步骤 | 交易 | 区块 |
 |---|---|---|
-| Deploy MinimalAccount | <https://sepolia.etherscan.io/tx/0x45a588c4f4df8c4afbcf70a5068c08d0363618dcbfc65011072f1c9724294f42> | `0x9ef8df` |
-| Sponsor → Alice (1 USDC) | <https://sepolia.etherscan.io/tx/0x9bb91afd02d2aaa8b9d65b3e73cc56e98b2365bf4638dbcd8ff400447332b369> | `0x9ef8e0` |
 | UserOp on-chain tx | <https://sepolia.etherscan.io/tx/0xc44e17cd76b960a899b0345f42debc1faad59671898c729a2292627b7477402c> | `0x9ef8e1` |
 
 ---
